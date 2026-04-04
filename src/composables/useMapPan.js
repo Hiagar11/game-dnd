@@ -5,6 +5,13 @@
 
 import { ref, onMounted, onUnmounted } from 'vue'
 
+// module-level ref — доступен любому импортёру без вызова composable.
+// Хранит факт: было ли реальное перемещение во время последнего правого клика.
+// Сбрасывается в false при каждом новом mousedown, устанавливается в true
+// при первом же mousemove во время drag. Благодаря этому contextmenu-обработчики
+// в других компонентах могут проверить, был ли это клик или перетаскивание.
+export const wasDragged = ref(false)
+
 export function useMapPan(viewRef, canvasRef) {
   // ref() — реактивные переменные: при их изменении Vue обновит шаблон.
   // Смещение карты относительно начального положения.
@@ -21,6 +28,10 @@ export function useMapPan(viewRef, canvasRef) {
     if (e.button !== 2) return
 
     isDragging = true
+    // Сбрасываем флаг перетаскивания при каждом новом нажатии.
+    // Это важно: без сброса после первого drag все последующие правые клики
+    // будут считаться перетаскиванием даже без движения.
+    wasDragged.value = false
     // Запоминаем точку захвата с учётом текущего смещения карты,
     // чтобы карта не "прыгала" в начало при каждом новом захвате.
     startX = e.clientX - offsetX.value
@@ -35,6 +46,9 @@ export function useMapPan(viewRef, canvasRef) {
 
   function onMouseMove(e) {
     if (!isDragging) return
+
+    // Фиксируем факт реального перемещения — курсор сдвинулся пока была зажата кнопка.
+    wasDragged.value = true
 
     const newX = e.clientX - startX
     const newY = e.clientY - startY

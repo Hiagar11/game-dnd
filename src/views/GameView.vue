@@ -15,7 +15,7 @@
       :style="{ transform: `translate(${offsetX}px, ${offsetY}px)` }"
       @mouseup="onMouseUp"
       @mousedown="onMouseDown"
-      @click="store.selectPlacedToken(null)"
+      @click="(store.selectPlacedToken(null), closeContextMenu())"
     >
       <!-- @ready — GameMap сообщает, что карта нарисована, и передаёт элемент canvas -->
       <GameMap map-src="/maps/images/picnic-day.webp" @ready="onMapReady" />
@@ -43,6 +43,7 @@
   import GameTokens from '../components/GameTokens.vue'
   import GameMenu from '../components/GameMenu.vue'
   import { useTokenDrop } from '../composables/useTokenDrop'
+  import { useTokenContextMenu } from '../composables/useTokenContextMenu'
 
   const viewRef = ref(null)
   const mapRef = ref(null)
@@ -58,6 +59,7 @@
   )
 
   const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
+  const { close: closeContextMenu } = useTokenContextMenu()
 
   const store = useGameStore()
 

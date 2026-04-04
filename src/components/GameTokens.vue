@@ -17,8 +17,17 @@
         width: `${store.cellSize}px`,
         height: `${store.cellSize}px`,
       }"
-      @click.stop="store.selectPlacedToken(placed.uid)"
+      @click.stop="(store.selectPlacedToken(placed.uid), closeContextMenu())"
+      @contextmenu.stop.prevent="onContextMenu(placed)"
     >
+      <!--
+        Меню рендерится ДО картинки в DOM, чтобы быть визуально за ней.
+        Дополнительно: img имеет z-index: 1, меню — z-index: 0.
+      -->
+      <GameTokenContextMenu
+        :visible="ctxState.uid === placed.uid && ctxState.visible"
+        @remove="handleRemove(placed.uid)"
+      />
       <img
         :src="getTokenDef(placed.tokenId)?.src"
         :alt="getTokenDef(placed.tokenId)?.name"
@@ -31,6 +40,9 @@
 
 <script setup>
   import { useGameStore } from '../stores/game'
+  import { useTokenContextMenu } from '../composables/useTokenContextMenu'
+  import { wasDragged } from '../composables/useMapPan'
+  import GameTokenContextMenu from './GameTokenContextMenu.vue'
 
   defineProps({
     width: { type: Number, required: true },
@@ -38,11 +50,37 @@
   })
 
   const store = useGameStore()
+  const { state: ctxState, open: openContextMenu, close: closeContextMenu } = useTokenContextMenu()
 
   // Находит определение токена (src, name) по tokenId.
   // Вынесено в функцию чтобы не дублировать в шаблоне дважды.
   function getTokenDef(tokenId) {
     return store.tokens.find((t) => t.id === tokenId)
+  }
+
+  // Правый клик: выбираем токен, открываем меню.
+  // Повторный правый клик по тому же токену закрывает меню (тоггл).
+  // Если перед этим было перетаскивание карты — игнорируем: contextmenu
+  // всегда стреляет после mouseup, даже если пользователь просто тащил карту.
+  function onContextMenu(placed) {
+    if (wasDragged.value) return
+
+    // selectPlacedToken имеет тоггл-логику: повторный вызов на уже выбранном
+    // токене снял бы выделение. Поэтому выбираем только если не выбран.
+    if (store.selectedPlacedUid !== placed.uid) {
+      store.selectPlacedToken(placed.uid)
+    }
+
+    if (ctxState.value.visible && ctxState.value.uid === placed.uid) {
+      closeContextMenu()
+    } else {
+      openContextMenu(placed.uid)
+    }
+  }
+
+  function handleRemove(uid) {
+    store.removeToken(uid)
+    closeContextMenu()
   }
 </script>
 
@@ -72,6 +110,13 @@
     height: 100%;
     object-fit: contain;
     border-radius: var(--radius-full);
+
+    /*
+      position: relative + z-index: 1 гарантируют, что картинка токена
+      всегда поверх контекстного меню (z-index: 0).
+    */
+    position: relative;
+    z-index: 1;
   }
 
   /*

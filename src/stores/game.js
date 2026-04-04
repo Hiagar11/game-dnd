@@ -88,6 +88,18 @@ export const useGameStore = defineStore('game', () => {
     })
   }
 
+  // Удаляет размещённый токен с карты по uid.
+  // Если он был выбран — сбрасывает выбор.
+  function removeToken(uid) {
+    const idx = placedTokens.value.findIndex((t) => t.uid === uid)
+    if (idx !== -1) {
+      placedTokens.value.splice(idx, 1)
+      if (selectedPlacedUid.value === uid) {
+        selectedPlacedUid.value = null
+      }
+    }
+  }
+
   // Перемещает уже размещённый токен в новую ячейку по его uid.
   function moveToken(uid, col, row) {
     const token = placedTokens.value.find((t) => t.uid === uid)
@@ -115,6 +127,7 @@ export const useGameStore = defineStore('game', () => {
     selectToken,
     selectPlacedToken,
     placeToken,
+    removeToken,
     moveToken,
   }
 })
