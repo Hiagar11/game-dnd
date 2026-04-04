@@ -1,11 +1,50 @@
 import { Router } from 'express'
+import multer from 'multer'
+import path from 'path'
+import fs from 'fs/promises'
+import { fileURLToPath } from 'url'
 import Scenario from '../models/Scenario.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
+
+// ─── Multer: загрузка изображений карты ──────────────────────────────────────
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const mapUploadDir = path.join(__dirname, '..', 'uploads', 'maps')
+
+await fs.mkdir(mapUploadDir, { recursive: true })
+
+const mapStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, mapUploadDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+    const base = path.basename(file.originalname, ext).replace(/\s+/g, '_')
+    cb(null, `${Date.now()}-${base}${ext}`)
+  },
+})
+
+const mapUpload = multer({
+  storage: mapStorage,
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp']
+    cb(null, allowed.includes(file.mimetype))
+  },
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 МБ — карты бывают крупные
+})
 
 const router = Router()
 
 // Все роуты требуют авторизации
 router.use(requireAuth)
+
+// ─── POST /api/scenarios/upload-map ─────────────────────────────────────────
+// Загружает изображение карты на сервер. Возвращает путь и URL для превью.
+// Должен быть зарегистрирован ДО /:id, иначе Express перепутает 'upload-map' с id.
+router.post('/upload-map', requireAdmin, mapUpload.single('map'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Файл не выбран' })
+  // imagePath — относительный путь без ведущего /; используется при построении URL
+  const mapImagePath = `uploads/maps/${req.file.filename}`
+  const mapImageUrl = `${req.protocol}://${req.get('host')}/${mapImagePath}`
+  res.json({ mapImageUrl, mapImagePath })
+})
 
 // ─── POST /api/scenarios ──────────────────────────────────────────────────────
 // Создание нового сценария. Только для admin.
@@ -21,9 +60,9 @@ router.post('/', requireAdmin, async (req, res) => {
       owner: req.user.id,
       name: name.trim(),
       mapImagePath: mapImagePath || '',
-      cellSize: Number(cellSize) || 50,
+      cellSize: Number(cellSize) || 60,
     })
-    res.status(201).json(formatScenario(scenario))
+    res.status(201).json(formatScenario(scenario, req))
   } catch {
     res.status(500).json({ error: 'Ошибка сервера' })
   }
@@ -38,7 +77,7 @@ router.get('/', async (req, res) => {
       .select('name mapImagePath cellSize createdAt')
       .sort({ createdAt: -1 })
 
-    res.json(scenarios.map(formatScenario))
+    res.json(scenarios.map((s) => formatScenario(s, req)))
   } catch {
     res.status(500).json({ error: 'Ошибка сервера' })
   }
@@ -56,7 +95,7 @@ router.get('/:id', async (req, res) => {
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
 
     const isAdmin = req.user.role === 'admin'
-    res.json(formatScenario(scenario, { full: true, showHidden: isAdmin }))
+    res.json(formatScenario(scenario, req, { full: true, showHidden: isAdmin }))
   } catch {
     res.status(500).json({ error: 'Ошибка сервера' })
   }
@@ -75,7 +114,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (cellSize !== undefined) scenario.cellSize = Number(cellSize)
 
     await scenario.save()
-    res.json(formatScenario(scenario))
+    res.json(formatScenario(scenario, req))
   } catch {
     res.status(500).json({ error: 'Ошибка сервера' })
   }
@@ -94,11 +133,17 @@ router.delete('/:id', requireAdmin, async (req, res) => {
 })
 
 // ─── Хелпер: форматирование вывода ───────────────────────────────────────────
-function formatScenario(scenario, { full = false, showHidden = false } = {}) {
+// req нужен для построения абсолютного URL картинки карты (протокол + хост)
+function formatScenario(scenario, req, { full = false, showHidden = false } = {}) {
+  const mapImageUrl = scenario.mapImagePath
+    ? `${req.protocol}://${req.get('host')}/${scenario.mapImagePath}`
+    : null
+
   const base = {
     id: scenario._id,
     name: scenario.name,
     mapImagePath: scenario.mapImagePath,
+    mapImageUrl,
     cellSize: scenario.cellSize,
     createdAt: scenario.createdAt,
   }

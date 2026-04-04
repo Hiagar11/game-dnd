@@ -14,12 +14,16 @@ const routes = [
     path: '/',
     name: 'menu',
     component: () => import('../views/MenuView.vue'),
-    meta: { role: 'admin' },
   },
   {
     path: '/game',
     name: 'game',
     component: () => import('../views/GameView.vue'),
+  },
+  {
+    path: '/editor',
+    name: 'editor',
+    component: () => import('../views/ScenarioEditorView.vue'),
     meta: { role: 'admin' },
   },
 ]
@@ -39,7 +43,10 @@ router.beforeEach(async (to) => {
 
   const auth = useAuthStore()
 
-  if (!auth.isAuthenticated) {
+  // Если пользователь не загружен — восстанавливаем сессию.
+  // Это происходит при перезагрузке страницы: токен есть в storage,
+  // но user ещё null (store не помнит данные между перезагрузками).
+  if (!auth.user) {
     const ok = await auth.restoreSession()
     if (!ok) return { name: 'login' }
   }

@@ -18,14 +18,22 @@
 </template>
 
 <script setup>
+  import { computed } from 'vue'
   import { useSound } from '../composables/useSound'
+  import { useAuthStore } from '../stores/auth'
   import AppBackground from '../components/AppBackground.vue'
+
   const { playHover, playClick } = useSound()
-  const menuItems = [
-    { to: '/game', label: 'Играть' },
-    { to: '/settings', label: 'Настройки' },
-    { to: '/editor', label: 'Редактор' },
-  ]
+  const auth = useAuthStore()
+
+  // Игрок видит только «Играть». Мастер (admin) видит также «Редактор».
+  const menuItems = computed(() => {
+    const items = [{ to: '/game', label: 'Играть' }]
+    if (auth.role === 'admin') {
+      items.push({ to: '/editor', label: 'Редактор' })
+    }
+    return items
+  })
 </script>
 
 <style scoped>
