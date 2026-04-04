@@ -40,6 +40,12 @@ export const useGameStore = defineStore('game', () => {
   //   col/row — координаты ячейки на сетке
   const placedTokens = ref([])
 
+  // Выбранный размещённый токен на карте (uid или null).
+  // Отдельно от selectedToken в меню — это разные понятия:
+  //   selectedToken — фокус в панели меню (какой тип выбран)
+  //   selectedPlacedUid — какой конкретный экземпляр на карте выделен
+  const selectedPlacedUid = ref(null)
+
   // --- GETTERS ---
   // computed() — вычисляемое значение на основе state.
   // Пересчитывается автоматически при изменении зависимостей.
@@ -67,7 +73,10 @@ export const useGameStore = defineStore('game', () => {
       selectedToken.value?.id === id ? null : (tokens.value.find((t) => t.id === id) ?? null)
   }
 
-  // Размещает новый экземпляр токена на карте в указанной ячейке.
+  // Выбирает размещённый на карте токен по uid. Повторный клик — снимает выбор.
+  function selectPlacedToken(uid) {
+    selectedPlacedUid.value = selectedPlacedUid.value === uid ? null : uid
+  }
   // Один тип токена можно разместить несколько раз — каждый раз создаётся новый uid.
   // crypto.randomUUID() — встроенный в браузер генератор уникальных идентификаторов.
   function placeToken(tokenId, col, row) {
@@ -97,12 +106,14 @@ export const useGameStore = defineStore('game', () => {
     tokens,
     selectedToken,
     placedTokens,
+    selectedPlacedUid,
     // getters
     cellSizePx,
     // actions
     setCellSize,
     setColorGrid,
     selectToken,
+    selectPlacedToken,
     placeToken,
     moveToken,
   }

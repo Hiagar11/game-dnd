@@ -15,6 +15,7 @@
       :style="{ transform: `translate(${offsetX}px, ${offsetY}px)` }"
       @mouseup="onMouseUp"
       @mousedown="onMouseDown"
+      @click="store.selectPlacedToken(null)"
     >
       <!-- @ready — GameMap сообщает, что карта нарисована, и передаёт элемент canvas -->
       <GameMap map-src="/maps/images/picnic-day.webp" @ready="onMapReady" />
@@ -34,6 +35,7 @@
 <script setup>
   import { ref } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
+  import { useGameStore } from '../stores/game'
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
@@ -56,6 +58,8 @@
   )
 
   const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
+
+  const store = useGameStore()
 
   // Размеры карты — нужны GameGrid, чтобы знать площадь для отрисовки сетки
   const mapSize = ref({ width: 0, height: 0 })
