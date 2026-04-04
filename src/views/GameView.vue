@@ -11,6 +11,8 @@
     >
       <!-- @ready — GameMap сообщает, что карта нарисована, и передаёт элемент canvas -->
       <GameMap map-src="/maps/images/picnic-day.webp" @ready="onMapReady" />
+      <!-- Передаём размеры карты, чтобы GameGrid знал, насколько большой рисовать сетку -->
+      <GameGrid :width="mapSize.width" :height="mapSize.height" />
     </div>
   </div>
 </template>
@@ -20,6 +22,7 @@
   import { useMapPan } from '../composables/useMapPan'
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
+  import GameGrid from '../components/GameGrid.vue'
 
   const viewRef = ref(null)
   const mapRef = ref(null)
@@ -34,9 +37,13 @@
     canvasRef
   )
 
+  // Размеры карты — нужны GameGrid, чтобы знать площадь для отрисовки сетки
+  const mapSize = ref({ width: 0, height: 0 })
+
   // GameMap вызывает emit('ready', canvas) когда изображение нарисовано
   const onMapReady = (canvas) => {
     canvasRef.value = canvas
+    mapSize.value = { width: canvas.width, height: canvas.height }
 
     // Задаём контейнеру точные размеры, иначе position: absolute схлопнется до 0
     mapRef.value.style.width = `${canvas.width}px`
