@@ -154,6 +154,30 @@ export const useGameStore = defineStore('game', () => {
     return { id, name, src: imageUrl, ...stats }
   }
 
+  // ─── Загрузка расстановки из сохранённого сценария ───────────────────────
+  // serverTokens — массив { uid, tokenId, col, row } с сервера.
+  // Для каждого ищем шаблон в tokens, чтобы восстановить name/src/stats.
+  // Вызывается при входе в режим редактирования уровня.
+  function initPlacedTokens(serverTokens) {
+    placedTokens.value = serverTokens.map(({ uid, tokenId, col, row }) => {
+      const def = tokens.value.find((t) => t.id === String(tokenId))
+      return {
+        uid,
+        tokenId: String(tokenId),
+        col,
+        row,
+        name: def?.name ?? 'Неизвестный',
+        src: def?.src ?? '',
+        meleeDmg: def?.meleeDmg ?? 0,
+        rangedDmg: def?.rangedDmg ?? 0,
+        visionRange: def?.visionRange ?? 6,
+        defense: def?.defense ?? 0,
+        evasion: def?.evasion ?? 0,
+      }
+    })
+    selectedPlacedUid.value = null
+  }
+
   return {
     cellSize,
     colorGrid,
@@ -174,5 +198,6 @@ export const useGameStore = defineStore('game', () => {
     addToken,
     editToken,
     deleteToken,
+    initPlacedTokens,
   }
 })

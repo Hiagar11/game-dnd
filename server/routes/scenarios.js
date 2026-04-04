@@ -3,6 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
+import mongoose from 'mongoose'
 import Scenario from '../models/Scenario.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
 
@@ -49,32 +50,51 @@ router.post('/upload-map', requireAdmin, mapUpload.single('map'), (req, res) => 
 // ─── POST /api/scenarios ──────────────────────────────────────────────────────
 // Создание нового сценария. Только для admin.
 router.post('/', requireAdmin, async (req, res) => {
-  const { name, mapImagePath, cellSize } = req.body
+  const { name, mapImagePath, cellSize, placedTokens } = req.body
 
   if (!name?.trim()) {
-    return res.status(400).json({ error: 'Название сценария обязательно' })
+    return res.status(400).json({ error: 'Название обязательно' })
   }
 
   try {
+    // Уникальность имени в рамках сценариев этого админа
+    const exists = await Scenario.findOne({ owner: req.user.id, name: name.trim() })
+    if (exists) {
+      return res.status(409).json({ error: 'Сценарий с таким названием уже существует' })
+    }
+
+    const normalizedTokens = Array.isArray(placedTokens)
+      ? placedTokens.map(({ uid, tokenId, col, row, hidden = false }) => ({
+          uid: String(uid),
+          tokenId: new mongoose.Types.ObjectId(String(tokenId)),
+          col: Number(col),
+          row: Number(row),
+          hidden: Boolean(hidden),
+        }))
+      : []
+
     const scenario = await Scenario.create({
       owner: req.user.id,
       name: name.trim(),
       mapImagePath: mapImagePath || '',
       cellSize: Number(cellSize) || 60,
+      placedTokens: normalizedTokens,
     })
     res.status(201).json(formatScenario(scenario, req))
-  } catch {
-    res.status(500).json({ error: 'Ошибка сервера' })
+  } catch (err) {
+    console.error('[POST /api/scenarios]', err.message)
+    res.status(500).json({ error: err.message || 'Ошибка сервера' })
   }
 })
 
 // ─── GET /api/scenarios ───────────────────────────────────────────────────────
 // Список сценариев — admin видит свои, player видит все (чтобы подключиться).
+// В ответе возвращается tokensCount — количество расставленных токенов.
 router.get('/', async (req, res) => {
   try {
     const filter = req.user.role === 'admin' ? { owner: req.user.id } : {}
     const scenarios = await Scenario.find(filter)
-      .select('name mapImagePath cellSize createdAt')
+      .select('name mapImagePath cellSize placedTokens createdAt')
       .sort({ createdAt: -1 })
 
     res.json(scenarios.map((s) => formatScenario(s, req)))
@@ -105,7 +125,7 @@ router.get('/:id', async (req, res) => {
 // Обновление мета-данных сценария (имя, карта, размер клетки). Только admin.
 router.put('/:id', requireAdmin, async (req, res) => {
   try {
-    const scenario = await Scenario.findOne({ _id: req.params.id, owner: req.user.id })
+    const scenario = await Scenario.findById(req.params.id)
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
 
     const { name, mapImagePath, cellSize } = req.body
@@ -120,11 +140,44 @@ router.put('/:id', requireAdmin, async (req, res) => {
   }
 })
 
+// ─── PATCH /api/scenarios/:id/placed-tokens ───────────────────────────────────────
+// Сохраняет расстановку токенов и опционально обновляет имя сценария.
+// Роут защищён requireAdmin — дополнительная проверка владельца не нужна.
+router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
+  try {
+    const scenario = await Scenario.findById(req.params.id)
+    if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
+
+    const { placedTokens, name } = req.body
+    if (!Array.isArray(placedTokens)) {
+      return res.status(400).json({ error: 'placedTokens должен быть массивом' })
+    }
+
+    // Имя — опциональное, обновляем только если передано
+    if (name && typeof name === 'string' && name.trim()) {
+      scenario.name = name.trim()
+    }
+
+    scenario.placedTokens = placedTokens.map(({ uid, tokenId, col, row, hidden = false }) => ({
+      uid,
+      tokenId,
+      col,
+      row,
+      hidden,
+    }))
+
+    await scenario.save()
+    res.json({ ok: true, count: scenario.placedTokens.length, name: scenario.name })
+  } catch {
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+})
+
 // ─── DELETE /api/scenarios/:id ────────────────────────────────────────────────
-// Удаление сценария. Только admin-владелец.
+// Удаление сценария. Только admin.
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
-    const scenario = await Scenario.findOneAndDelete({ _id: req.params.id, owner: req.user.id })
+    const scenario = await Scenario.findByIdAndDelete(req.params.id)
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
     res.status(204).end()
   } catch {
@@ -145,6 +198,8 @@ function formatScenario(scenario, req, { full = false, showHidden = false } = {}
     mapImagePath: scenario.mapImagePath,
     mapImageUrl,
     cellSize: scenario.cellSize,
+    // Количество расставленных токенов — позволяет отличать «карту» (токенов = 0) от «уровня» (токены > 0)
+    tokensCount: scenario.placedTokens?.length ?? 0,
     createdAt: scenario.createdAt,
   }
 

@@ -56,6 +56,27 @@ export const useScenariosStore = defineStore('scenarios', () => {
     return api.post('/api/scenarios/upload-map', fd)
   }
 
+  // ─── Получение одного сценария с полными данными ───────────────────────────
+  // Возвращает сценарий со всеми полями, включая placedTokens.
+  async function fetchScenario(id) {
+    return api.get(`/api/scenarios/${id}`)
+  }
+
+  // ─── Сохранение расстановки токенов уровня ──────────────────────────────
+  // placedTokens — массив { uid, tokenId, col, row } из game store.
+  // name — опциональное новое имя сценария.
+  async function saveLevelTokens(id, placedTokens, name) {
+    const body = { placedTokens }
+    if (name) body.name = name
+    const result = await api.patch(`/api/scenarios/${id}/placed-tokens`, body)
+    // Обновляем имя в локальном списке, если сервер вернул новое
+    if (result.name) {
+      const idx = scenarios.value.findIndex((s) => String(s.id) === String(id))
+      if (idx !== -1) scenarios.value[idx] = { ...scenarios.value[idx], name: result.name }
+    }
+    return result
+  }
+
   return {
     scenarios,
     loading,
@@ -64,5 +85,7 @@ export const useScenariosStore = defineStore('scenarios', () => {
     updateScenario,
     deleteScenario,
     uploadMapImage,
+    fetchScenario,
+    saveLevelTokens,
   }
 })

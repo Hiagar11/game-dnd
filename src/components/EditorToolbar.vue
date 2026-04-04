@@ -1,6 +1,6 @@
 <template>
   <div class="editor-toolbar">
-    <router-link class="editor-toolbar__back" :to="{ name: 'menu' }">←</router-link>
+    <button class="editor-toolbar__back" @click="$emit('back')">←</button>
 
     <!-- Название сценария -->
     <input
@@ -87,6 +87,7 @@
     // Передаёт новый cellSize — родитель может сразу перерисовать холст.
     // Отдельное событие позволяет не зависеть от порядка обновления реактивности.
     'redraw',
+    'back',
     'change-map',
     'save',
     'delete',
@@ -119,9 +120,11 @@
     padding: var(--space-1) var(--space-3);
     border-radius: var(--radius-sm);
     border: 1px solid var(--color-border);
+    background: transparent;
     color: var(--color-text-muted);
-    text-decoration: none;
     font-size: 14px;
+    font-family: var(--font-ui);
+    cursor: pointer;
     transition:
       color var(--transition-fast),
       border-color var(--transition-fast);

@@ -9,7 +9,9 @@
     <GameMenuTokens />
 
     <!-- Правая панель — зарезервирована под будущий функционал -->
-    <div class="game-menu__empty" />
+    <div class="game-menu__empty">
+      <slot name="right-panel" />
+    </div>
   </aside>
 </template>
 

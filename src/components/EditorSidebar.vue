@@ -1,9 +1,11 @@
 <template>
   <aside class="editor-sidebar">
-    <router-link class="editor-sidebar__back" :to="{ name: 'menu' }">← Меню</router-link>
+    <router-link v-if="showBack" class="editor-sidebar__back" :to="{ name: 'menu' }"
+      >← Меню</router-link
+    >
 
     <div class="editor-sidebar__header">
-      <span class="editor-sidebar__title">Сценарии</span>
+      <span class="editor-sidebar__title">{{ title }}</span>
       <button class="editor-sidebar__new-btn" title="Создать новый" @click="$emit('create')">
         +
       </button>
@@ -29,6 +31,8 @@
     scenarios: { type: Array, required: true },
     loading: { type: Boolean, default: false },
     activeId: { type: String, default: null },
+    title: { type: String, default: 'Карты' },
+    showBack: { type: Boolean, default: false },
   })
 
   defineEmits(['select', 'create'])
