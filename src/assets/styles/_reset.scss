@@ -1,0 +1,79 @@
+// CSS Reset — убирает разные браузерные стили по умолчанию,
+// чтобы страница выглядела одинаково везде.
+// Основан на современном минималистичном подходе (Andy Bell's Modern Reset).
+
+*,
+*::before,
+*::after {
+  // box-sizing: border-box — padding и border включаются в ширину элемента.
+  // Без этого width: 100px + padding: 10px = 110px (неудобно).
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+// Убираем стили списков только там, где задан role="list" (доступность)
+ul[role='list'],
+ol[role='list'] {
+  list-style: none;
+}
+
+html {
+  // Плавная прокрутка при переходе по якорям (#section)
+  scroll-behavior: smooth;
+
+  // Запрещаем появление горизонтального скролла
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100vh;
+  text-rendering: optimizespeed;
+  -webkit-font-smoothing: antialiased; // Сглаживание шрифтов на macOS/iOS
+}
+
+// Картинки и медиа — адаптивные по умолчанию.
+// canvas намеренно исключён: его размер задаётся в JS через canvas.width/height,
+// max-width: 100% ломает горизонтальные размеры если канвас шире родителя.
+img,
+picture,
+video,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+canvas {
+  display: block;
+}
+
+// Текстовые поля наследуют шрифт от родителя (браузеры не делают это по умолчанию)
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+// Не ломать слова там где не нужно, но переносить слишком длинные
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+// Убираем анимации для тех, кто настроил это в ОС (доступность)
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

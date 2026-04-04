@@ -1,0 +1,12 @@
+# Запускается когда ты пишешь сообщение коммита (git commit -m "...").
+# commitlint проверяет, что сообщение соответствует Conventional Commits.
+#
+# Правильный формат: тип(область): описание
+# Примеры:
+#   feat: добавить карту игрового поля
+#   fix: исправить перемещение токена
+#   chore: обновить зависимости
+#   refactor(store): вынести логику хода в отдельный action
+#
+# Типы: feat, fix, docs, style, refactor, test, chore, perf, ci, build, revert
+npx --no -- commitlint --edit "$1"
