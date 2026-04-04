@@ -27,6 +27,7 @@
       <GameTokenContextMenu
         :visible="ctxState.uid === placed.uid && ctxState.visible"
         @remove="handleRemove(placed.uid)"
+        @edit="handleEdit(placed.tokenId)"
       />
       <img
         :src="getTokenDef(placed.tokenId)?.src"
@@ -36,13 +37,26 @@
       />
     </div>
   </div>
+
+  <!--
+    Попап редактирования живёт здесь — открывается при нажатии ≡ в контекстном меню.
+    tokenId передаётся для заполнения формы текущими данными токена.
+    При закрытии сбрасываем editTokenId в null.
+  -->
+  <GameTokenEditPopup
+    :visible="editTokenId !== null"
+    :token-id="editTokenId"
+    @close="editTokenId = null"
+  />
 </template>
 
 <script setup>
+  import { ref } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
   import { wasDragged } from '../composables/useMapPan'
   import GameTokenContextMenu from './GameTokenContextMenu.vue'
+  import GameTokenEditPopup from './GameTokenEditPopup.vue'
 
   defineProps({
     width: { type: Number, required: true },
@@ -80,6 +94,13 @@
 
   function handleRemove(uid) {
     store.removeToken(uid)
+    closeContextMenu()
+  }
+
+  const editTokenId = ref(null)
+
+  function handleEdit(tokenId) {
+    editTokenId.value = tokenId
     closeContextMenu()
   }
 </script>

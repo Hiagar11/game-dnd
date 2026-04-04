@@ -1,6 +1,15 @@
 <template>
-  <!-- Центральная панель: список всех токенов для выбора -->
+  <!-- Центральная панель: список всех токенов для выбора + кнопка добавления -->
   <div class="game-menu-tokens">
+    <!-- Кнопка добавления нового токена — всегда первая в списке -->
+    <button
+      class="game-menu-tokens__item game-menu-tokens__item--add"
+      title="Добавить токен"
+      @click="isPopupOpen = true"
+    >
+      <span class="game-menu-tokens__add-icon">+</span>
+    </button>
+
     <button
       v-for="token in store.tokens"
       :key="token.id"
@@ -18,14 +27,20 @@
       <img :src="token.src" :alt="token.name" class="game-menu-tokens__img" draggable="true" />
     </button>
   </div>
+
+  <GameTokenEditPopup :visible="isPopupOpen" @close="isPopupOpen = false" />
 </template>
 
 <script setup>
+  import { ref } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useTokenDrag } from '../composables/useTokenDrag'
+  import GameTokenEditPopup from './GameTokenEditPopup.vue'
 
   const store = useGameStore()
   const { onDragStart } = useTokenDrag()
+
+  const isPopupOpen = ref(false)
 </script>
 
 <style scoped>
@@ -67,6 +82,30 @@
       border-color: var(--color-primary);
       box-shadow: 0 0 8px var(--color-primary-glow);
     }
+  }
+
+  .game-menu-tokens__item--add {
+    border-style: dashed;
+    border-color: rgb(255 255 255 / 30%);
+    background: transparent;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted);
+    transition:
+      border-color var(--transition-fast),
+      color var(--transition-fast);
+
+    &:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+  }
+
+  .game-menu-tokens__add-icon {
+    font-size: 28px;
+    line-height: 1;
+    user-select: none;
   }
 
   .game-menu-tokens__img {

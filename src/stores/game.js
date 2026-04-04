@@ -26,8 +26,8 @@ export const useGameStore = defineStore('game', () => {
   const colorGrid = ref('rgba(0,0,0,0.3)')
 
   // Список токенов на карте.
-  // Каждый токен: { id, name, src } — временные данные, в будущем придут с бэкенда.
-  const tokens = ref([{ id: 1, name: 'Enemy', src: '/tokens/enemy.webp' }])
+  // Каждый токен: { id, name, src, meleeDmg, rangedDmg, visionRange, defense, evasion }
+  const tokens = ref([])
 
   // Выбранный токен — тот, на котором сейчас фокус.
   // null — никакой токен не выбран.
@@ -109,6 +109,20 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
+  // Добавляет новый тип токена в список.
+  // id генерируется как max(существующих id) + 1 — простой автоинкремент без сервера.
+  function addToken({ name, src, meleeDmg, rangedDmg, visionRange, defense, evasion }) {
+    const nextId = tokens.value.reduce((max, t) => Math.max(max, t.id), 0) + 1
+    tokens.value.push({ id: nextId, name, src, meleeDmg, rangedDmg, visionRange, defense, evasion })
+  }
+
+  // Обновляет характеристики существующего токена по id.
+  // Образ не меняется — это blob URL, явное редактирование не поддерживается.
+  function editToken(id, { name, meleeDmg, rangedDmg, visionRange, defense, evasion }) {
+    const token = tokens.value.find((t) => t.id === id)
+    if (token) Object.assign(token, { name, meleeDmg, rangedDmg, visionRange, defense, evasion })
+  }
+
   // Всё, что возвращается из defineStore, становится доступным снаружи стора.
   // То, что не возвращается — остаётся приватным (инкапсуляция).
   return {
@@ -129,5 +143,7 @@ export const useGameStore = defineStore('game', () => {
     placeToken,
     removeToken,
     moveToken,
+    addToken,
+    editToken,
   }
 })

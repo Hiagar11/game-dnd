@@ -17,8 +17,8 @@
         <span class="token-ctx-menu__icon">✕</span>
       </button>
 
-      <button class="token-ctx-menu__btn" title="Информация (скоро)" disabled>
-        <span class="token-ctx-menu__icon">ℹ</span>
+      <button class="token-ctx-menu__btn" title="Редактировать" @click="$emit('edit')">
+        <span class="token-ctx-menu__icon">≡</span>
       </button>
     </div>
   </Transition>
@@ -29,7 +29,7 @@
     visible: { type: Boolean, required: true },
   })
 
-  defineEmits(['remove'])
+  defineEmits(['remove', 'edit'])
 </script>
 
 <style scoped>
