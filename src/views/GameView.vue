@@ -67,12 +67,12 @@
     overflow: hidden;
   }
 
-  /* Карта лежит поверх AppVideo (z-index: -1) */
+  /* Карта лежит поверх AppBackground (z-index: var(--z-background)) */
   .game-view__map {
     position: absolute;
     top: 0;
     left: 0;
-    z-index: 1;
+    z-index: var(--z-map);
     cursor: grab;
   }
 
@@ -80,21 +80,14 @@
     cursor: grabbing;
   }
 
-  /*
-    Рамка рисуется через псевдоэлемент ::after снаружи карты.
-    inset: -30px — псевдоэлемент выходит за края карты на 30px (= border).
-    border: 30px рисуется ровно в этой полосе — не заходит внутрь карты.
-    Псевдоэлемент может выходить за экран по краям — это нормально,
-    overflow: hidden на .game-view просто обрежет невидимую часть.
-  */
   .game-view__map::after {
     content: '';
     position: absolute;
-    inset: -30px;
-    z-index: 100;
+    inset: calc(-1 * var(--map-border-size));
+    z-index: var(--z-map-border);
     pointer-events: none;
-    border: 30px solid transparent;
-    border-image: url('/systemImage/border.jpg') 90 round;
-    clip-path: inset(0 round 20px);
+    border: var(--map-border-size) solid transparent;
+    border-image: url('/systemImage/border.jpg') var(--map-border-slice) round;
+    clip-path: inset(0 round var(--map-border-radius));
   }
 </style>

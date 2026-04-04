@@ -25,6 +25,14 @@ export const useGameStore = defineStore('game', () => {
   // Цвет линий сетки.
   const colorGrid = ref('rgba(0,0,0,0.3)')
 
+  // Список токенов на карте.
+  // Каждый токен: { id, name, src } — временные данные, в будущем придут с бэкенда.
+  const tokens = ref([{ id: 1, name: 'Enemy', src: '/tokens/enemy.webp' }])
+
+  // Выбранный токен — тот, на котором сейчас фокус.
+  // null — никакой токен не выбран.
+  const selectedToken = ref(null)
+
   // --- GETTERS ---
   // computed() — вычисляемое значение на основе state.
   // Пересчитывается автоматически при изменении зависимостей.
@@ -46,16 +54,25 @@ export const useGameStore = defineStore('game', () => {
     colorGrid.value = color
   }
 
+  // Выбирает токен по id. Если кликнуть на уже выбранный — сбрасывает выбор.
+  function selectToken(id) {
+    selectedToken.value =
+      selectedToken.value?.id === id ? null : (tokens.value.find((t) => t.id === id) ?? null)
+  }
+
   // Всё, что возвращается из defineStore, становится доступным снаружи стора.
   // То, что не возвращается — остаётся приватным (инкапсуляция).
   return {
     // state
     cellSize,
     colorGrid,
+    tokens,
+    selectedToken,
     // getters
     cellSizePx,
     // actions
     setCellSize,
     setColorGrid,
+    selectToken,
   }
 })
