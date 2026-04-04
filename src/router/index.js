@@ -1,31 +1,55 @@
-// Vue Router — управляет навигацией между страницами (views) без перезагрузки браузера.
-// createRouter — создаёт экземпляр роутера.
-// createWebHistory — использует History API браузера (красивые URL без #).
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 
-// Каждый объект в массиве routes описывает один маршрут:
-// path  — URL путь
-// name  — имя маршрута (удобно для навигации через { name: '...' })
-// component — какой компонент показывать по этому пути
-
+// meta.public — доступен без авторизации
+// meta.role   — ограничивает доступ по роли: 'admin' | 'player'
 const routes = [
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/LoginView.vue'),
+    meta: { public: true },
+  },
   {
     path: '/',
     name: 'menu',
-    // lazy import: компонент загружается только когда пользователь заходит на эту страницу
     component: () => import('../views/MenuView.vue'),
+    meta: { role: 'admin' },
   },
   {
     path: '/game',
     name: 'game',
-    // lazy import: компонент загружается только когда пользователь заходит на эту страницу
     component: () => import('../views/GameView.vue'),
+    meta: { role: 'admin' },
   },
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+
+// ─── Navigation guard ────────────────────────────────────────────────────
+// Порядок проверок:
+//   1. Если маршрут публичный — пропускаем.
+//   2. Если не авторизован — пытаемся восстановить сессию, иначе — на /login.
+//   3. Если маршрут требует определённую роль и роль не совпадает — на /login.
+router.beforeEach(async (to) => {
+  if (to.meta.public) return true
+
+  const auth = useAuthStore()
+
+  if (!auth.isAuthenticated) {
+    const ok = await auth.restoreSession()
+    if (!ok) return { name: 'login' }
+  }
+
+  // Проверка роли: если маршрут требует admin, а у пользователя роль player — отправляем назад.
+  if (to.meta.role && to.meta.role !== auth.role) {
+    return { name: 'login' }
+  }
+
+  return true
 })
 
 export default router
