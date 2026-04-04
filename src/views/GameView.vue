@@ -13,6 +13,10 @@
       <GameMap map-src="/maps/images/picnic-day.webp" @ready="onMapReady" />
       <!-- Передаём размеры карты, чтобы GameGrid знал, насколько большой рисовать сетку -->
       <GameGrid :width="mapSize.width" :height="mapSize.height" />
+      <!-- Пока нет картинки — слот пустой, слой просто невидим -->
+      <GameFog :width="mapSize.width" :height="mapSize.height">
+        <!-- <img src="/fog.gif" alt="fog" /> -->
+      </GameFog>
     </div>
   </div>
 </template>
@@ -23,6 +27,7 @@
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
+  import GameFog from '../components/GameFog.vue'
 
   const viewRef = ref(null)
   const mapRef = ref(null)
@@ -70,5 +75,23 @@
 
   .game-view__map:active {
     cursor: grabbing;
+  }
+
+  /*
+    Рамка рисуется через псевдоэлемент ::after снаружи карты.
+    inset: -30px — псевдоэлемент выходит за края карты на 30px (= border).
+    border: 30px рисуется ровно в этой полосе — не заходит внутрь карты.
+    Псевдоэлемент может выходить за экран по краям — это нормально,
+    overflow: hidden на .game-view просто обрежет невидимую часть.
+  */
+  .game-view__map::after {
+    content: '';
+    position: absolute;
+    inset: -30px;
+    z-index: 100;
+    pointer-events: none;
+    border: 30px solid transparent;
+    border-image: url('/border.jpg') 90 round;
+    clip-path: inset(0 round 20px);
   }
 </style>
