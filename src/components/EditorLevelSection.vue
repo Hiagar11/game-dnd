@@ -90,6 +90,7 @@
               <button class="level-save__btn" :disabled="saving" @click="onSaveBtnClick">
                 {{ isEditingLevel ? 'Обновить' : 'Сохранить уровень' }}
               </button>
+              <p v-if="doorHint" class="level-save__door-hint">{{ doorHint }}</p>
             </div>
           </template>
         </GameMenu>
@@ -127,10 +128,12 @@
         </div>
 
         <!-- Тост: успешное сохранение ─────────────────────────────────────── -->
-        <div v-if="saveSuccess" class="level-toast">{{ saveToastMsg }}</div>
       </div>
     </template>
   </div>
+
+  <!-- Тост: вне шаблонных веток — виден и на экране выбора, и в игровом интерфейсе -->
+  <div v-if="saveSuccess" class="level-toast">{{ saveToastMsg }}</div>
 </template>
 
 <script setup>
@@ -166,6 +169,9 @@
   const saveToastMsg = ref('')
   const deletingId = ref(null)
   const deleteError = ref('')
+
+  // Подсказка валидации: дверь без назначенной локации
+  const doorHint = ref('')
 
   // Флаг: открыт существующий уровень — кнопка станет «Обновить»
   const isEditingLevel = ref(false)
@@ -257,10 +263,24 @@
     }
   }
 
-  // ─── Обработка кнопки сохранения ───────────────────────────────────────────
+  // Проверяет наличие дверей без назначенной локации перехода.
+  // Если найдена такая дверь — трясёт её и показывает подсказку.
+  function validateDoors() {
+    const bad = gameStore.placedTokens.find((t) => t.systemToken === 'door' && !t.targetScenarioId)
+    if (bad) {
+      gameStore.shakeToken(bad.uid)
+      doorHint.value = 'Выберите локацию перехода для каждой двери'
+      return false
+    }
+    doorHint.value = ''
+    return true
+  }
+
+  // Обработка кнопки сохранения ─────────────────────────────────────────────
   // В режиме редактирования (уровень) — сразу обновляем, без попапа.
   // В режиме создания — открываем попап для ввода названия.
   function onSaveBtnClick() {
+    if (!validateDoors()) return
     if (isEditingLevel.value) {
       onUpdateLevel()
     } else {
@@ -273,14 +293,19 @@
     saving.value = true
     saveError.value = ''
     try {
-      const tokens = gameStore.placedTokens.map(({ uid, tokenId, col, row, hidden }) => ({
-        uid,
-        tokenId,
-        col,
-        row,
-        hidden: hidden ?? false,
-      }))
+      const tokens = gameStore.placedTokens.map(
+        ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden }) => ({
+          uid,
+          // Системные токены не имеют tokenId, вместо этого передают systemToken.
+          ...(systemToken ? { systemToken } : { tokenId }),
+          ...(targetScenarioId ? { targetScenarioId } : {}),
+          col,
+          row,
+          hidden: hidden ?? false,
+        })
+      )
       await store.saveLevelTokens(selectedScenario.value.id, tokens)
+      exitGame()
       saveToastMsg.value = 'Уровень обновлён'
       saveSuccess.value = true
       setTimeout(() => {
@@ -327,13 +352,16 @@
     saving.value = true
     saveError.value = ''
     try {
-      const tokens = gameStore.placedTokens.map(({ uid, tokenId, col, row }) => ({
-        uid,
-        tokenId,
-        col,
-        row,
-        hidden: false,
-      }))
+      const tokens = gameStore.placedTokens.map(
+        ({ uid, tokenId, systemToken, targetScenarioId, col, row }) => ({
+          uid,
+          ...(systemToken ? { systemToken } : { tokenId }),
+          ...(targetScenarioId ? { targetScenarioId } : {}),
+          col,
+          row,
+          hidden: false,
+        })
+      )
       console.log('[EditorLevelSection] saving tokens:', tokens.length, JSON.stringify(tokens))
       // Создаём новый сценарий с токенами (источник остаётся нетронутым)
       await store.createScenario({
@@ -565,6 +593,14 @@
     font-size: 11px;
     color: #f87171;
     text-align: center;
+  }
+
+  .level-save__door-hint {
+    font-size: 11px;
+    color: #fbbf24;
+    text-align: center;
+    max-inline-size: 120px;
+    line-height: 1.4;
   }
 
   /* ─── Кнопка «К выбору» ──────────────────────────────────────────────────── */

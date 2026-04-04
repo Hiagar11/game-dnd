@@ -111,6 +111,7 @@
       const full = await scenariosStore.fetchScenario(s.id)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.initPlacedTokens(full.placedTokens ?? [])
+      gameStore.currentScenario = full
       selectedScenario.value = full
     } catch (err) {
       loadError.value = err.message || 'Не удалось загрузить карту'
@@ -121,6 +122,7 @@
 
   function exitGame() {
     selectedScenario.value = null
+    gameStore.currentScenario = null
   }
 
   // GameMap вызывает emit('ready', canvas) когда изображение нарисовано

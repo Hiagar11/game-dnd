@@ -13,6 +13,12 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useApi } from '../composables/useApi'
 
+// Системные токены — статичные, не хранятся в БД, определяются на клиенте.
+// id — строковый идентификатор, сохраняется в поле systemToken в модели Scenario.
+export const SYSTEM_TOKENS = [
+  { id: 'door', name: 'Дверь', src: '/systemImage/door-system-token.webp' },
+]
+
 export const useGameStore = defineStore('game', () => {
   const api = useApi()
 
@@ -28,6 +34,12 @@ export const useGameStore = defineStore('game', () => {
   const selectedToken = ref(null)
   const placedTokens = ref([])
   const selectedPlacedUid = ref(null)
+
+  // Текущий загруженный сценарий (для отображения имени локации в дверном попапе)
+  const currentScenario = ref(null)
+
+  // uid токена, который сейчас трясётся (анимация валидации)
+  const shakingTokenUid = ref(null)
 
   // --- GETTERS ---
 
@@ -79,6 +91,44 @@ export const useGameStore = defineStore('game', () => {
       defense: def?.defense ?? 0,
       evasion: def?.evasion ?? 0,
     })
+  }
+
+  // Размещает системный токен (дверь, ловушка и т.д.) на карте.
+  // Системные токены не имеют tokenId (они не из БД шаблонов Token).
+  function placeSystemToken(systemTokenId, col, row) {
+    const def = SYSTEM_TOKENS.find((t) => t.id === systemTokenId)
+    if (!def) return
+    placedTokens.value.push({
+      uid: crypto.randomUUID(),
+      tokenId: null,
+      systemToken: systemTokenId,
+      targetScenarioId: null,
+      col,
+      row,
+      hidden: false,
+      name: def.name,
+      src: def.src,
+      meleeDmg: 0,
+      rangedDmg: 0,
+      visionRange: 0,
+      defense: 0,
+      evasion: 0,
+    })
+  }
+
+  // Устанавливает целевой сценарий для токена-двери по uid.
+  function setDoorTarget(uid, targetScenarioId) {
+    const token = placedTokens.value.find((t) => t.uid === uid)
+    if (token) token.targetScenarioId = targetScenarioId || null
+  }
+
+  // Запускает анимацию тряски для токена по uid.
+  // Автоматически снимается через 700мс.
+  function shakeToken(uid) {
+    shakingTokenUid.value = uid
+    setTimeout(() => {
+      if (shakingTokenUid.value === uid) shakingTokenUid.value = null
+    }, 700)
   }
 
   // Удаляет размещённый токен с карты по uid.
@@ -163,7 +213,31 @@ export const useGameStore = defineStore('game', () => {
   // { _id, name, imagePath, stats }. Поэтому нельзя просто делать String(tokenId) —
   // получим "[object Object]". Проверяем тип и достаём _id если нужно.
   function initPlacedTokens(serverTokens) {
-    placedTokens.value = serverTokens.map(({ uid, tokenId, col, row, hidden }) => {
+    placedTokens.value = serverTokens.map((serverToken) => {
+      const { uid, tokenId, systemToken, col, row, hidden } = serverToken
+      // Системный токен (дверь, ловушка и т.д.) — восстанавливаем из SYSTEM_TOKENS
+      if (systemToken) {
+        const def = SYSTEM_TOKENS.find((t) => t.id === systemToken)
+        return {
+          uid,
+          tokenId: null,
+          systemToken,
+          targetScenarioId: serverToken.targetScenarioId
+            ? String(serverToken.targetScenarioId)
+            : null,
+          col,
+          row,
+          hidden: hidden ?? false,
+          name: def?.name ?? systemToken,
+          src: def?.src ?? '',
+          meleeDmg: 0,
+          rangedDmg: 0,
+          visionRange: 0,
+          defense: 0,
+          evasion: 0,
+        }
+      }
+      // Обычный токен — ищем шаблон по id
       const id = tokenId && typeof tokenId === 'object' ? String(tokenId._id) : String(tokenId)
       const def = tokens.value.find((t) => t.id === id)
       return {
@@ -191,12 +265,17 @@ export const useGameStore = defineStore('game', () => {
     selectedToken,
     placedTokens,
     selectedPlacedUid,
+    currentScenario,
+    shakingTokenUid,
     cellSizePx,
     setCellSize,
     setColorGrid,
     selectToken,
     selectPlacedToken,
     placeToken,
+    placeSystemToken,
+    setDoorTarget,
+    shakeToken,
     removeToken,
     moveToken,
     editPlacedToken,

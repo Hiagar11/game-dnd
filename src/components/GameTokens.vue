@@ -10,7 +10,10 @@
       v-for="placed in store.placedTokens"
       :key="placed.uid"
       class="game-tokens__token"
-      :class="{ 'game-tokens__token--selected': store.selectedPlacedUid === placed.uid }"
+      :class="{
+        'game-tokens__token--selected': store.selectedPlacedUid === placed.uid,
+        'game-tokens__token--shaking': store.shakingTokenUid === placed.uid,
+      }"
       :style="{
         left: `${placed.col * store.cellSize}px`,
         top: `${placed.row * store.cellSize}px`,
@@ -43,6 +46,12 @@
     :placed-uid="editPlacedUid"
     @close="editPlacedUid = null"
   />
+
+  <GameDoorPopup
+    :visible="doorPlacedUid !== null"
+    :placed-uid="doorPlacedUid"
+    @close="doorPlacedUid = null"
+  />
 </template>
 
 <script setup>
@@ -52,6 +61,7 @@
   import { wasDragged } from '../composables/useMapPan'
   import GameTokenContextMenu from './GameTokenContextMenu.vue'
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
+  import GameDoorPopup from './GameDoorPopup.vue'
 
   defineProps({
     width: { type: Number, required: true },
@@ -86,10 +96,16 @@
   }
 
   const editPlacedUid = ref(null)
+  const doorPlacedUid = ref(null)
 
   function handleEdit(uid) {
-    editPlacedUid.value = uid
+    const placed = store.placedTokens.find((t) => t.uid === uid)
     closeContextMenu()
+    if (placed?.systemToken === 'door') {
+      doorPlacedUid.value = uid
+    } else {
+      editPlacedUid.value = uid
+    }
   }
 </script>
 
@@ -167,5 +183,20 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  /* Тряска токена — запускается когда дверь не настроена перед сохранением */
+  .game-tokens__token--shaking .game-tokens__img {
+    animation: token-shake 0.65s ease;
+  }
+
+  @keyframes token-shake {
+    0%, 100% { transform: translateX(0) rotate(0); }
+    15%       { transform: translateX(-7px) rotate(-4deg); }
+    30%       { transform: translateX(7px) rotate(4deg); }
+    45%       { transform: translateX(-6px) rotate(-3deg); }
+    60%       { transform: translateX(6px) rotate(3deg); }
+    75%       { transform: translateX(-3px) rotate(-1deg); }
+    90%       { transform: translateX(3px) rotate(1deg); }
   }
 </style>

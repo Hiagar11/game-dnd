@@ -69,10 +69,14 @@ export const useScenariosStore = defineStore('scenarios', () => {
     const body = { placedTokens }
     if (name) body.name = name
     const result = await api.patch(`/api/scenarios/${id}/placed-tokens`, body)
-    // Обновляем имя в локальном списке, если сервер вернул новое
-    if (result.name) {
-      const idx = scenarios.value.findIndex((s) => String(s.id) === String(id))
-      if (idx !== -1) scenarios.value[idx] = { ...scenarios.value[idx], name: result.name }
+    // Синхронизируем локальный список: имя + актуальный tokensCount
+    const idx = scenarios.value.findIndex((s) => String(s.id) === String(id))
+    if (idx !== -1) {
+      scenarios.value[idx] = {
+        ...scenarios.value[idx],
+        ...(result.name ? { name: result.name } : {}),
+        tokensCount: result.count ?? scenarios.value[idx].tokensCount,
+      }
     }
     return result
   }

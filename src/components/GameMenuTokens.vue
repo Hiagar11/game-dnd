@@ -59,7 +59,7 @@
     flex-wrap: wrap;
     align-content: flex-start;
     gap: var(--space-2);
-    min-height: 0; /* чтобы overflow-y: auto заработал внутри flex */
+    min-height: 0;
     overflow-y: auto;
   }
 

@@ -64,13 +64,21 @@ router.post('/', requireAdmin, async (req, res) => {
     }
 
     const normalizedTokens = Array.isArray(placedTokens)
-      ? placedTokens.map(({ uid, tokenId, col, row, hidden = false }) => ({
-          uid: String(uid),
-          tokenId: new mongoose.Types.ObjectId(String(tokenId)),
-          col: Number(col),
-          row: Number(row),
-          hidden: Boolean(hidden),
-        }))
+      ? placedTokens.map(
+          ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden = false }) => ({
+            uid: String(uid),
+            // Системные токены (дверь, ловушка) не ссылаются на шаблон Token —
+            // они хранятся через поле systemToken.
+            ...(systemToken
+              ? { systemToken: String(systemToken) }
+              : { tokenId: new mongoose.Types.ObjectId(String(tokenId)) }),
+            targetScenarioId: targetScenarioId
+              ? new mongoose.Types.ObjectId(String(targetScenarioId))
+              : null,
+            row: Number(row),
+            hidden: Boolean(hidden),
+          })
+        )
       : []
 
     const scenario = await Scenario.create({
@@ -158,13 +166,20 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
       scenario.name = name.trim()
     }
 
-    scenario.placedTokens = placedTokens.map(({ uid, tokenId, col, row, hidden = false }) => ({
-      uid,
-      tokenId,
-      col,
-      row,
-      hidden,
-    }))
+    scenario.placedTokens = placedTokens.map(
+      ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden = false }) => ({
+        uid,
+        ...(systemToken
+          ? { systemToken: String(systemToken) }
+          : { tokenId: tokenId ? new mongoose.Types.ObjectId(String(tokenId)) : null }),
+        targetScenarioId: targetScenarioId
+          ? new mongoose.Types.ObjectId(String(targetScenarioId))
+          : null,
+        col,
+        row,
+        hidden,
+      })
+    )
 
     await scenario.save()
     res.json({ ok: true, count: scenario.placedTokens.length, name: scenario.name })

@@ -5,11 +5,19 @@ const placedTokenSchema = new mongoose.Schema(
   {
     // uid — уникальный идентификатор экземпляра (один шаблон можно поставить несколько раз)
     uid: { type: String, required: true },
-    // Ссылка на шаблон токена
+    // Ссылка на шаблон токена. null — для системных токенов (дверь, ловушка и т.д.)
     tokenId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Token',
-      required: true,
+      default: null,
+    },
+    // Идентификатор системного токена (например 'door'). null — для обычных токенов.
+    systemToken: { type: String, default: null },
+    // Для дверей: id целевого сценария для перехода. null — связь не настроена.
+    targetScenarioId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Scenario',
+      default: null,
     },
     col: { type: Number, required: true },
     row: { type: Number, required: true },
