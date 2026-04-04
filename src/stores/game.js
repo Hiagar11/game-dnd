@@ -59,12 +59,25 @@ export const useGameStore = defineStore('game', () => {
   }
   // Один тип токена можно разместить несколько раз — каждый раз создаётся новый uid.
   // crypto.randomUUID() — встроенный в браузер генератор уникальных идентификаторов.
+  //
+  // Важно: при размещении делаем снимок (snapshot) данных шаблона.
+  // Это делает каждый размещённый токен независимым — изменение шаблона
+  // не затрагивает уже размещённые экземпляры.
   function placeToken(tokenId, col, row) {
+    const def = tokens.value.find((t) => t.id === tokenId)
     placedTokens.value.push({
       uid: crypto.randomUUID(),
       tokenId,
       col,
       row,
+      // Снимок шаблона — каждый экземпляр на карте хранит собственную копию
+      name: def?.name ?? '',
+      src: def?.src ?? '',
+      meleeDmg: def?.meleeDmg ?? 0,
+      rangedDmg: def?.rangedDmg ?? 0,
+      visionRange: def?.visionRange ?? 0,
+      defense: def?.defense ?? 0,
+      evasion: def?.evasion ?? 0,
     })
   }
 
@@ -87,6 +100,13 @@ export const useGameStore = defineStore('game', () => {
       token.col = col
       token.row = row
     }
+  }
+
+  // Редактирует конкретный экземпляр токена на карте (не шаблон).
+  // fields — объект с изменяемыми полями: { name, meleeDmg, ... }
+  function editPlacedToken(uid, fields) {
+    const token = placedTokens.value.find((t) => t.uid === uid)
+    if (token) Object.assign(token, fields)
   }
 
   // ─── Загрузка токенов с сервера ──────────────────────────────────────────
@@ -149,6 +169,7 @@ export const useGameStore = defineStore('game', () => {
     placeToken,
     removeToken,
     moveToken,
+    editPlacedToken,
     fetchTokens,
     addToken,
     editToken,

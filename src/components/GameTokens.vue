@@ -27,14 +27,9 @@
       <GameTokenContextMenu
         :visible="ctxState.uid === placed.uid && ctxState.visible"
         @remove="handleRemove(placed.uid)"
-        @edit="handleEdit(placed.tokenId)"
+        @edit="handleEdit(placed.uid)"
       />
-      <img
-        :src="getTokenDef(placed.tokenId)?.src"
-        :alt="getTokenDef(placed.tokenId)?.name"
-        class="game-tokens__img"
-        draggable="false"
-      />
+      <img :src="placed.src" :alt="placed.name" class="game-tokens__img" draggable="false" />
     </div>
   </div>
 
@@ -44,9 +39,9 @@
     При закрытии сбрасываем editTokenId в null.
   -->
   <GameTokenEditPopup
-    :visible="editTokenId !== null"
-    :token-id="editTokenId"
-    @close="editTokenId = null"
+    :visible="editPlacedUid !== null"
+    :placed-uid="editPlacedUid"
+    @close="editPlacedUid = null"
   />
 </template>
 
@@ -65,13 +60,6 @@
 
   const store = useGameStore()
   const { state: ctxState, open: openContextMenu, close: closeContextMenu } = useTokenContextMenu()
-
-  // Находит определение токена (src, name) по tokenId.
-  // Вынесено в функцию чтобы не дублировать в шаблоне дважды.
-  function getTokenDef(tokenId) {
-    return store.tokens.find((t) => t.id === tokenId)
-  }
-
   // Правый клик: выбираем токен, открываем меню.
   // Повторный правый клик по тому же токену закрывает меню (тоггл).
   // Если перед этим было перетаскивание карты — игнорируем: contextmenu
@@ -97,10 +85,10 @@
     closeContextMenu()
   }
 
-  const editTokenId = ref(null)
+  const editPlacedUid = ref(null)
 
-  function handleEdit(tokenId) {
-    editTokenId.value = tokenId
+  function handleEdit(uid) {
+    editPlacedUid.value = uid
     closeContextMenu()
   }
 </script>

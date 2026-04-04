@@ -19,7 +19,7 @@ export function useTokenDrop(offsetX, offsetY) {
   function onDrop(e) {
     e.preventDefault()
 
-    const tokenId = Number(e.dataTransfer.getData('tokenId'))
+    const tokenId = e.dataTransfer.getData('tokenId')
     if (!tokenId) return
 
     // Стор вызывается здесь, а не на верхнем уровне модуля —

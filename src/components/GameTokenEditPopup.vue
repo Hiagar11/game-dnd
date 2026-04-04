@@ -10,10 +10,22 @@
           class="token-edit-popup"
           role="dialog"
           aria-modal="true"
-          :aria-label="isEditMode ? 'Редактировать токен' : 'Добавить токен'"
+          :aria-label="
+            isPlacedMode
+              ? 'Токен на карте'
+              : isEditMode
+                ? 'Редактировать шаблон'
+                : 'Добавить шаблон'
+          "
         >
           <h2 class="token-edit-popup__title">
-            {{ isEditMode ? 'Редактировать токен' : 'Добавить токен' }}
+            {{
+              isPlacedMode
+                ? 'Токен на карте'
+                : isEditMode
+                  ? 'Редактировать шаблон'
+                  : 'Добавить шаблон'
+            }}
           </h2>
 
           <div class="token-edit-popup__body">
@@ -90,7 +102,7 @@
               :disabled="saving"
               @click="onDelete"
             >
-              Удалить
+              {{ isPlacedMode ? 'Убрать с карты' : 'Удалить' }}
             </button>
             <button
               class="token-edit-popup__btn token-edit-popup__btn--cancel"
@@ -105,7 +117,9 @@
               @click="onSave"
             >
               <span v-if="saving" class="token-edit-popup__spinner" />
-              <span v-else>{{ isEditMode ? 'Сохранить' : 'Добавить' }}</span>
+              <span v-else>{{
+                isPlacedMode ? 'Сохранить' : isEditMode ? 'Сохранить шаблон' : 'Добавить'
+              }}</span>
             </button>
           </div>
           <p v-if="saveError" class="token-edit-popup__save-error">{{ saveError }}</p>
@@ -121,9 +135,10 @@
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
-    // Если передан tokenId — попап работает в режиме редактирования.
-    // Без tokenId — режим создания нового токена.
+    // tokenId — режим создания/редактирования шаблона (из меню)
     tokenId: { type: [Number, String], default: null },
+    // placedUid — режим редактирования конкретного экземпляра на карте
+    placedUid: { type: String, default: null },
   })
 
   const emit = defineEmits(['close'])
@@ -133,8 +148,10 @@
   const saving = ref(false)
   const saveError = ref('')
 
-  // Режим редактирования активен когда есть tokenId
-  const isEditMode = computed(() => props.tokenId !== null)
+  // placedUid — редактируем экземпляр на карте (независимо от шаблона)
+  const isPlacedMode = computed(() => props.placedUid !== null)
+  // isEditMode — любой режим редактирования (шаблон или экземпляр)
+  const isEditMode = computed(() => props.tokenId !== null || isPlacedMode.value)
 
   /*
     Описание характеристик токена.
@@ -180,8 +197,16 @@
 
   function resetForm() {
     saveError.value = ''
-    if (isEditMode.value) {
-      // Режим редактирования: популяруем форму текущими данными токена
+    if (isPlacedMode.value) {
+      // Режим экземпляра: заполняем из placedTokens (локальные данные)
+      const token = store.placedTokens.find((t) => t.uid === props.placedUid)
+      if (token) {
+        const { name, src, meleeDmg, rangedDmg, visionRange, defense, evasion } = token
+        form.value = { name, meleeDmg, rangedDmg, visionRange, defense, evasion }
+        previewSrc.value = src
+      }
+    } else if (isEditMode.value) {
+      // Режим редактирования шаблона: популяруем форму текущими данными токена
       const token = store.tokens.find((t) => t.id === props.tokenId)
       if (token) {
         const { name, src, meleeDmg, rangedDmg, visionRange, defense, evasion } = token
@@ -229,8 +254,18 @@
     try {
       const { name, meleeDmg, rangedDmg, visionRange, defense, evasion } = form.value
 
-      if (isEditMode.value) {
-        // Редактирование: отправляем только текстовые поля (изображение не меняется)
+      if (isPlacedMode.value) {
+        // Режим экземпляра: обновляем только локальный store, без сервера
+        store.editPlacedToken(props.placedUid, {
+          name,
+          meleeDmg,
+          rangedDmg,
+          visionRange,
+          defense,
+          evasion,
+        })
+      } else if (isEditMode.value) {
+        // Редактирование шаблона: отправляем только текстовые поля (изображение не меняется)
         await store.editToken(props.tokenId, {
           name,
           meleeDmg,
@@ -269,7 +304,13 @@
   }
 
   async function onDelete() {
-    if (!confirm(`Удалить токен «${form.name}»?`)) return
+    if (isPlacedMode.value) {
+      if (!confirm(`Убрать токен «${form.value.name}» с карты?`)) return
+      store.removeToken(props.placedUid)
+      emit('close')
+      return
+    }
+    if (!confirm(`Удалить токен «${form.value.name}»?`)) return
     saving.value = true
     try {
       await store.deleteToken(props.tokenId)
