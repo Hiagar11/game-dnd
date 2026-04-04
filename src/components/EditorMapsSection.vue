@@ -10,6 +10,7 @@
         title="Карты"
         @select="loadScenario"
         @create="newScenario"
+        @delete="onDeleteScenario"
       />
 
       <main class="maps-main">
@@ -249,6 +250,24 @@
     try {
       await store.deleteScenario(form.value.id)
       newScenario()
+    } catch (err) {
+      saveError.value = err.message || 'Ошибка при удалении'
+    } finally {
+      saving.value = false
+    }
+  }
+
+  // Удаление из боковой панели — принимает объект сценария (s)
+  async function onDeleteScenario(s) {
+    if (!confirm(`Удалить «${s.name || 'Без названия'}»?`)) return
+    saving.value = true
+    saveError.value = ''
+    try {
+      await store.deleteScenario(String(s.id))
+      // Если удаляем то, что сейчас открыто — сбрасываем форму
+      if (String(s.id) === form.value.id) {
+        newScenario()
+      }
     } catch (err) {
       saveError.value = err.message || 'Ошибка при удалении'
     } finally {

@@ -6,22 +6,25 @@
 
     <div class="editor-sidebar__header">
       <span class="editor-sidebar__title">{{ title }}</span>
-      <button class="editor-sidebar__new-btn" title="Создать новый" @click="$emit('create')">
+      <!-- <button class="editor-sidebar__new-btn" title="Создать новый" @click="$emit('create')">
         +
-      </button>
+      </button> -->
     </div>
 
     <div class="editor-sidebar__list">
-      <button
-        v-for="s in scenarios"
-        :key="s.id"
-        class="editor-sidebar__item"
-        :class="{ 'editor-sidebar__item--active': activeId === s.id }"
-        @click="$emit('select', s)"
-      >
-        {{ s.name || 'Без названия' }}
-      </button>
-      <p v-if="!loading && !scenarios.length" class="editor-sidebar__empty">Нет сценариев</p>
+      <div v-for="s in scenarios" :key="s.id" class="editor-sidebar__item-wrap">
+        <button
+          class="editor-sidebar__item"
+          :class="{ 'editor-sidebar__item--active': activeId === s.id }"
+          @click="$emit('select', s)"
+        >
+          {{ s.name || 'Без названия' }}
+        </button>
+        <button class="editor-sidebar__item-del" title="Удалить" @click="$emit('delete', s)">
+          ×
+        </button>
+      </div>
+      <p v-if="!loading && !scenarios.length" class="editor-sidebar__empty">Нет загруженных карт</p>
     </div>
   </aside>
 </template>
@@ -35,7 +38,7 @@
     showBack: { type: Boolean, default: false },
   })
 
-  defineEmits(['select', 'create'])
+  defineEmits(['select', 'create', 'delete'])
 </script>
 
 <style scoped>
@@ -105,8 +108,22 @@
     gap: var(--space-1);
   }
 
+  /* Обёртка строки: кнопка выбора + кнопка удаления рядом */
+  .editor-sidebar__item-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+
+    /* Кнопка удаления скрыта — появляется при наведении на строку */
+    &:hover .editor-sidebar__item-del {
+      opacity: 1;
+    }
+  }
+
   .editor-sidebar__item {
-    width: 100%;
+    /* flex: 1 чтобы кнопка выбора занимала всё доступное место */
+    flex: 1;
+    min-width: 0;
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-sm);
     border: 1px solid transparent;
@@ -115,6 +132,9 @@
     font-size: 13px;
     text-align: left;
     cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     transition:
       background var(--transition-fast),
       border-color var(--transition-fast);
@@ -127,6 +147,29 @@
       background: rgb(255 255 255 / 8%);
       border-color: var(--color-primary);
       color: var(--color-primary);
+    }
+  }
+
+  /* Кнопка удаления — появляется при наведении на строку */
+  .editor-sidebar__item-del {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity var(--transition-fast),
+      color var(--transition-fast);
+
+    &:hover {
+      color: #e05555;
     }
   }
 

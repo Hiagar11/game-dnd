@@ -26,6 +26,38 @@
         </div>
 
         <p v-if="loadError" class="level-section__error">{{ loadError }}</p>
+
+        <!-- ── Сохранённые уровни ─────────────────────────────────────────── -->
+        <!-- Тот же список, что видит игрок в GameView. Удаление здесь скрывает -->
+        <!-- уровень из «Играть», т.к. оба читают из одного сенарийного стора.  -->
+        <h2 class="level-picker__title level-picker__title--levels">Сохранённые уровни</h2>
+
+        <p v-if="!levels.length && !store.loading" class="level-picker__hint">
+          Нет сохранённых уровней.
+        </p>
+
+        <div v-else class="level-picker__grid">
+          <!-- Клик по карточке открывает уровень в режиме редактирования (кнопка «Обновить») -->
+          <!-- Кнопка × удаляет уровень окончательно из обоих разделов -->
+          <div v-for="s in levels" :key="s.id" class="level-card-wrap">
+            <button class="level-card" :disabled="loadingId === s.id" @click="editLevel(s)">
+              <img v-if="s.mapImageUrl" :src="s.mapImageUrl" class="level-card__img" alt="" />
+              <div v-else class="level-card__no-img">Нет карты</div>
+              <p class="level-card__name">{{ s.name || 'Без названия' }}</p>
+              <span v-if="loadingId === s.id" class="level-card__loading">Загрузка…</span>
+            </button>
+            <button
+              class="level-card__del"
+              title="Удалить уровень"
+              :disabled="deletingId === s.id"
+              @click="onDeleteLevel(s)"
+            >
+              {{ deletingId === s.id ? '…' : '×' }}
+            </button>
+          </div>
+        </div>
+
+        <p v-if="deleteError" class="level-section__error">{{ deleteError }}</p>
       </div>
     </template>
 
@@ -55,8 +87,8 @@
         <GameMenu>
           <template #right-panel>
             <div class="level-save">
-              <button class="level-save__btn" :disabled="saving" @click="openSavePopup">
-                Сохранить уровень
+              <button class="level-save__btn" :disabled="saving" @click="onSaveBtnClick">
+                {{ isEditingLevel ? 'Обновить' : 'Сохранить уровень' }}
               </button>
             </div>
           </template>
@@ -95,7 +127,7 @@
         </div>
 
         <!-- Тост: успешное сохранение ─────────────────────────────────────── -->
-        <div v-if="saveSuccess" class="level-toast">Уровень сохранён</div>
+        <div v-if="saveSuccess" class="level-toast">{{ saveToastMsg }}</div>
       </div>
     </template>
   </div>
@@ -119,6 +151,10 @@
   // Только карты без токенов — их выбираем для расставки
   const maps = computed(() => store.scenarios.filter((s) => !s.tokensCount))
 
+  // Заполненные уровни (с токенами) — тот же источник, что показывает GameView.
+  // computed автоматически обновится после удаления через store.deleteScenario.
+  const levels = computed(() => store.scenarios.filter((s) => s.tokensCount > 0))
+
   // ─── Состояние ──────────────────────────────────────────────────────────────
   const selectedScenario = ref(null)
   const mapSize = ref({ width: 0, height: 0 })
@@ -127,6 +163,12 @@
   const saving = ref(false)
   const saveError = ref('')
   const saveSuccess = ref(false)
+  const saveToastMsg = ref('')
+  const deletingId = ref(null)
+  const deleteError = ref('')
+
+  // Флаг: открыт существующий уровень — кнопка станет «Обновить»
+  const isEditingLevel = ref(false)
 
   // ─── Попап сохранения ────────────────────────────────────────────────────────
   const showSavePopup = ref(false)
@@ -193,6 +235,79 @@
   function exitGame() {
     selectedScenario.value = null
     saveError.value = ''
+    isEditingLevel.value = false
+  }
+
+  // ─── Открытие уровня для редактирования ─────────────────────────────────────
+  // То же что selectScenario, но ставит флаг isEditingLevel = true.
+  async function editLevel(s) {
+    loadingId.value = s.id
+    loadError.value = ''
+    try {
+      await gameStore.fetchTokens()
+      const full = await store.fetchScenario(s.id)
+      gameStore.setCellSize(full.cellSize ?? 60)
+      gameStore.initPlacedTokens(full.placedTokens ?? [])
+      selectedScenario.value = full
+      isEditingLevel.value = true
+    } catch (err) {
+      loadError.value = err.message || 'Не удалось загрузить уровень'
+    } finally {
+      loadingId.value = null
+    }
+  }
+
+  // ─── Обработка кнопки сохранения ───────────────────────────────────────────
+  // В режиме редактирования (уровень) — сразу обновляем, без попапа.
+  // В режиме создания — открываем попап для ввода названия.
+  function onSaveBtnClick() {
+    if (isEditingLevel.value) {
+      onUpdateLevel()
+    } else {
+      openSavePopup()
+    }
+  }
+
+  // Обновляем токены существующего уровня через PATCH запрос.
+  async function onUpdateLevel() {
+    saving.value = true
+    saveError.value = ''
+    try {
+      const tokens = gameStore.placedTokens.map(({ uid, tokenId, col, row, hidden }) => ({
+        uid,
+        tokenId,
+        col,
+        row,
+        hidden: hidden ?? false,
+      }))
+      await store.saveLevelTokens(selectedScenario.value.id, tokens)
+      saveToastMsg.value = 'Уровень обновлён'
+      saveSuccess.value = true
+      setTimeout(() => {
+        saveSuccess.value = false
+      }, 3000)
+    } catch (err) {
+      saveError.value = err.message || 'Ошибка при обновлении'
+    } finally {
+      saving.value = false
+    }
+  }
+
+  // ─── Удаление сохранённого уровня ────────────────────────────────────────────
+  async function onDeleteLevel(s) {
+    if (
+      !confirm(`Удалить уровень «${s.name || 'Без названия'}»?\nОн исчезнет из раздела «Играть».`)
+    )
+      return
+    deletingId.value = s.id
+    deleteError.value = ''
+    try {
+      await store.deleteScenario(String(s.id))
+    } catch (err) {
+      deleteError.value = err.message || 'Ошибка при удалении'
+    } finally {
+      deletingId.value = null
+    }
   }
 
   // ─── Сохранение расстановки ──────────────────────────────────────────────────
@@ -229,6 +344,7 @@
       })
       closeSavePopup()
       // Показываем тост на 3 секунды
+      saveToastMsg.value = 'Уровень сохранён'
       saveSuccess.value = true
       setTimeout(() => {
         saveSuccess.value = false
@@ -260,6 +376,11 @@
     font-size: 18px;
     font-weight: 600;
     margin-block-end: var(--space-5);
+
+    /* Заголовок раздела «Сохранённые уровни» с отступом сверху */
+    &--levels {
+      margin-block-start: var(--space-8);
+    }
   }
 
   .level-picker__hint {
@@ -272,6 +393,16 @@
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: var(--space-4);
     margin-block-start: var(--space-4);
+  }
+
+  /* Обёртка: position:relative для абсолютной кнопки × */
+  .level-card-wrap {
+    position: relative;
+
+    /* Кнопка × появляется при наведении */
+    &:hover .level-card__del {
+      opacity: 1;
+    }
   }
 
   .level-card {
@@ -297,6 +428,35 @@
     }
   }
 
+  /* Кнопка удаления уровня */
+  .level-card__del {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: rgb(0 0 0 / 70%);
+    backdrop-filter: blur(4px);
+    color: var(--color-text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity var(--transition-fast),
+      color var(--transition-fast);
+
+    &:hover:not(:disabled) {
+      color: #e05555;
+    }
+
+    &:disabled {
+      cursor: wait;
+    }
+  }
+
   .level-card__img {
     width: 100%;
     aspect-ratio: 16 / 9;
@@ -315,6 +475,7 @@
   }
 
   .level-card__name {
+    color: white;
     padding: var(--space-2) var(--space-3);
     font-size: 13px;
     text-align: left;

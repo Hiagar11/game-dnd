@@ -175,10 +175,19 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
 
 // ─── DELETE /api/scenarios/:id ────────────────────────────────────────────────
 // Удаление сценария. Только admin.
+// Вместе со сценарием удаляем файл карты с диска, чтобы не засорять uploads/.
 router.delete('/:id', requireAdmin, async (req, res) => {
   try {
     const scenario = await Scenario.findByIdAndDelete(req.params.id)
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
+
+    // Если у сценария была карта — удаляем файл. Ошибку игнорируем:
+    // файл мог быть уже удалён вручную или путь мог не совпасть.
+    if (scenario.mapImagePath) {
+      const filePath = path.join(__dirname, '..', scenario.mapImagePath)
+      await fs.unlink(filePath).catch(() => {})
+    }
+
     res.status(204).end()
   } catch {
     res.status(500).json({ error: 'Ошибка сервера' })

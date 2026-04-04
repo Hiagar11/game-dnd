@@ -229,6 +229,7 @@
   }
 
   .game-card__name {
+    color: white;
     padding: var(--space-2) var(--space-3);
     font-size: 13px;
     text-align: left;
