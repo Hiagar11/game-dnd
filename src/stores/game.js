@@ -33,6 +33,13 @@ export const useGameStore = defineStore('game', () => {
   // null — никакой токен не выбран.
   const selectedToken = ref(null)
 
+  // Токены, размещённые на карте.
+  // Каждый экземпляр: { uid, tokenId, col, row }
+  //   uid     — уникальный id экземпляра (один тип токена можно поставить несколько раз)
+  //   tokenId — ссылка на определение в tokens[]
+  //   col/row — координаты ячейки на сетке
+  const placedTokens = ref([])
+
   // --- GETTERS ---
   // computed() — вычисляемое значение на основе state.
   // Пересчитывается автоматически при изменении зависимостей.
@@ -60,6 +67,27 @@ export const useGameStore = defineStore('game', () => {
       selectedToken.value?.id === id ? null : (tokens.value.find((t) => t.id === id) ?? null)
   }
 
+  // Размещает новый экземпляр токена на карте в указанной ячейке.
+  // Один тип токена можно разместить несколько раз — каждый раз создаётся новый uid.
+  // crypto.randomUUID() — встроенный в браузер генератор уникальных идентификаторов.
+  function placeToken(tokenId, col, row) {
+    placedTokens.value.push({
+      uid: crypto.randomUUID(),
+      tokenId,
+      col,
+      row,
+    })
+  }
+
+  // Перемещает уже размещённый токен в новую ячейку по его uid.
+  function moveToken(uid, col, row) {
+    const token = placedTokens.value.find((t) => t.uid === uid)
+    if (token) {
+      token.col = col
+      token.row = row
+    }
+  }
+
   // Всё, что возвращается из defineStore, становится доступным снаружи стора.
   // То, что не возвращается — остаётся приватным (инкапсуляция).
   return {
@@ -68,11 +96,14 @@ export const useGameStore = defineStore('game', () => {
     colorGrid,
     tokens,
     selectedToken,
+    placedTokens,
     // getters
     cellSizePx,
     // actions
     setCellSize,
     setColorGrid,
     selectToken,
+    placeToken,
+    moveToken,
   }
 })

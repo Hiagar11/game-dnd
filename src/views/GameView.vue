@@ -1,5 +1,12 @@
 <template>
-  <div ref="viewRef" class="game-view" @mousemove="onMouseMove" @contextmenu="onContextMenu">
+  <div
+    ref="viewRef"
+    class="game-view"
+    @mousemove="onMouseMove"
+    @contextmenu="onContextMenu"
+    @dragover="onDragOver"
+    @drop="onDrop"
+  >
     <AppBackground src="/video/maw.gif" />
 
     <div
@@ -14,6 +21,7 @@
       <!-- Передаём размеры карты, чтобы GameGrid знал, насколько большой рисовать сетку -->
       <GameGrid :width="mapSize.width" :height="mapSize.height" />
       <!-- Пока нет картинки — слот пустой, слой просто невидим -->
+      <GameTokens :width="mapSize.width" :height="mapSize.height" />
       <GameFog :width="mapSize.width" :height="mapSize.height">
         <!-- <img src="/systemImage/fog.gif" alt="fog" /> -->
       </GameFog>
@@ -30,7 +38,9 @@
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
   import GameFog from '../components/GameFog.vue'
+  import GameTokens from '../components/GameTokens.vue'
   import GameMenu from '../components/GameMenu.vue'
+  import { useTokenDrop } from '../composables/useTokenDrop'
 
   const viewRef = ref(null)
   const mapRef = ref(null)
@@ -44,6 +54,8 @@
     viewRef,
     canvasRef
   )
+
+  const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
 
   // Размеры карты — нужны GameGrid, чтобы знать площадь для отрисовки сетки
   const mapSize = ref({ width: 0, height: 0 })

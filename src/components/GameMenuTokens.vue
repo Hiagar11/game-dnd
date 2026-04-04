@@ -7,17 +7,25 @@
       class="game-menu-tokens__item"
       :class="{ 'game-menu-tokens__item--active': store.selectedToken?.id === token.id }"
       :title="token.name"
+      draggable="false"
       @click="store.selectToken(token.id)"
+      @dragstart="onDragStart($event, token)"
     >
-      <img :src="token.src" :alt="token.name" class="game-menu-tokens__img" />
+      <!--
+        draggable="false" на img — отключает встроенное перетаскивание картинки,
+        чтобы браузер тянул всю кнопку, а не только изображение.
+      -->
+      <img :src="token.src" :alt="token.name" class="game-menu-tokens__img" draggable="true" />
     </button>
   </div>
 </template>
 
 <script setup>
   import { useGameStore } from '../stores/game'
+  import { useTokenDrag } from '../composables/useTokenDrag'
 
   const store = useGameStore()
+  const { onDragStart } = useTokenDrag()
 </script>
 
 <style scoped>
