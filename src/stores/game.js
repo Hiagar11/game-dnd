@@ -11,46 +11,26 @@
 //   function   → actions (методы, в том числе сеттеры)
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { useApi } from '../composables/useApi'
 
 export const useGameStore = defineStore('game', () => {
+  const api = useApi()
+
   // --- STATE ---
-  // ref() делает переменную реактивной — Vue следит за её изменениями
-  // и автоматически обновляет шаблоны, которые её используют.
 
-  // Размер одной ячейки сетки в пикселях.
-  // Подбирается под конкретную карту, поэтому хранится в сторе —
-  // в будущем его можно будет менять из панели настроек.
   const cellSize = ref(60)
-
-  // Цвет линий сетки.
   const colorGrid = ref('rgba(0,0,0,0.3)')
 
-  // Список токенов на карте.
-  // Каждый токен: { id, name, src, meleeDmg, rangedDmg, visionRange, defense, evasion }
+  // Список шаблонов токенов, загруженных с сервера.
+  // Каждый объект: { id, name, imageUrl, stats: { meleeDmg, ... } }
   const tokens = ref([])
 
-  // Выбранный токен — тот, на котором сейчас фокус.
-  // null — никакой токен не выбран.
   const selectedToken = ref(null)
-
-  // Токены, размещённые на карте.
-  // Каждый экземпляр: { uid, tokenId, col, row }
-  //   uid     — уникальный id экземпляра (один тип токена можно поставить несколько раз)
-  //   tokenId — ссылка на определение в tokens[]
-  //   col/row — координаты ячейки на сетке
   const placedTokens = ref([])
-
-  // Выбранный размещённый токен на карте (uid или null).
-  // Отдельно от selectedToken в меню — это разные понятия:
-  //   selectedToken — фокус в панели меню (какой тип выбран)
-  //   selectedPlacedUid — какой конкретный экземпляр на карте выделен
   const selectedPlacedUid = ref(null)
 
   // --- GETTERS ---
-  // computed() — вычисляемое значение на основе state.
-  // Пересчитывается автоматически при изменении зависимостей.
 
-  // Размер ячейки в формате CSS-строки (например, для inline-стилей).
   const cellSizePx = computed(() => `${cellSize.value}px`)
 
   // --- ACTIONS (SETTERS) ---
@@ -109,33 +89,59 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  // Добавляет новый тип токена в список.
-  // id генерируется как max(существующих id) + 1 — простой автоинкремент без сервера.
-  function addToken({ name, src, meleeDmg, rangedDmg, visionRange, defense, evasion }) {
-    const nextId = tokens.value.reduce((max, t) => Math.max(max, t.id), 0) + 1
-    tokens.value.push({ id: nextId, name, src, meleeDmg, rangedDmg, visionRange, defense, evasion })
+  // ─── Загрузка токенов с сервера ──────────────────────────────────────────
+  // Вызывается при монтировании MenuView (после авторизации).
+  async function fetchTokens() {
+    const data = await api.get('/api/tokens')
+    // Нормализуем: приводим серверный формат { id, name, imageUrl, stats } к плоскому,
+    // который ожидают компоненты: { id, name, src, meleeDmg, ... }
+    tokens.value = data.map(normalizeToken)
   }
 
-  // Обновляет характеристики существующего токена по id.
-  // Образ не меняется — это blob URL, явное редактирование не поддерживается.
-  function editToken(id, { name, meleeDmg, rangedDmg, visionRange, defense, evasion }) {
-    const token = tokens.value.find((t) => t.id === id)
-    if (token) Object.assign(token, { name, meleeDmg, rangedDmg, visionRange, defense, evasion })
+  // ─── Создание нового токена ───────────────────────────────────────────────
+  // Принимает FormData (файл + поля). Возвращает созданный токен.
+  async function addToken(formData) {
+    const data = await api.post('/api/tokens', formData)
+    const token = normalizeToken(data)
+    tokens.value.unshift(token)
+    return token
   }
 
-  // Всё, что возвращается из defineStore, становится доступным снаружи стора.
-  // То, что не возвращается — остаётся приватным (инкапсуляция).
+  // ─── Редактирование токена ────────────────────────────────────────────────
+  // id — серверный _id токена (строка MongoDB ObjectId).
+  async function editToken(id, fields) {
+    const data = await api.put(`/api/tokens/${id}`, fields)
+    const updated = normalizeToken(data)
+    const idx = tokens.value.findIndex((t) => t.id === id)
+    if (idx !== -1) tokens.value[idx] = updated
+    return updated
+  }
+
+  // ─── Удаление шаблона токена ──────────────────────────────────────────────
+  // Удаляет как с сервера, так и из локального стора.
+  // Также снимает выбор, если был выбран этот токен.
+  async function deleteToken(id) {
+    await api.delete(`/api/tokens/${id}`)
+    const idx = tokens.value.findIndex((t) => t.id === id)
+    if (idx !== -1) tokens.value.splice(idx, 1)
+    if (selectedToken.value?.id === id) selectedToken.value = null
+  }
+
+  // ─── Вспомогательная нормализация ────────────────────────────────────────
+  // Сервер возвращает { id, name, imageUrl, stats: { meleeDmg, ... } }.
+  // Компоненты ожидают плоский объект { id, name, src, meleeDmg, ... }.
+  function normalizeToken({ id, name, imageUrl, stats }) {
+    return { id, name, src: imageUrl, ...stats }
+  }
+
   return {
-    // state
     cellSize,
     colorGrid,
     tokens,
     selectedToken,
     placedTokens,
     selectedPlacedUid,
-    // getters
     cellSizePx,
-    // actions
     setCellSize,
     setColorGrid,
     selectToken,
@@ -143,7 +149,9 @@ export const useGameStore = defineStore('game', () => {
     placeToken,
     removeToken,
     moveToken,
+    fetchTokens,
     addToken,
     editToken,
+    deleteToken,
   }
 })

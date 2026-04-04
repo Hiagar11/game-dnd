@@ -84,7 +84,19 @@
           </div>
 
           <div class="token-edit-popup__footer">
-            <button class="token-edit-popup__btn token-edit-popup__btn--cancel" @click="onCancel">
+            <button
+              v-if="isEditMode"
+              class="token-edit-popup__btn token-edit-popup__btn--delete"
+              :disabled="saving"
+              @click="onDelete"
+            >
+              Удалить
+            </button>
+            <button
+              class="token-edit-popup__btn token-edit-popup__btn--cancel"
+              :disabled="saving"
+              @click="onCancel"
+            >
               Отмена
             </button>
             <button
@@ -92,9 +104,11 @@
               :disabled="!canSave"
               @click="onSave"
             >
-              {{ isEditMode ? 'Сохранить' : 'Добавить' }}
+              <span v-if="saving" class="token-edit-popup__spinner" />
+              <span v-else>{{ isEditMode ? 'Сохранить' : 'Добавить' }}</span>
             </button>
           </div>
+          <p v-if="saveError" class="token-edit-popup__save-error">{{ saveError }}</p>
         </div>
       </div>
     </Transition>
@@ -109,13 +123,15 @@
     visible: { type: Boolean, required: true },
     // Если передан tokenId — попап работает в режиме редактирования.
     // Без tokenId — режим создания нового токена.
-    tokenId: { type: Number, default: null },
+    tokenId: { type: [Number, String], default: null },
   })
 
   const emit = defineEmits(['close'])
 
   const store = useGameStore()
   const fileInputRef = ref(null)
+  const saving = ref(false)
+  const saveError = ref('')
 
   // Режим редактирования активен когда есть tokenId
   const isEditMode = computed(() => props.tokenId !== null)
@@ -138,7 +154,7 @@
 
   // Форма — локальное состояние, не реактивно через store до сохранения
   const form = ref({ name: '', ...DEFAULT_STATS })
-  const previewSrc = ref(null) // blob URL или null
+  const previewSrc = ref(null) // blob URL при создании, imageUrl при редактировании
   const fileRef = ref(null) // сам File-объект
 
   /*
@@ -146,10 +162,12 @@
     - в режиме создания: требуется имя + картинка
     - в режиме редактирования: достаточно только имя
   */
-  const canSave = computed(() =>
-    isEditMode.value
-      ? form.value.name.length > 0
-      : form.value.name.length > 0 && previewSrc.value !== null
+  const canSave = computed(
+    () =>
+      !saving.value &&
+      (isEditMode.value
+        ? form.value.name.length > 0
+        : form.value.name.length > 0 && previewSrc.value !== null)
   )
 
   // Сброс/заполнение формы при каждом открытии попапа
@@ -161,6 +179,7 @@
   )
 
   function resetForm() {
+    saveError.value = ''
     if (isEditMode.value) {
       // Режим редактирования: популяруем форму текущими данными токена
       const token = store.tokens.find((t) => t.id === props.tokenId)
@@ -201,23 +220,44 @@
     previewSrc.value = URL.createObjectURL(file)
   }
 
-  function onSave() {
+  async function onSave() {
     if (!canSave.value) return
-    const { name, meleeDmg, rangedDmg, visionRange, defense, evasion } = form.value
-    if (isEditMode.value) {
-      store.editToken(props.tokenId, { name, meleeDmg, rangedDmg, visionRange, defense, evasion })
-    } else {
-      store.addToken({
-        name,
-        src: previewSrc.value,
-        meleeDmg,
-        rangedDmg,
-        visionRange,
-        defense,
-        evasion,
-      })
+
+    saving.value = true
+    saveError.value = ''
+
+    try {
+      const { name, meleeDmg, rangedDmg, visionRange, defense, evasion } = form.value
+
+      if (isEditMode.value) {
+        // Редактирование: отправляем только текстовые поля (изображение не меняется)
+        await store.editToken(props.tokenId, {
+          name,
+          meleeDmg,
+          rangedDmg,
+          visionRange,
+          defense,
+          evasion,
+        })
+      } else {
+        // Создание: собираем FormData — файл + поля
+        const fd = new FormData()
+        fd.append('image', fileRef.value)
+        fd.append('name', name)
+        fd.append('meleeDmg', meleeDmg)
+        fd.append('rangedDmg', rangedDmg)
+        fd.append('visionRange', visionRange)
+        fd.append('defense', defense)
+        fd.append('evasion', evasion)
+        await store.addToken(fd)
+      }
+
+      emit('close')
+    } catch (err) {
+      saveError.value = err.message ?? 'Ошибка при сохранении'
+    } finally {
+      saving.value = false
     }
-    emit('close')
   }
 
   function onCancel() {
@@ -226,6 +266,19 @@
       URL.revokeObjectURL(previewSrc.value)
     }
     emit('close')
+  }
+
+  async function onDelete() {
+    if (!confirm(`Удалить токен «${form.name}»?`)) return
+    saving.value = true
+    try {
+      await store.deleteToken(props.tokenId)
+      emit('close')
+    } catch (err) {
+      saveError.value = err.message || 'Ошибка при удалении'
+    } finally {
+      saving.value = false
+    }
   }
 </script>
 
@@ -478,6 +531,23 @@
         cursor: not-allowed;
       }
     }
+
+    &--delete {
+      margin-right: auto;
+      background: transparent;
+      border: 1px solid rgb(220 38 38 / 50%);
+      color: #f87171;
+
+      &:hover:not(:disabled) {
+        background: rgb(220 38 38 / 15%);
+        border-color: #f87171;
+      }
+
+      &:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+    }
   }
 
   /* Анимация появления попапа */
@@ -496,6 +566,33 @@
 
     .token-edit-popup {
       transform: scale(0.95) translateY(8px);
+    }
+  }
+
+  .token-edit-popup__spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgb(26 26 26 / 30%);
+    border-top-color: #1a1a1a;
+    border-radius: 50%;
+    animation: token-spin 0.7s linear infinite;
+  }
+
+  .token-edit-popup__save-error {
+    margin-top: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-sm);
+    background: rgb(220 38 38 / 10%);
+    border: 1px solid rgb(220 38 38 / 40%);
+    color: #f87171;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  @keyframes token-spin {
+    to {
+      transform: rotate(360deg);
     }
   }
 </style>
