@@ -155,17 +155,23 @@ export const useGameStore = defineStore('game', () => {
   }
 
   // ─── Загрузка расстановки из сохранённого сценария ───────────────────────
-  // serverTokens — массив { uid, tokenId, col, row } с сервера.
+  // serverTokens — массив { uid, tokenId, col, row, hidden } с сервера.
   // Для каждого ищем шаблон в tokens, чтобы восстановить name/src/stats.
   // Вызывается при входе в режим редактирования уровня.
+  //
+  // Важно: после populate() на сервере tokenId приходит не строкой, а объектом
+  // { _id, name, imagePath, stats }. Поэтому нельзя просто делать String(tokenId) —
+  // получим "[object Object]". Проверяем тип и достаём _id если нужно.
   function initPlacedTokens(serverTokens) {
-    placedTokens.value = serverTokens.map(({ uid, tokenId, col, row }) => {
-      const def = tokens.value.find((t) => t.id === String(tokenId))
+    placedTokens.value = serverTokens.map(({ uid, tokenId, col, row, hidden }) => {
+      const id = tokenId && typeof tokenId === 'object' ? String(tokenId._id) : String(tokenId)
+      const def = tokens.value.find((t) => t.id === id)
       return {
         uid,
-        tokenId: String(tokenId),
+        tokenId: id,
         col,
         row,
+        hidden: hidden ?? false,
         name: def?.name ?? 'Неизвестный',
         src: def?.src ?? '',
         meleeDmg: def?.meleeDmg ?? 0,
