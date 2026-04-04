@@ -19,8 +19,8 @@ export default [
   prettierConfig,
 
   {
-    // Применяем эти настройки только к .js и .vue файлам
-    files: ['**/*.{js,vue}'],
+    // Применяем эти настройки только к .js и .vue файлам фронтенда
+    files: ['src/**/*.{js,vue}'],
 
     languageOptions: {
       // globals.browser — полный список всех браузерных API: window, document,
@@ -34,6 +34,17 @@ export default [
     rules: {
       // Здесь можно добавлять свои правила.
       // Например: 'no-console': 'warn' — предупреждать о console.log в коде.
+    },
+  },
+
+  {
+    // Настройки для серверных файлов (Node.js окружение, а не браузерное)
+    files: ['server/**/*.js'],
+    languageOptions: {
+      // globals.node — process, Buffer, __filename, __dirname, setTimeout и др.
+      globals: {
+        ...globals.node,
+      },
     },
   },
 ]
