@@ -1,5 +1,123 @@
-# Vue 3 + Vite
+# ⚔️ Game D&D
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+> Браузерная D&D-игра с интерактивной картой, токенами, ходами и бросками кубика.
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+---
+
+## 📖 О проекте
+
+**Game D&D** — это пошаговая ролевая игра в браузере, вдохновлённая Dungeons & Dragons.  
+Игроки перемещаются по карте подземелья, управляют токенами и бросают кубики, чтобы определить исход событий.
+
+Проект разрабатывается поэтапно: сначала фронтенд, затем бэкенд с мультиплеером.
+
+---
+
+## 🛠️ Технологии
+
+### Фронтенд
+
+| Технология                                     | Назначение           |
+| ---------------------------------------------- | -------------------- |
+| [Vue 3](https://vuejs.org/) + Composition API  | UI-фреймворк         |
+| [Vite](https://vitejs.dev/)                    | Сборщик и дев-сервер |
+| [Pinia](https://pinia.vuejs.org/)              | Глобальное состояние |
+| [Vue Router](https://router.vuejs.org/)        | Маршрутизация        |
+| [SASS](https://sass-lang.com/)                 | Препроцессор CSS     |
+| [PostCSS](https://postcss.org/) + Autoprefixer | Постпроцессор CSS    |
+
+### Инструменты качества
+
+| Инструмент                                 | Назначение          |
+| ------------------------------------------ | ------------------- |
+| [ESLint](https://eslint.org/)              | Линтер JavaScript   |
+| [Stylelint](https://stylelint.io/)         | Линтер CSS/SCSS     |
+| [Prettier](https://prettier.io/)           | Форматирование кода |
+| [Husky](https://typicode.github.io/husky/) | Git-хуки            |
+| [commitlint](https://commitlint.js.org/)   | Конвенция коммитов  |
+
+---
+
+## 🚀 Быстрый старт
+
+### Требования
+
+- [Node.js](https://nodejs.org/) v18+
+- npm v9+
+
+### Установка
+
+```bash
+# 1. Клонировать репозиторий
+git clone <url-репозитория>
+cd game-dnd
+
+# 2. Установить зависимости
+npm install
+
+# 3. Запустить дев-сервер
+npm run dev
+```
+
+Открой [http://localhost:5173](http://localhost:5173) в браузере.
+
+---
+
+## 📦 Скрипты
+
+```bash
+npm run dev        # Запустить дев-сервер
+npm run build      # Собрать продакшн-сборку
+npm run preview    # Предпросмотр продакшн-сборки
+
+npm run lint       # Проверить JS через ESLint
+npm run lint:css   # Проверить CSS/SCSS через Stylelint
+npm run format     # Отформатировать код через Prettier
+```
+
+---
+
+## 📁 Структура проекта
+
+```
+game-dnd/
+├── public/                 # Статические ресурсы (карты, звуки, токены)
+│   ├── maps/images/
+│   ├── sounds/
+│   └── tokens/
+└── src/
+    ├── assets/styles/      # SCSS-стили (переменные, сброс, глобальные)
+    ├── components/         # Переиспользуемые Vue-компоненты
+    ├── composables/        # Логика, вынесенная из компонентов
+    ├── data/maps/          # JSON-данные карт
+    ├── router/             # Маршруты Vue Router
+    ├── stores/             # Pinia-сторы (глобальное состояние)
+    └── views/              # Страницы (MenuView, GameView)
+```
+
+---
+
+## 🗺️ Роадмап
+
+- [x] Базовая структура проекта
+- [x] Интерактивная карта с перетаскиванием (pan)
+- [ ] Токены на карте и их перемещение
+- [ ] Пошаговая система ходов
+- [ ] Бросок кубика (D6, D20...)
+- [ ] Бэкенд: Node.js + Express + MongoDB
+- [ ] Мультиплеер в реальном времени
+
+---
+
+## 📜 Конвенция коммитов
+
+Проект использует [Conventional Commits](https://www.conventionalcommits.org/ru/):
+
+```
+feat:     новая функциональность
+fix:      исправление бага
+refactor: рефакторинг без изменения поведения
+style:    изменения форматирования
+docs:     изменения документации
+chore:    служебные задачи (обновление зависимостей и т.п.)
+```
