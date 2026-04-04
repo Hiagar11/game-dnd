@@ -15,9 +15,11 @@
       <GameGrid :width="mapSize.width" :height="mapSize.height" />
       <!-- Пока нет картинки — слот пустой, слой просто невидим -->
       <GameFog :width="mapSize.width" :height="mapSize.height">
-        <!-- <img src="/fog.gif" alt="fog" /> -->
+        <!-- <img src="/systemImage/fog.gif" alt="fog" /> -->
       </GameFog>
     </div>
+
+    <GameMenu />
   </div>
 </template>
 
@@ -28,6 +30,7 @@
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
   import GameFog from '../components/GameFog.vue'
+  import GameMenu from '../components/GameMenu.vue'
 
   const viewRef = ref(null)
   const mapRef = ref(null)
@@ -91,7 +94,7 @@
     z-index: 100;
     pointer-events: none;
     border: 30px solid transparent;
-    border-image: url('/border.jpg') 90 round;
+    border-image: url('/systemImage/border.jpg') 90 round;
     clip-path: inset(0 round 20px);
   }
 </style>
