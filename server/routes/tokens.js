@@ -150,8 +150,10 @@ router.put('/:id', async (req, res) => {
 
 // ─── DELETE /api/tokens/:id ───────────────────────────────────────────────────
 // Удаление токена и его файла с диска.
-router.delete('/:id', async (req, res) => {  if (!mongoose.Types.ObjectId.isValid(req.params.id))
-    return res.status(400).json({ error: 'Некорректный id' })  try {
+router.delete('/:id', async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
+  try {
     const token = await Token.findOne({ _id: req.params.id, owner: req.user.id })
     if (!token) return res.status(404).json({ error: 'Токен не найден' })
 

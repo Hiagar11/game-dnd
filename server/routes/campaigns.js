@@ -75,8 +75,10 @@ router.post('/', requireAdmin, async (req, res) => {
 })
 
 // ─── PUT /api/campaigns/:id ─────────────────────────────────────────────────
-router.put('/:id', requireAdmin, async (req, res) => {  if (!mongoose.Types.ObjectId.isValid(req.params.id))
-    return res.status(400).json({ error: 'Некорректный id' })  const { name, nodes, edges, startScenarioId } = req.body
+router.put('/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
+  const { name, nodes, edges, startScenarioId } = req.body
   try {
     const campaign = await Campaign.findById(req.params.id)
     if (!campaign) return res.status(404).json({ error: 'Сценарий не найден' })
@@ -97,8 +99,10 @@ router.put('/:id', requireAdmin, async (req, res) => {  if (!mongoose.Types.Obje
 })
 
 // ─── DELETE /api/campaigns/:id ──────────────────────────────────────────────
-router.delete('/:id', requireAdmin, async (req, res) => {  if (!mongoose.Types.ObjectId.isValid(req.params.id))
-    return res.status(400).json({ error: 'Некорректный id' })  try {
+router.delete('/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
+  try {
     const campaign = await Campaign.findById(req.params.id)
     if (!campaign) return res.status(404).json({ error: 'Сценарий не найден' })
     if (String(campaign.owner) !== String(req.user.id))
