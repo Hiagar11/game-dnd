@@ -19,6 +19,19 @@ const routes = [
     path: '/game',
     name: 'game',
     component: () => import('../views/GameView.vue'),
+    meta: { role: 'admin' },
+  },
+  {
+    path: '/lobby',
+    name: 'lobby',
+    component: () => import('../views/PlayerLobbyView.vue'),
+    meta: { role: 'player' },
+  },
+  {
+    path: '/viewer/:sessionId',
+    name: 'viewer',
+    component: () => import('../views/ViewerView.vue'),
+    meta: { role: 'player' },
   },
   {
     path: '/editor',

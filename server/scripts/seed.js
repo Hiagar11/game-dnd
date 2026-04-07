@@ -1,4 +1,4 @@
-// Скрипт создания первого пользователя (root/root).
+// Скрипт создания тестовых пользователей.
 // Запускать один раз: node server/scripts/seed.js
 //
 // Безопасно запускать повторно — если пользователь уже существует, ничего не произойдёт.
@@ -15,14 +15,20 @@ config({ path: path.join(__dirname, '..', '.env') })
 
 await mongoose.connect(process.env.MONGO_URI)
 
-const existing = await User.findOne({ username: 'root' })
+const seeds = [
+  { username: 'root', password: 'root', role: 'admin' },
+  { username: 'user', password: 'user', role: 'player' },
+]
 
-if (existing) {
-  console.log('[seed] Пользователь root уже существует, пропускаем.')
-} else {
-  const passwordHash = await bcrypt.hash('root', 12)
-  await User.create({ username: 'root', passwordHash, role: 'admin' })
-  console.log('[seed] Пользователь root создан (логин: root, пароль: root).')
+for (const seed of seeds) {
+  const existing = await User.findOne({ username: seed.username })
+  if (existing) {
+    console.log(`[seed] Пользователь ${seed.username} уже существует, пропускаем.`)
+  } else {
+    const passwordHash = await bcrypt.hash(seed.password, 12)
+    await User.create({ username: seed.username, passwordHash, role: seed.role })
+    console.log(`[seed] Создан ${seed.role} "${seed.username}" (пароль: ${seed.password}).`)
+  }
 }
 
 await mongoose.disconnect()

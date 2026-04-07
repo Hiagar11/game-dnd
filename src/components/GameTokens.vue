@@ -20,15 +20,16 @@
         width: `${store.cellSize}px`,
         height: `${store.cellSize}px`,
       }"
-      @click.stop="(store.selectPlacedToken(placed.uid), closeContextMenu())"
-      @dblclick.stop="onDblClick(placed)"
-      @contextmenu.stop.prevent="onContextMenu(placed)"
+      @click.stop="!props.viewerMode && (store.selectPlacedToken(placed.uid), closeContextMenu())"
+      @dblclick.stop="!props.viewerMode && onDblClick(placed)"
+      @contextmenu.stop.prevent="!props.viewerMode && onContextMenu(placed)"
     >
       <!--
         Меню рендерится ДО картинки в DOM, чтобы быть визуально за ней.
         Дополнительно: img имеет z-index: 1, меню — z-index: 0.
       -->
       <GameTokenContextMenu
+        v-if="!props.viewerMode"
         :visible="ctxState.uid === placed.uid && ctxState.visible"
         @remove="handleRemove(placed.uid)"
         @edit="handleEdit(placed.uid)"
@@ -42,17 +43,19 @@
     tokenId передаётся для заполнения формы текущими данными токена.
     При закрытии сбрасываем editTokenId в null.
   -->
-  <GameTokenEditPopup
-    :visible="editPlacedUid !== null"
-    :placed-uid="editPlacedUid"
-    @close="editPlacedUid = null"
-  />
+  <template v-if="!props.viewerMode">
+    <GameTokenEditPopup
+      :visible="editPlacedUid !== null"
+      :placed-uid="editPlacedUid"
+      @close="editPlacedUid = null"
+    />
 
-  <GameDoorPopup
-    :visible="doorPlacedUid !== null"
-    :placed-uid="doorPlacedUid"
-    @close="doorPlacedUid = null"
-  />
+    <GameDoorPopup
+      :visible="doorPlacedUid !== null"
+      :placed-uid="doorPlacedUid"
+      @close="doorPlacedUid = null"
+    />
+  </template>
 </template>
 
 <script setup>
@@ -64,9 +67,11 @@
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
   import GameDoorPopup from './GameDoorPopup.vue'
 
-  defineProps({
+  const props = defineProps({
     width: { type: Number, required: true },
     height: { type: Number, required: true },
+    // viewerMode: true — режим зрителя: нет контекстного меню, попапов и drag-событий
+    viewerMode: { type: Boolean, default: false },
   })
 
   const emit = defineEmits(['door-transition'])

@@ -67,12 +67,14 @@
 </template>
 
 <script setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, watch, onUnmounted } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useGameStore } from '../stores/game'
   import { useTokensStore } from '../stores/tokens'
   import { useScenariosStore } from '../stores/scenarios'
   import { useCampaignsStore } from '../stores/campaigns'
+  import { useAuthStore } from '../stores/auth'
+  import { useSocket } from '../composables/useSocket'
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
@@ -94,6 +96,30 @@
   const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
   const { close: closeContextMenu } = useTokenContextMenu()
 
+  const auth = useAuthStore()
+  const { connect, getSocket } = useSocket()
+
+  // Флаг: открыта ли активная сессия трансляции для зрителей
+  const sessionActive = ref(false)
+
+  // Дебаунс-таймер для game:pan (не шлём на каждый пиксель)
+  let panTimer = null
+  watch([offsetX, offsetY], ([x, y]) => {
+    if (!sessionActive.value) return
+    clearTimeout(panTimer)
+    panTimer = setTimeout(() => {
+      getSocket()?.emit('game:pan', { offsetX: x, offsetY: y })
+    }, 50)
+  })
+
+  onUnmounted(() => {
+    clearTimeout(panTimer)
+    if (sessionActive.value) {
+      getSocket()?.emit('game:session:close')
+      sessionActive.value = false
+    }
+  })
+
   const gameStore = useGameStore()
   const tokensStore = useTokensStore()
   const scenariosStore = useScenariosStore()
@@ -107,6 +133,10 @@
   onMounted(() => {
     scenariosStore.fetchScenarios()
     campaignsStore.fetchCampaigns()
+    // Подключаем сокет для трансляции зрителям
+    if (auth.role === 'admin') {
+      connect(auth.token)
+    }
   })
 
   // Количество уровней в кампании — для подписи на карточке
@@ -155,6 +185,28 @@
       gameStore.initPlacedTokens(full.placedTokens ?? [])
       gameStore.currentScenario = full
       selectedScenario.value = full
+
+      // Открываем/обновляем сессию для зрителей
+      if (auth.role === 'admin') {
+        const socket = getSocket()
+        if (socket) {
+          if (!sessionActive.value) {
+            socket.emit(
+              'game:session:open',
+              {
+                campaignId: String(gameStore.activeCampaign?.id ?? ''),
+                campaignName: gameStore.activeCampaign?.name ?? '',
+                scenarioId: String(full.id),
+              },
+              (res) => {
+                if (res?.ok) sessionActive.value = true
+              }
+            )
+          } else {
+            socket.emit('game:scenario:change', { scenarioId: String(full.id) })
+          }
+        }
+      }
     } catch (err) {
       loadError.value = err.message || 'Не удалось загрузить карту'
     } finally {
@@ -163,6 +215,10 @@
   }
 
   function exitGame() {
+    if (sessionActive.value) {
+      getSocket()?.emit('game:session:close')
+      sessionActive.value = false
+    }
     selectedScenario.value = null
     gameStore.currentScenario = null
     // Остаёмся в рамках того же сценария: возвращаемся к выбору уровня, не на старт

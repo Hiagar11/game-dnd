@@ -26,13 +26,15 @@
   const { playHover, playClick } = useSound()
   const auth = useAuthStore()
 
-  // Игрок видит только «Играть». Мастер (admin) видит также «Редактор».
+  // Игрок видит только «Играть» → лобби. Мастер (admin) видит «Играть» → игра и «Редактор».
   const menuItems = computed(() => {
-    const items = [{ to: '/game', label: 'Играть' }]
     if (auth.role === 'admin') {
-      items.push({ to: '/editor', label: 'Редактор' })
+      return [
+        { to: '/game', label: 'Играть' },
+        { to: '/editor', label: 'Редактор' },
+      ]
     }
-    return items
+    return [{ to: '/lobby', label: 'Играть' }]
   })
 </script>
 

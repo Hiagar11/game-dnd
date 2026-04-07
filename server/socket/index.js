@@ -5,6 +5,20 @@ import Scenario from '../models/Scenario.js'
 // Эта функция принимает io (сервер Socket.io) и навешивает все обработчики.
 
 export function setupSocket(io) {
+  // ─── Активные игровые сессии ──────────────────────────────────────────────
+  // Map: userId (admin) → { adminSocketId, adminName, campaignId, campaignName, scenarioId, offsetX, offsetY }
+  const sessions = new Map()
+
+  function listSessions() {
+    return Array.from(sessions.entries()).map(([sessionId, s]) => ({
+      sessionId,
+      adminName: s.adminName,
+      campaignId: s.campaignId,
+      campaignName: s.campaignName,
+      scenarioId: s.scenarioId,
+    }))
+  }
+
   // ─── Middleware: проверка JWT при подключении ─────────────────────────────
   // Клиент должен передавать токен в handshake:
   //   const socket = io('http://localhost:3000', {
@@ -207,8 +221,138 @@ export function setupSocket(io) {
       }
     })
 
+    // ─── Открытие игровой сессии (admin) ─────────────────────────────────────
+    // Событие: game:session:open { campaignId, campaignName, scenarioId }
+    // Создаёт публичную сессию — зрители видят её в лобби.
+    socket.on('game:session:open', ({ campaignId, campaignName, scenarioId }, ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+
+      const sessionId = socket.user.id
+      sessions.set(sessionId, {
+        adminSocketId: socket.id,
+        adminName: username,
+        campaignId,
+        campaignName,
+        scenarioId,
+        offsetX: 0,
+        offsetY: 0,
+      })
+
+      socket.join(`viewer:${sessionId}`)
+      io.emit('sessions:updated', listSessions())
+      ack?.({ ok: true, sessionId })
+    })
+
+    // ─── Смена сценария в рамках сессии (admin, переход через дверь) ─────────
+    // Событие: game:scenario:change { scenarioId }
+    // Переводит всех зрителей в новую комнату сценария.
+    socket.on('game:scenario:change', async ({ scenarioId }, ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+
+      const sessionId = socket.user.id
+      const session = sessions.get(sessionId)
+      if (!session) return ackError(ack, 'Нет активной сессии')
+
+      const oldScenarioId = session.scenarioId
+      session.scenarioId = scenarioId
+      session.offsetX = 0
+      session.offsetY = 0
+
+      // Переводим зрителей в комнату нового сценария
+      const viewerRoom = `viewer:${sessionId}`
+      const viewerSockets = await io.in(viewerRoom).fetchSockets()
+      for (const s of viewerSockets) {
+        if (s.id !== socket.id) {
+          s.leave(oldScenarioId)
+          s.join(scenarioId)
+        }
+      }
+
+      io.to(viewerRoom).emit('game:scenario:changed', { scenarioId })
+      ack?.({ ok: true })
+    })
+
+    // ─── Синхронизация панорамы (admin) ──────────────────────────────────────
+    // Событие: game:pan { offsetX, offsetY }
+    // Транслирует позицию камеры всем зрителям (без ack — fire-and-forget).
+    socket.on('game:pan', ({ offsetX, offsetY }) => {
+      if (role !== 'admin') return
+
+      const sessionId = socket.user.id
+      const session = sessions.get(sessionId)
+      if (!session) return
+
+      session.offsetX = offsetX
+      session.offsetY = offsetY
+      socket.to(`viewer:${sessionId}`).emit('game:panned', { offsetX, offsetY })
+    })
+
+    // ─── Закрытие сессии (admin) ──────────────────────────────────────────────
+    // Событие: game:session:close
+    socket.on('game:session:close', (ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+
+      sessions.delete(socket.user.id)
+      io.emit('sessions:updated', listSessions())
+      ack?.({ ok: true })
+    })
+
+    // ─── Список активных сессий ───────────────────────────────────────────────
+    // Событие: game:sessions:list (ack) → [{ sessionId, adminName, campaignName, ... }]
+    socket.on('game:sessions:list', (ack) => {
+      ack?.({ ok: true, sessions: listSessions() })
+    })
+
+    // ─── Вход зрителя в сессию ────────────────────────────────────────────────
+    // Событие: game:session:join { sessionId }
+    // Возвращает снапшот текущего состояния игры.
+    socket.on('game:session:join', async ({ sessionId }, ack) => {
+      const session = sessions.get(sessionId)
+      if (!session) return ackError(ack, 'Сессия не найдена или уже завершена')
+
+      socket.join(`viewer:${sessionId}`)
+      socket.join(session.scenarioId)
+
+      try {
+        const scenario = await Scenario.findById(session.scenarioId).populate(
+          'placedTokens.tokenId',
+          'name imagePath'
+        )
+        if (!scenario) return ackError(ack, 'Сценарий не найден')
+
+        // Игроки видят только не скрытые токены
+        const placedTokens = scenario.placedTokens.filter((t) => !t.hidden)
+
+        ack?.({
+          ok: true,
+          session: {
+            sessionId,
+            campaignId: session.campaignId,
+            campaignName: session.campaignName,
+            scenarioId: session.scenarioId,
+            offsetX: session.offsetX,
+            offsetY: session.offsetY,
+          },
+          scenario: {
+            id: String(scenario._id),
+            mapImagePath: scenario.mapImagePath,
+            cellSize: scenario.cellSize ?? 60,
+            placedTokens,
+            revealedCells: scenario.revealedCells,
+          },
+        })
+      } catch {
+        ackError(ack, 'Ошибка сервера')
+      }
+    })
+
     socket.on('disconnect', () => {
       console.log(`[socket] ${username} отключился — ${socket.id}`)
+      // Если отключился admin с активной сессией — закрываем её
+      if (role === 'admin' && sessions.has(socket.user.id)) {
+        sessions.delete(socket.user.id)
+        io.emit('sessions:updated', listSessions())
+      }
     })
   })
 }
