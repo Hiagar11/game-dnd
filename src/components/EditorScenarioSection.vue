@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-  import { onMounted } from 'vue'
+  import { onMounted, onBeforeUnmount } from 'vue'
   import { useScenariosStore } from '../stores/scenarios'
   import { useCampaignsStore } from '../stores/campaigns'
   import { useGameStore } from '../stores/game'
@@ -141,6 +141,17 @@
     deleteCampaign,
   } = useCampaignCrud(graph)
 
+  // Горизонтальный скролл колёсиком мыши.
+  // Нужен { passive: false }, чтобы вызов e.preventDefault() не игнорировался браузером.
+  function onCanvasWheel(e) {
+    e.preventDefault()
+    canvasRef.value.scrollLeft += e.deltaY
+  }
+
+  onBeforeUnmount(() => {
+    canvasRef.value?.removeEventListener('wheel', onCanvasWheel)
+  })
+
   // Двойной клик по узлу: открываем редактор дверей для этого сценария.
   // Строим временный объект кампании с текущими рёбрами (даже если не сохранены) —
   // GameDoorPopup читает campaign.edges и фильтрует список связанных локаций.
@@ -155,10 +166,11 @@
 
   onMounted(async () => {
     await Promise.all([scenariosStore.fetchScenarios(), campaignsStore.fetchCampaigns()])
+    canvasRef.value?.addEventListener('wheel', onCanvasWheel, { passive: false })
   })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
   /* ─── Общая разметка ────────────────────────────────────────────── */
   .scenario-editor {
     display: flex;
@@ -170,7 +182,7 @@
   /* ─── Холст графа ──────────────────────────────────────────────── */
   .scenario-canvas {
     flex: 1;
-    overflow: auto;
+    overflow: auto hidden;
     min-height: 0;
     background:
       radial-gradient(circle at 50% 50%, rgb(200 154 74 / 3%) 0%, transparent 70%),
@@ -188,6 +200,25 @@
         rgb(255 255 255 / 3%) 39px,
         rgb(255 255 255 / 3%) 40px
       );
+
+    /* ─── Кастомный горизонтальный скроллбар ────────────────────── */
+    &::-webkit-scrollbar {
+      height: 5px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--color-primary-dark);
+      border-radius: 3px;
+      transition: background var(--transition-fast);
+
+      &:hover {
+        background: var(--color-primary);
+      }
+    }
   }
 
   .scenario-canvas__content {
