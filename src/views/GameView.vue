@@ -70,6 +70,7 @@
   import { ref, onMounted } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useGameStore } from '../stores/game'
+  import { useTokensStore } from '../stores/tokens'
   import { useScenariosStore } from '../stores/scenarios'
   import { useCampaignsStore } from '../stores/campaigns'
   import AppBackground from '../components/AppBackground.vue'
@@ -94,6 +95,7 @@
   const { close: closeContextMenu } = useTokenContextMenu()
 
   const gameStore = useGameStore()
+  const tokensStore = useTokensStore()
   const scenariosStore = useScenariosStore()
   const campaignsStore = useCampaignsStore()
 
@@ -147,7 +149,7 @@
     loadingId.value = s.id
     loadError.value = ''
     try {
-      await gameStore.fetchTokens()
+      await tokensStore.fetchTokens()
       const full = await scenariosStore.fetchScenario(s.id)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.initPlacedTokens(full.placedTokens ?? [])

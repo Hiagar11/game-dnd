@@ -33,11 +33,11 @@
 
 <script setup>
   import { ref, onMounted } from 'vue'
-  import { useGameStore } from '../stores/game'
+  import { useTokensStore } from '../stores/tokens'
   import { useTokenDrag } from '../composables/useTokenDrag'
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
 
-  const store = useGameStore()
+  const store = useTokensStore()
   const { onDragStart } = useTokenDrag()
 
   const isPopupOpen = ref(false)

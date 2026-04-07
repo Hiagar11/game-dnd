@@ -138,66 +138,39 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch, nextTick, onMounted } from 'vue'
+  import { ref, computed, watch, onMounted } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
+  import { useLevelSave } from '../composables/useLevelSave'
   import { useGameStore } from '../stores/game'
+  import { useTokensStore } from '../stores/tokens'
   import { useScenariosStore } from '../stores/scenarios'
   import GameMap from './GameMap.vue'
   import GameGrid from './GameGrid.vue'
   import GameTokens from './GameTokens.vue'
   import GameMenu from './GameMenu.vue'
 
-  // autoLoadScenario: предаётся из EditorScenarioSection через ScenarioEditorView
-  // при двойном клике по узлу графа. Ѐback-to-scenario — возвращает назад.
-  const props = defineProps({
-    autoLoadScenario: { type: Object, default: null },
-  })
+  const props = defineProps({ autoLoadScenario: { type: Object, default: null } })
   const emit = defineEmits(['back-to-scenario'])
 
   const store = useScenariosStore()
   const gameStore = useGameStore()
+  const tokensStore = useTokensStore()
 
-  // Только карты без токенов — их выбираем для расставки
   const maps = computed(() => store.scenarios.filter((s) => !s.tokensCount))
-
-  // Заполненные уровни (с токенами) — тот же источник, что показывает GameView.
-  // computed автоматически обновится после удаления через store.deleteScenario.
   const levels = computed(() => store.scenarios.filter((s) => s.tokensCount > 0))
 
-  // ─── Состояние ──────────────────────────────────────────────────────────────
+  // ─── Состояние компонента ────────────────────────────────────────────────────
   const selectedScenario = ref(null)
   const mapSize = ref({ width: 0, height: 0 })
   const loadingId = ref(null)
   const loadError = ref('')
-  const saving = ref(false)
-  const saveError = ref('')
-  const saveSuccess = ref(false)
-  const saveToastMsg = ref('')
+  const isEditingLevel = ref(false)
   const deletingId = ref(null)
   const deleteError = ref('')
 
-  // Флаг: открыт существующий уровень — кнопка станет «Обновить»
-  const isEditingLevel = ref(false)
-
-  // ─── Попап сохранения ────────────────────────────────────────────────────────
-  const showSavePopup = ref(false)
-  const levelName = ref('')
-  const levelNameInputRef = ref(null)
-
-  function openSavePopup() {
-    levelName.value = ''
-    saveError.value = ''
-    showSavePopup.value = true
-    nextTick(() => levelNameInputRef.value?.focus())
-  }
-
-  function closeSavePopup() {
-    showSavePopup.value = false
-  }
-
-  // ─── useMapPan (левый клик — пан) ───────────────────────────────────────────
+  // ─── Карта: пан + дропзона ───────────────────────────────────────────────────
   const viewRef = ref(null)
   const mapRef = ref(null)
   const canvasRef = ref(null)
@@ -206,32 +179,48 @@
     viewRef,
     canvasRef
   )
-
   const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
   const { close: closeContextMenu } = useTokenContextMenu()
 
-  // ─── Жизненный цикл ─────────────────────────────────────────────────────────
-  onMounted(() => store.fetchScenarios())
-  // Когда ScenarioEditorView передаёт сценарий через prop, автоматически открываем его в режиме редактирования.
-  // GameDoorPopup в тот момент уже читает gameStore.activeCampaign (выставлено в EditorScenarioSection),
-  // так что ему доступны только связанные локации из текущей схемы сценария.
-  watch(
-    () => props.autoLoadScenario,
-    async (scenario) => {
-      if (scenario) await editLevel(scenario)
-    },
-    { immediate: true }
-  )
-  // ─── Выбор карты ────────────────────────────────────────────────────────────
-  async function selectScenario(s) {
+  // ─── Навигация ───────────────────────────────────────────────────────────────
+  function exitGame() {
+    selectedScenario.value = null
+    isEditingLevel.value = false
+  }
+
+  function goBack() {
+    exitGame()
+    gameStore.setActiveCampaign(null)
+    emit('back-to-scenario')
+  }
+
+  // ─── Логика сохранения (попап + PATCH/POST) ───────────────────────────────────
+  const autoLoadRef = computed(() => props.autoLoadScenario)
+  const {
+    showSavePopup,
+    levelName,
+    levelNameInputRef,
+    saving,
+    saveError,
+    saveSuccess,
+    saveToastMsg,
+    closeSavePopup,
+    onSaveBtnClick,
+    onSaveLevel,
+  } = useLevelSave(selectedScenario, isEditingLevel, autoLoadRef, exitGame, goBack)
+
+  // ─── Загрузка сценария (карта + токены) ─────────────────────────────────────
+  async function loadScenarioData(s, editMode = false) {
     loadingId.value = s.id
     loadError.value = ''
     try {
-      await gameStore.fetchTokens()
+      await tokensStore.fetchTokens()
       const full = await store.fetchScenario(s.id)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.initPlacedTokens(full.placedTokens ?? [])
+      gameStore.currentScenario = full
       selectedScenario.value = full
+      isEditingLevel.value = editMode
     } catch (err) {
       loadError.value = err.message || 'Не удалось загрузить карту'
     } finally {
@@ -239,7 +228,9 @@
     }
   }
 
-  // ─── Обработчики игрового интерфейса ────────────────────────────────────────
+  const selectScenario = (s) => loadScenarioData(s, false)
+  const editLevel = (s) => loadScenarioData(s, true)
+
   function onMapReady(canvas) {
     canvasRef.value = canvas
     mapSize.value = { width: canvas.width, height: canvas.height }
@@ -252,86 +243,7 @@
     closeContextMenu()
   }
 
-  function exitGame() {
-    selectedScenario.value = null
-    saveError.value = ''
-    isEditingLevel.value = false
-  }
-
-  // ВозвраТ в режим редактора сценария: ресет состояния редактора + сообщаем родителю.
-  function goBack() {
-    exitGame()
-    gameStore.setActiveCampaign(null)
-    emit('back-to-scenario')
-  }
-
-  // ─── Открытие уровня для редактирования ─────────────────────────────────────
-  // То же что selectScenario, но ставит флаг isEditingLevel = true.
-  async function editLevel(s) {
-    loadingId.value = s.id
-    loadError.value = ''
-    try {
-      await gameStore.fetchTokens()
-      const full = await store.fetchScenario(s.id)
-      gameStore.setCellSize(full.cellSize ?? 60)
-      gameStore.initPlacedTokens(full.placedTokens ?? [])
-      gameStore.currentScenario = full
-      selectedScenario.value = full
-      isEditingLevel.value = true
-    } catch (err) {
-      loadError.value = err.message || 'Не удалось загрузить уровень'
-    } finally {
-      loadingId.value = null
-    }
-  }
-
-  // Обработка кнопки сохранения ─────────────────────────────────────────────
-  // В режиме редактирования (уровень) — сразу обновляем, без попапа.
-  // В режиме создания — открываем попап для ввода названия.
-  function onSaveBtnClick() {
-    if (isEditingLevel.value) {
-      onUpdateLevel()
-    } else {
-      openSavePopup()
-    }
-  }
-
-  // Обновляем токены существующего уровня через PATCH запрос.
-  async function onUpdateLevel() {
-    saving.value = true
-    saveError.value = ''
-    try {
-      const tokens = gameStore.placedTokens.map(
-        ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden }) => ({
-          uid,
-          // Системные токены не имеют tokenId, вместо этого передают systemToken.
-          ...(systemToken ? { systemToken } : { tokenId }),
-          ...(targetScenarioId ? { targetScenarioId } : {}),
-          col,
-          row,
-          hidden: hidden ?? false,
-        })
-      )
-      await store.saveLevelTokens(selectedScenario.value.id, tokens)
-      if (props.autoLoadScenario) {
-        // Возвращаемся в редактор сценария без потери счётчика сценария и связей
-        goBack()
-      } else {
-        exitGame()
-        saveToastMsg.value = 'Уровень обновлён'
-        saveSuccess.value = true
-        setTimeout(() => {
-          saveSuccess.value = false
-        }, 3000)
-      }
-    } catch (err) {
-      saveError.value = err.message || 'Ошибка при обновлении'
-    } finally {
-      saving.value = false
-    }
-  }
-
-  // ─── Удаление сохранённого уровня ────────────────────────────────────────────
+  // ─── Удаление уровня ─────────────────────────────────────────────────────────
   async function onDeleteLevel(s) {
     if (
       !confirm(`Удалить уровень «${s.name || 'Без названия'}»?\nОн исчезнет из раздела «Играть».`)
@@ -348,54 +260,14 @@
     }
   }
 
-  // ─── Сохранение расстановки ──────────────────────────────────────────────────
-  // Уровень сохраняется как НОВЫЙ сценарий — источник (карта) остаётся нетронутым.
-  async function onSaveLevel() {
-    if (!levelName.value) return
-
-    // Клиентская проверка: имя не должно совпадать ни с одним существующим сценарием
-    const duplicate = store.scenarios.find(
-      (s) => s.name.trim().toLowerCase() === levelName.value.toLowerCase()
-    )
-    if (duplicate) {
-      saveError.value = 'Это имя уже занято другой картой или уровнем'
-      return
-    }
-
-    saving.value = true
-    saveError.value = ''
-    try {
-      const tokens = gameStore.placedTokens.map(
-        ({ uid, tokenId, systemToken, targetScenarioId, col, row }) => ({
-          uid,
-          ...(systemToken ? { systemToken } : { tokenId }),
-          ...(targetScenarioId ? { targetScenarioId } : {}),
-          col,
-          row,
-          hidden: false,
-        })
-      )
-      console.log('[EditorLevelSection] saving tokens:', tokens.length, JSON.stringify(tokens))
-      // Создаём новый сценарий с токенами (источник остаётся нетронутым)
-      await store.createScenario({
-        name: levelName.value,
-        mapImagePath: selectedScenario.value.mapImagePath,
-        cellSize: selectedScenario.value.cellSize,
-        placedTokens: tokens,
-      })
-      closeSavePopup()
-      // Показываем тост на 3 секунды
-      saveToastMsg.value = 'Уровень сохранён'
-      saveSuccess.value = true
-      setTimeout(() => {
-        saveSuccess.value = false
-      }, 3000)
-    } catch (err) {
-      saveError.value = err.message || 'Ошибка при сохранении'
-    } finally {
-      saving.value = false
-    }
-  }
+  onMounted(() => store.fetchScenarios())
+  watch(
+    () => props.autoLoadScenario,
+    async (scenario) => {
+      if (scenario) await editLevel(scenario)
+    },
+    { immediate: true }
+  )
 </script>
 
 <style scoped>

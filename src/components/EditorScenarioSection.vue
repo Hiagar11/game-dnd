@@ -45,7 +45,7 @@
           <button
             class="scenario-panel__btn scenario-panel__btn--danger"
             :disabled="saving"
-            @click="onDeleteCampaign"
+            @click="deleteCampaign"
           >
             Удалить
           </button>
@@ -175,10 +175,12 @@
 </template>
 
 <script setup>
-  import { ref, computed, reactive, onMounted } from 'vue'
+  import { onMounted } from 'vue'
   import { useScenariosStore } from '../stores/scenarios'
   import { useCampaignsStore } from '../stores/campaigns'
   import { useGameStore } from '../stores/game'
+  import { useScenarioGraph } from '../composables/useScenarioGraph'
+  import { useCampaignCrud } from '../composables/useCampaignCrud'
 
   const emit = defineEmits(['open-level'])
 
@@ -186,218 +188,36 @@
   const campaignsStore = useCampaignsStore()
   const gameStore = useGameStore()
 
-  // ─── Константы размеров ──────────────────────────────────────────────────
-  const NODE_W = 160
-  const NODE_H = 110
-  const GRID_COLS = 4
-  const GRID_GAP = 52
-  // Порог в пикселях: драг активируется только при движении больше этого значения
-  const DRAG_THRESHOLD = 5
+  // ─── Граф: узлы, рёбра, перетаскивание ──────────────────────────────────────
+  const graph = useScenarioGraph()
+  const {
+    canvasRef, NODE_W, NODE_H, edges, hoveredNodeId,
+    connecting, connectingFromId, connectingStart, connectingEnd,
+    levels, levelsWithNodes, displayEdges,
+    startNodeDrag, startConnect, onMouseMove, onMouseUp, removeEdge,
+  } = graph
 
-  // ─── Состояние кампании ────────────────────────────────────────────
-  const activeCampaignId = ref(null)
-  const campaignName = ref('')
-  const saving = ref(false)
-  const saveSuccess = ref(false)
-  const saveError = ref('')
-  // ID сценария, помеченного как стартовая локация (null = не задана)
-  const startScenarioId = ref(null)
+  // ─── CRUD кампании ────────────────────────────────────────────────────────────
+  const campaign = useCampaignCrud(graph)
+  const { activeCampaignId, campaignName, startScenarioId, saving, saveSuccess, saveError } = campaign
+  const { loadCampaign, resetEditor, toggleStart, saveCampaign, deleteCampaign } = campaign
 
-  // ─── Граф: позиции узлов и рёбра ───────────────────────────────
-  // nodePos[scenarioId] = { x, y } — позиция центра карточки на холсте
-  const nodePos = reactive({})
-  const edges = ref([]) // [{ from: scenarioId, to: scenarioId }]
-
-  // ─── Взаимодействие с холстом ─────────────────────────────────────
-  const canvasRef = ref(null)
-  const draggingNodeId = ref(null)
-  const _dragOffset = { x: 0, y: 0 } // pendingDrag: mousedown зафиксирован — драг начинается после преодоления DRAG_THRESHOLD
-  const pendingDrag = ref(null) // { nodeId, startX, startY, offsetX, offsetY }
-  const connecting = ref(false)
-  const connectingFromId = ref(null)
-  const connectingStart = ref({ x: 0, y: 0 })
-  const connectingEnd = ref({ x: 0, y: 0 })
-  const hoveredNodeId = ref(null)
-
-  // ─── Вычисляемые ─────────────────────────────────────────────────
-  const levels = computed(() => scenariosStore.scenarios.filter((s) => s.tokensCount > 0))
-
-  function defaultX(i) {
-    return (i % GRID_COLS) * (NODE_W + GRID_GAP) + GRID_GAP
-  }
-  function defaultY(i) {
-    return Math.floor(i / GRID_COLS) * (NODE_H + GRID_GAP) + GRID_GAP
-  }
-
-  // Каждый уровень получает позицию: сохранённую или дефолтную в сетке
-  const levelsWithNodes = computed(() =>
-    levels.value.map((s, i) => {
-      const sid = String(s.id)
-      return {
-        scenarioId: sid,
-        scenario: s,
-        x: nodePos[sid]?.x ?? defaultX(i),
-        y: nodePos[sid]?.y ?? defaultY(i),
-      }
-    })
-  )
-
-  // Рёбра с пиксельными координатами для SVG
-  const displayEdges = computed(() =>
-    edges.value.flatMap((edge) => {
-      const fn = levelsWithNodes.value.find((n) => n.scenarioId === edge.from)
-      const tn = levelsWithNodes.value.find((n) => n.scenarioId === edge.to)
-      if (!fn || !tn) return []
-      return [
-        {
-          key: `${edge.from}__${edge.to}`,
-          x1: fn.x + NODE_W / 2,
-          y1: fn.y + NODE_H / 2,
-          x2: tn.x + NODE_W / 2,
-          y2: tn.y + NODE_H / 2,
-          from: edge.from,
-          to: edge.to,
-        },
-      ]
-    })
-  )
-
-  // ─── Координаты релативно холста ───────────────────────────────────
-  // clientX/clientY — оконные координаты, canvasRef — скролляемый контейнер.
-  // scrollLeft/scrollTop компенсируют прокрутку, давая позицию внутри content.
-  function canvasPos(e) {
-    const c = canvasRef.value
-    const r = c.getBoundingClientRect()
-    return { x: e.clientX - r.left + c.scrollLeft, y: e.clientY - r.top + c.scrollTop }
-  }
-
-  // ─── Перемещение узла ────────────────────────────────────────────────
-  // mousedown только регистрирует потенциальный драг (до порога DRAG_THRESHOLD).
-  // Это позволяет отличать одиночный клик/двойной клик (открытие редактора дверей) от драга.
-  function startNodeDrag(e, node) {
-    // Клик по порту запускает создание связи, а не перемещение
-    if (e.target.classList.contains('scenario-node__port')) return
-    e.preventDefault()
-    const pos = canvasPos(e)
-    pendingDrag.value = {
-      nodeId: node.scenarioId,
-      startX: pos.x,
-      startY: pos.y,
-      offsetX: pos.x - node.x,
-      offsetY: pos.y - node.y,
+  // ─── Открытие уровня двойным кликом ─────────────────────────────────────────
+  function onNodeDblClick(node) {
+    graph.draggingNodeId.value = null
+    graph.pendingDrag.value = null
+    const tempCampaign = {
+      id: activeCampaignId.value,
+      edges: graph.edges.value.map((e) => ({ from: e.from, to: e.to })),
     }
+    gameStore.setActiveCampaign(tempCampaign)
+    emit('open-level', { scenario: node.scenario })
   }
 
-  // ─── Создание связи драгом с порта ────────────────────────────────
-  function startConnect(e, node) {
-    e.preventDefault()
-    connecting.value = true
-    connectingFromId.value = node.scenarioId
-    connectingStart.value = { x: node.x + NODE_W / 2, y: node.y + NODE_H / 2 }
-    connectingEnd.value = canvasPos(e)
-  }
-
-  // ─── Обработчики движения мыши ──────────────────────────────────
-  function onMouseMove(e) {
-    const pos = canvasPos(e)
-    // Проверяем порог перед активацией драга
-    if (pendingDrag.value && !draggingNodeId.value) {
-      const dx = Math.abs(pos.x - pendingDrag.value.startX)
-      const dy = Math.abs(pos.y - pendingDrag.value.startY)
-      if (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD) {
-        draggingNodeId.value = pendingDrag.value.nodeId
-        _dragOffset.x = pendingDrag.value.offsetX
-        _dragOffset.y = pendingDrag.value.offsetY
-        pendingDrag.value = null
-      }
-    }
-    if (draggingNodeId.value) {
-      nodePos[draggingNodeId.value] = {
-        x: Math.max(0, pos.x - _dragOffset.x),
-        y: Math.max(0, pos.y - _dragOffset.y),
-      }
-    }
-    if (connecting.value) {
-      connectingEnd.value = pos
-    }
-  }
-
-  function onMouseUp() {
-    if (
-      connecting.value &&
-      connectingFromId.value &&
-      hoveredNodeId.value &&
-      hoveredNodeId.value !== connectingFromId.value
-    ) {
-      addEdge(connectingFromId.value, hoveredNodeId.value)
-    }
-    connecting.value = false
-    connectingFromId.value = null
-    draggingNodeId.value = null
-    pendingDrag.value = null
-  }
-
-  // ─── Управление рёбрами ──────────────────────────────────────────
-  function addEdge(fromId, toId) {
-    const exists = edges.value.some(
-      (e) => (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
-    )
-    if (!exists) edges.value.push({ from: fromId, to: toId })
-  }
-
-  function removeEdge(edge) {
-    edges.value = edges.value.filter(
-      (e) =>
-        !((e.from === edge.from && e.to === edge.to) || (e.from === edge.to && e.to === edge.from))
-    )
-  }
-
-  // Переключить стартовую локацию (повторный клик снимает отметку)
-  function toggleStart(scenarioId) {
-    startScenarioId.value = startScenarioId.value === scenarioId ? null : scenarioId
-  }
-
-  // ─── Загрузка кампании ─────────────────────────────────────────
-  function loadCampaign(campaign) {
-    activeCampaignId.value = campaign.id
-    campaignName.value = campaign.name
-    saveSuccess.value = false
-    saveError.value = ''
-
-    // Очистить текущее состояние
-    Object.keys(nodePos).forEach((k) => delete nodePos[k])
-    edges.value = []
-
-    // Восстановить позиции узлов
-    for (const node of campaign.nodes) {
-      nodePos[String(node.scenarioId)] = { x: node.x, y: node.y }
-    }
-    // Восстановить рёбра
-    edges.value = campaign.edges.map((e) => ({ from: String(e.from), to: String(e.to) }))
-    // Восстановить стартовую локацию
-    startScenarioId.value = campaign.startScenarioId ?? null
-  }
-
-  function resetEditor() {
-    activeCampaignId.value = null
-    campaignName.value = ''
-    saveSuccess.value = false
-    saveError.value = ''
-    startScenarioId.value = null
-    Object.keys(nodePos).forEach((k) => delete nodePos[k])
-    edges.value = []
-  }
-
-  // ─── Сохранение кампании ───────────────────────────────────────
-  async function saveCampaign() {
-    if (!campaignName.value) return
-    saving.value = true
-    saveError.value = ''
-    saveSuccess.value = false
-    try {
-      const data = {
-        name: campaignName.value,
-        // Сохраняем позиции всех уровней (включая новые, которые ещё не были в кампании)
+  onMounted(async () => {
+    await Promise.all([scenariosStore.fetchScenarios(), campaignsStore.fetchCampaigns()])
+  })
+</script>
         nodes: levelsWithNodes.value.map(({ scenarioId, x, y }) => ({ scenarioId, x, y })),
         edges: edges.value,
         startScenarioId: startScenarioId.value || null,

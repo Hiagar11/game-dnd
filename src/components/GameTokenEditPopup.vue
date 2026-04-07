@@ -132,6 +132,7 @@
 <script setup>
   import { ref, computed, watch } from 'vue'
   import { useGameStore } from '../stores/game'
+  import { useTokensStore } from '../stores/tokens'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
@@ -144,6 +145,7 @@
   const emit = defineEmits(['close'])
 
   const store = useGameStore()
+  const tokensStore = useTokensStore()
   const fileInputRef = ref(null)
   const saving = ref(false)
   const saveError = ref('')
@@ -207,7 +209,7 @@
       }
     } else if (isEditMode.value) {
       // Режим редактирования шаблона: популяруем форму текущими данными токена
-      const token = store.tokens.find((t) => t.id === props.tokenId)
+      const token = tokensStore.tokens.find((t) => t.id === props.tokenId)
       if (token) {
         const { name, src, meleeDmg, rangedDmg, visionRange, defense, evasion } = token
         form.value = { name, meleeDmg, rangedDmg, visionRange, defense, evasion }
@@ -266,7 +268,7 @@
         })
       } else if (isEditMode.value) {
         // Редактирование шаблона: отправляем только текстовые поля (изображение не меняется)
-        await store.editToken(props.tokenId, {
+        await tokensStore.editToken(props.tokenId, {
           name,
           meleeDmg,
           rangedDmg,
@@ -284,7 +286,7 @@
         fd.append('visionRange', visionRange)
         fd.append('defense', defense)
         fd.append('evasion', evasion)
-        await store.addToken(fd)
+        await tokensStore.addToken(fd)
       }
 
       emit('close')
@@ -313,7 +315,7 @@
     if (!confirm(`Удалить токен «${form.value.name}»?`)) return
     saving.value = true
     try {
-      await store.deleteToken(props.tokenId)
+      await tokensStore.deleteToken(props.tokenId)
       emit('close')
     } catch (err) {
       saveError.value = err.message || 'Ошибка при удалении'

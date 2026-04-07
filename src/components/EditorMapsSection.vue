@@ -10,7 +10,7 @@
         title="Карты"
         @select="loadScenario"
         @create="newScenario"
-        @delete="onDeleteScenario"
+        @delete="handleDeleteScenario"
       />
 
       <main class="maps-main">
@@ -68,7 +68,7 @@
         @redraw="drawPreview"
         @change-map="triggerMapPicker"
         @save="onSave"
-        @delete="onDelete"
+        @delete="handleDelete"
       />
     </div>
 
@@ -84,27 +84,16 @@
 </template>
 
 <script setup>
-  import { ref, computed, onMounted, watch, nextTick } from 'vue'
+  import { ref, onMounted, watch, nextTick } from 'vue'
   import { useScenariosStore } from '../stores/scenarios'
   import { useEditorCanvas } from '../composables/useEditorCanvas'
+  import { useMapScenarioForm } from '../composables/useMapScenarioForm'
   import EditorSidebar from './EditorSidebar.vue'
   import EditorMapDropzone from './EditorMapDropzone.vue'
   import EditorToolbar from './EditorToolbar.vue'
 
   const store = useScenariosStore()
 
-  // ─── Состояние формы ────────────────────────────────────────────────────────
-  const DEFAULT_CELL_SIZE = 60
-
-  const form = ref({
-    id: null,
-    name: '',
-    mapImageUrl: null,
-    mapImagePath: null,
-    cellSize: DEFAULT_CELL_SIZE,
-  })
-
-  // ─── Canvas: зум, пан, рисование ────────────────────────────────────────────
   const {
     previewCanvasRef,
     canvasWrapRef,
@@ -119,24 +108,54 @@
     onPanEnd,
   } = useEditorCanvas()
 
-  // ─── Рефы на DOM ────────────────────────────────────────────────────────────
+  const {
+    form,
+    saving,
+    uploadingMap,
+    saveError,
+    canSave,
+    resetForm,
+    fillFormFromScenario,
+    uploadMapFile,
+    onSave,
+    onDelete,
+    onDeleteScenario,
+  } = useMapScenarioForm()
+
   const mapInputRef = ref(null)
 
-  // ─── UI-флаги ────────────────────────────────────────────────────────────────
-  const saving = ref(false)
-  const uploadingMap = ref(false)
-  const saveError = ref('')
+  // Обёртки комбинируют сброс canvas и изменение формы
+  function newScenario() {
+    clearImage()
+    resetForm()
+  }
+  function loadScenario(s) {
+    clearImage()
+    fillFormFromScenario(s)
+  }
+  function handleDelete() {
+    onDelete(newScenario)
+  }
+  function handleDeleteScenario(s) {
+    onDeleteScenario(s, newScenario)
+  }
 
-  // ─── Геттеры ─────────────────────────────────────────────────────────────────
-  const canSave = computed(
-    () =>
-      form.value.name.length > 0 &&
-      form.value.mapImagePath !== null &&
-      !uploadingMap.value &&
-      !saving.value
-  )
+  function triggerMapPicker() {
+    mapInputRef.value?.click()
+  }
 
-  // ─── Жизненный цикл ─────────────────────────────────────────────────────────
+  function onMapFileChange(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    uploadMapFile(file)
+  }
+
+  function exitCanvas() {
+    clearImage()
+    form.value.mapImageUrl = null
+  }
+
   onMounted(() => store.fetchScenarios())
 
   watch(
@@ -150,130 +169,6 @@
       loadImageAndDraw(url, form.value.cellSize)
     }
   )
-
-  // ─── Возврат из canvas-режима в форму ────────────────────────────────────────
-  function exitCanvas() {
-    clearImage()
-    form.value.mapImageUrl = null
-  }
-
-  // ─── Список карт ─────────────────────────────────────────────────────────────
-  function newScenario() {
-    clearImage()
-    saveError.value = ''
-    form.value = {
-      id: null,
-      name: '',
-      mapImageUrl: null,
-      mapImagePath: null,
-      cellSize: DEFAULT_CELL_SIZE,
-    }
-  }
-
-  function loadScenario(s) {
-    clearImage()
-    saveError.value = ''
-    form.value = {
-      id: String(s.id),
-      name: s.name,
-      mapImageUrl: s.mapImageUrl ?? null,
-      mapImagePath: s.mapImagePath ?? null,
-      cellSize: s.cellSize ?? DEFAULT_CELL_SIZE,
-    }
-  }
-
-  // ─── Загрузка карты ───────────────────────────────────────────────────────────
-  function triggerMapPicker() {
-    mapInputRef.value?.click()
-  }
-
-  function onMapFileChange(e) {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-    uploadMapFile(file)
-  }
-
-  async function uploadMapFile(file) {
-    uploadingMap.value = true
-    saveError.value = ''
-    try {
-      const result = await store.uploadMapImage(file)
-      form.value.mapImageUrl = result.mapImageUrl
-      form.value.mapImagePath = result.mapImagePath
-    } catch (err) {
-      saveError.value = err.message || 'Ошибка загрузки карты'
-    } finally {
-      uploadingMap.value = false
-    }
-  }
-
-  // ─── Сохранение / удаление ───────────────────────────────────────────────────
-  async function onSave() {
-    if (!canSave.value) return
-    saving.value = true
-    saveError.value = ''
-
-    const payload = {
-      name: form.value.name,
-      mapImagePath: form.value.mapImagePath,
-      cellSize: form.value.cellSize,
-    }
-
-    try {
-      if (form.value.id) {
-        const updated = await store.updateScenario(form.value.id, payload)
-        form.value.id = String(updated.id)
-      } else {
-        // Клиентская проверка уникальности имени перед запросом
-        const duplicate = store.scenarios.find(
-          (s) => s.name.trim().toLowerCase() === form.value.name.toLowerCase()
-        )
-        if (duplicate) {
-          saveError.value = 'Карта с таким именем уже существует'
-          saving.value = false
-          return
-        }
-        const created = await store.createScenario(payload)
-        form.value.id = String(created.id)
-      }
-    } catch (err) {
-      saveError.value = err.message || 'Ошибка при сохранении'
-    } finally {
-      saving.value = false
-    }
-  }
-
-  async function onDelete() {
-    if (!confirm(`Удалить «${form.value.name}»?`)) return
-    saving.value = true
-    try {
-      await store.deleteScenario(form.value.id)
-      newScenario()
-    } catch (err) {
-      saveError.value = err.message || 'Ошибка при удалении'
-    } finally {
-      saving.value = false
-    }
-  }
-
-  // Удаление из боковой панели — принимает объект сценария (s)
-  async function onDeleteScenario(s) {
-    if (!confirm(`Удалить «${s.name || 'Без названия'}»?`)) return
-    saving.value = true
-    saveError.value = ''
-    try {
-      await store.deleteScenario(String(s.id))
-      // Если удаляем то, что сейчас открыто — сбрасываем форму
-      if (String(s.id) === form.value.id) {
-        newScenario()
-      }
-    } catch (err) {
-      saveError.value = err.message || 'Ошибка при удалении'
-    } finally {
-      saving.value = false
-    }
-  }
 </script>
 
 <style scoped>
