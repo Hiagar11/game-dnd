@@ -1,49 +1,39 @@
 <template>
-  <Teleport to="body">
-    <Transition name="popup-fade">
-      <div v-if="visible" class="door-overlay" @click.self="$emit('close')">
-        <div class="door-popup" role="dialog" aria-modal="true" aria-label="Настройка двери">
-          <h2 class="door-popup__title">Дверь</h2>
+  <PopupShell :visible="visible" aria-label="Настройка двери" @close="$emit('close')">
+    <h2 class="door-popup__title">Дверь</h2>
 
-          <div class="door-popup__selects">
-            <!-- Левый: текущая локация — всегда задизейблен -->
-            <div class="door-popup__select-wrap">
-              <label class="door-popup__label">Текущая локация</label>
-              <select class="door-popup__select door-popup__select--disabled" disabled>
-                <option>{{ currentName }}</option>
-              </select>
-            </div>
-
-            <span class="door-popup__arrow">→</span>
-
-            <!-- Правый: выбор целевой локации -->
-            <div class="door-popup__select-wrap">
-              <label class="door-popup__label">Переход в</label>
-              <select v-model="targetId" class="door-popup__select">
-                <option value="" disabled>— Выберите локацию —</option>
-                <option v-for="level in otherLevels" :key="level.id" :value="level.id">
-                  {{ level.name || 'Без названия' }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <div class="door-popup__footer">
-            <button class="door-popup__btn door-popup__btn--cancel" @click="$emit('close')">
-              Отмена
-            </button>
-            <button
-              class="door-popup__btn door-popup__btn--save"
-              :disabled="!targetId"
-              @click="onApply"
-            >
-              Применить
-            </button>
-          </div>
-        </div>
+    <div class="door-popup__selects">
+      <!-- Левый: текущая локация — всегда задизейблен -->
+      <div class="door-popup__select-wrap">
+        <label class="door-popup__label">Текущая локация</label>
+        <select class="door-popup__select door-popup__select--disabled" disabled>
+          <option>{{ currentName }}</option>
+        </select>
       </div>
-    </Transition>
-  </Teleport>
+
+      <span class="door-popup__arrow">→</span>
+
+      <!-- Правый: выбор целевой локации -->
+      <div class="door-popup__select-wrap">
+        <label class="door-popup__label">Переход в</label>
+        <select v-model="targetId" class="door-popup__select">
+          <option value="" disabled>— Выберите локацию —</option>
+          <option v-for="level in otherLevels" :key="level.id" :value="level.id">
+            {{ level.name || 'Без названия' }}
+          </option>
+        </select>
+      </div>
+    </div>
+
+    <div class="door-popup__footer">
+      <button class="door-popup__btn door-popup__btn--cancel" @click="$emit('close')">
+        Отмена
+      </button>
+      <button class="door-popup__btn door-popup__btn--save" :disabled="!targetId" @click="onApply">
+        Применить
+      </button>
+    </div>
+  </PopupShell>
 </template>
 
 <script setup>
@@ -51,6 +41,7 @@
   import { useGameStore } from '../stores/game'
   import { useScenariosStore } from '../stores/scenarios'
   import { useCampaignsStore } from '../stores/campaigns'
+  import PopupShell from './PopupShell.vue'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
@@ -107,32 +98,7 @@
   }
 </script>
 
-<style scoped>
-  .door-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-popup, 300);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--color-overlay-strong);
-    backdrop-filter: blur(2px);
-  }
-
-  .door-popup {
-    width: min(480px, 90vw);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-6);
-    padding: var(--space-8);
-    background: var(--color-surface);
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-lg);
-    box-shadow:
-      0 8px 32px rgb(0 0 0 / 70%),
-      0 0 16px var(--color-primary-glow);
-  }
-
+<style scoped lang="scss">
   .door-popup__title {
     margin: 0;
     font-family: var(--font-base);
@@ -164,30 +130,16 @@
   }
 
   .door-popup__label {
-    font-size: 12px;
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+    @include field-label;
   }
 
   .door-popup__select {
+    @include form-input(rgb(255 255 255 / 6%), 14px);
+
     width: 100%;
-    padding: var(--space-2) var(--space-3);
-    background: rgb(255 255 255 / 6%);
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    font-family: var(--font-ui);
-    font-size: 14px;
+    border-color: var(--color-primary);
     cursor: pointer;
-    outline: none;
-    transition: border-color var(--transition-fast);
 
-    &:focus {
-      border-color: var(--color-primary-bright, var(--color-primary));
-    }
-
-    /* Стили option — ограничены браузером, но убираем системный фон */
     option {
       background: var(--color-surface);
       color: var(--color-text);
@@ -227,29 +179,16 @@
     }
 
     &--save {
-      background: var(--color-primary);
-      color: var(--color-bg, #000);
-      font-weight: 600;
+      @include btn-primary;
+
+      padding: var(--space-2) var(--space-6);
+      font-size: 14px;
 
       &:hover:not(:disabled) {
         filter: brightness(1.15);
-      }
-
-      &:disabled {
-        opacity: 0.35;
-        cursor: default;
+        background: var(--color-primary);
+        border-color: var(--color-primary);
       }
     }
-  }
-
-  /* Повторное использование анимации из GameTokenEditPopup */
-  .popup-fade-enter-active,
-  .popup-fade-leave-active {
-    transition: opacity 0.15s ease;
-  }
-
-  .popup-fade-enter-from,
-  .popup-fade-leave-to {
-    opacity: 0;
   }
 </style>

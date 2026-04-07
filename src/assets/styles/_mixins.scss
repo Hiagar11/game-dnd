@@ -1,0 +1,169 @@
+// Переиспользуемые примеси (mixins) UI-компонентов.
+// Автоматически доступны во всех <style lang="scss"> через vite.config.js:
+//   css.preprocessorOptions.scss.additionalData → @use 'mixins' as *
+
+// ─── Кнопки ──────────────────────────────────────────────────────────────────
+
+/// Призрак: прозрачный фон, рамка border, hover → primary.
+@mixin btn-ghost {
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+}
+
+/// Контурная: прозрачный фон, золотая рамка и текст, hover → заливка.
+/// Используется там, где gold-outline нужен по умолчанию (а не как акцент).
+@mixin btn-outline {
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  background: rgb(0 0 0 / 40%);
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--color-primary);
+    color: #000;
+  }
+}
+
+/// Заливная: золотой фон, тёмный текст, hover → светлее.
+@mixin btn-primary {
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  color: #1a1200;
+  font-weight: 600;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    border-color: var(--color-primary-hover);
+  }
+}
+
+/// Деструктивная: красная рамка и текст, hover → слабый красный фон.
+@mixin btn-danger {
+  border-radius: var(--radius-sm);
+  font-family: var(--font-ui);
+  cursor: pointer;
+  background: transparent;
+  border: 1px solid rgb(220 38 38 / 50%);
+  color: #f87171;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &:hover:not(:disabled) {
+    background: rgb(220 38 38 / 15%);
+    border-color: #f87171;
+  }
+}
+
+// ─── Поля ввода ───────────────────────────────────────────────────────────────
+
+/// Текстовый / числовой инпут.
+/// @param $bg        — фоновый цвет (по умолчанию тёмный полупрозрачный)
+/// @param $font-size — размер текста
+@mixin form-input($bg: rgb(0 0 0 / 40%), $font-size: 13px) {
+  padding: var(--space-2) var(--space-3);
+  background: $bg;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: $font-size;
+  outline: none;
+  transition: border-color var(--transition-fast);
+
+  &:focus {
+    border-color: var(--color-primary);
+  }
+
+  &::placeholder {
+    color: var(--color-text-muted);
+  }
+}
+
+// ─── Типографика ──────────────────────────────────────────────────────────────
+
+/// Uppercase-подпись над полем (секционный заголовок / label).
+@mixin field-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+}
+
+/// Строка текста с ошибкой.
+@mixin text-error {
+  font-size: 12px;
+  color: #f87171;
+}
+
+/// Строка текста с успехом.
+@mixin text-success {
+  font-size: 12px;
+  color: #4ade80;
+}
+
+// ─── Индикаторы загрузки ──────────────────────────────────────────────────────
+
+/// Вращающееся кольцо-спиннер.
+/// @param $size  — диаметр
+/// @param $anim  — имя @keyframes (определи в компоненте)
+/// @param $light — true: светлый (для тёмных кнопок), false: тёмный (для золотых)
+@mixin spinner($size: 16px, $anim: spin, $light: true) {
+  display: inline-block;
+  width: $size;
+  height: $size;
+  border-radius: 50%;
+  animation: #{$anim} 0.7s linear infinite;
+
+  @if $light {
+    border: 2px solid rgb(255 255 255 / 20%);
+    border-top-color: var(--color-text-muted);
+  } @else {
+    border: 2px solid rgb(0 0 0 / 20%);
+    border-top-color: #1a1a1a;
+  }
+}

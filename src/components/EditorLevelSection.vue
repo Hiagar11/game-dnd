@@ -11,18 +11,13 @@
         </p>
 
         <div v-else class="level-picker__grid">
-          <button
+          <LevelCard
             v-for="s in maps"
             :key="s.id"
-            class="level-card"
-            :disabled="loadingId === s.id"
+            :scenario="s"
+            :is-loading="loadingId === s.id"
             @click="selectScenario(s)"
-          >
-            <img v-if="s.mapImageUrl" :src="s.mapImageUrl" class="level-card__img" alt="" />
-            <div v-else class="level-card__no-img">Нет карты</div>
-            <p class="level-card__name">{{ s.name || 'Без названия' }}</p>
-            <span v-if="loadingId === s.id" class="level-card__loading">Загрузка…</span>
-          </button>
+          />
         </div>
 
         <p v-if="loadError" class="level-section__error">{{ loadError }}</p>
@@ -37,15 +32,8 @@
         </p>
 
         <div v-else class="level-picker__grid">
-          <!-- Клик по карточке открывает уровень в режиме редактирования (кнопка «Обновить») -->
-          <!-- Кнопка × удаляет уровень окончательно из обоих разделов -->
           <div v-for="s in levels" :key="s.id" class="level-card-wrap">
-            <button class="level-card" :disabled="loadingId === s.id" @click="editLevel(s)">
-              <img v-if="s.mapImageUrl" :src="s.mapImageUrl" class="level-card__img" alt="" />
-              <div v-else class="level-card__no-img">Нет карты</div>
-              <p class="level-card__name">{{ s.name || 'Без названия' }}</p>
-              <span v-if="loadingId === s.id" class="level-card__loading">Загрузка…</span>
-            </button>
+            <LevelCard :scenario="s" :is-loading="loadingId === s.id" @click="editLevel(s)" />
             <button
               class="level-card__del"
               title="Удалить уровень"
@@ -100,33 +88,15 @@
         </button>
 
         <!-- Попап: имя сохранения ─────────────────────────────────────────── -->
-        <div v-if="showSavePopup" class="level-popup-overlay" @click.self="closeSavePopup">
-          <div class="level-popup">
-            <h3 class="level-popup__title">Сохранить уровень</h3>
-            <p class="level-popup__hint">Название сохранения</p>
-            <input
-              ref="levelNameInputRef"
-              v-model.trim="levelName"
-              class="level-popup__input"
-              type="text"
-              maxlength="80"
-              placeholder="Например: Встреча в таверне"
-              @keydown.enter="onSaveLevel"
-              @keydown.esc="closeSavePopup"
-            />
-            <p v-if="saveError" class="level-popup__error">{{ saveError }}</p>
-            <div class="level-popup__actions">
-              <button class="level-popup__cancel" @click="closeSavePopup">Отмена</button>
-              <button
-                class="level-popup__confirm"
-                :disabled="saving || !levelName"
-                @click="onSaveLevel"
-              >
-                {{ saving ? 'Сохраняю…' : 'Сохранить' }}
-              </button>
-            </div>
-          </div>
-        </div>
+        <LevelSavePopup
+          :visible="showSavePopup"
+          :model-value="levelName"
+          :saving="saving"
+          :error="saveError"
+          @update:model-value="levelName = $event"
+          @save="onSaveLevel"
+          @close="closeSavePopup"
+        />
 
         <!-- Тост: успешное сохранение ─────────────────────────────────────── -->
       </div>
@@ -150,6 +120,8 @@
   import GameGrid from './GameGrid.vue'
   import GameTokens from './GameTokens.vue'
   import GameMenu from './GameMenu.vue'
+  import LevelCard from './LevelCard.vue'
+  import LevelSavePopup from './LevelSavePopup.vue'
 
   const props = defineProps({ autoLoadScenario: { type: Object, default: null } })
   const emit = defineEmits(['back-to-scenario'])
@@ -270,7 +242,7 @@
   )
 </script>
 
-<style scoped>
+<style scoped lang="scss">
   .level-section {
     position: relative;
     width: 100%;
@@ -316,89 +288,6 @@
     &:hover .level-card__del {
       opacity: 1;
     }
-  }
-
-  .level-card {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: rgb(0 0 0 / 30%);
-    cursor: pointer;
-    transition:
-      border-color var(--transition-fast),
-      background var(--transition-fast);
-
-    &:hover:not(:disabled) {
-      border-color: var(--color-primary);
-      background: rgb(255 255 255 / 5%);
-    }
-
-    &:disabled {
-      cursor: wait;
-      opacity: 0.6;
-    }
-  }
-
-  /* Кнопка удаления уровня */
-  .level-card__del {
-    position: absolute;
-    top: var(--space-2);
-    right: var(--space-2);
-    width: 24px;
-    height: 24px;
-    border-radius: var(--radius-sm);
-    border: none;
-    background: rgb(0 0 0 / 70%);
-    backdrop-filter: blur(4px);
-    color: var(--color-text-muted);
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    opacity: 0;
-    transition:
-      opacity var(--transition-fast),
-      color var(--transition-fast);
-
-    &:hover:not(:disabled) {
-      color: #e05555;
-    }
-
-    &:disabled {
-      cursor: wait;
-    }
-  }
-
-  .level-card__img {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    object-fit: cover;
-  }
-
-  .level-card__no-img {
-    width: 100%;
-    aspect-ratio: 16 / 9;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgb(255 255 255 / 4%);
-    font-size: 12px;
-    color: var(--color-text-muted);
-  }
-
-  .level-card__name {
-    color: white;
-    padding: var(--space-2) var(--space-3);
-    font-size: 13px;
-    text-align: left;
-  }
-
-  .level-card__loading {
-    display: block;
-    padding: var(--space-1) var(--space-3) var(--space-2);
-    font-size: 11px;
-    color: var(--color-text-muted);
   }
 
   .level-section__error {
@@ -451,161 +340,32 @@
   }
 
   .level-save__btn {
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-primary);
-    background: rgb(0 0 0 / 40%);
-    color: var(--color-primary);
-    font-size: 13px;
-    font-family: var(--font-ui);
-    cursor: pointer;
-    transition:
-      background var(--transition-fast),
-      color var(--transition-fast);
+    @include btn-outline;
 
-    &:hover:not(:disabled) {
-      background: var(--color-primary);
-      color: #000;
-    }
+    padding: var(--space-2) var(--space-4);
+    font-size: 13px;
 
     &:disabled {
       cursor: wait;
-      opacity: 0.6;
     }
   }
 
   .level-save__error {
-    font-size: 11px;
-    color: #f87171;
+    @include text-error;
+
     text-align: center;
   }
 
   /* ─── Кнопка «К выбору» ──────────────────────────────────────────────────── */
   .level-back {
+    @include btn-ghost;
+
     position: fixed;
     top: var(--space-4);
     left: var(--space-4);
     z-index: 20;
     padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: rgb(0 0 0 / 70%);
-    color: var(--color-text-muted);
     font-size: 13px;
-    font-family: var(--font-ui);
-    cursor: pointer;
-    transition:
-      border-color var(--transition-fast),
-      color var(--transition-fast);
-
-    &:hover {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
-    }
-  }
-
-  /* ─── Попап сохранения ────────────────────────────────────────────────────── */
-  .level-popup-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-popup);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgb(0 0 0 / 60%);
-    backdrop-filter: blur(4px);
-  }
-
-  .level-popup {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-    width: 360px;
-    padding: var(--space-6);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: rgb(18 18 22 / 95%);
-  }
-
-  .level-popup__title {
-    font-size: 16px;
-    font-weight: 600;
-    margin: 0;
-  }
-
-  .level-popup__hint {
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-text-muted);
-    margin: 0;
-  }
-
-  .level-popup__input {
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: rgb(0 0 0 / 40%);
-    color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-ui);
-    transition: border-color var(--transition-fast);
-
-    &:focus {
-      outline: none;
-      border-color: var(--color-primary);
-    }
-  }
-
-  .level-popup__error {
-    font-size: 12px;
-    color: #f87171;
-    margin: 0;
-  }
-
-  .level-popup__actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--space-2);
-    margin-block-start: var(--space-1);
-  }
-
-  .level-popup__cancel {
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: transparent;
-    color: var(--color-text-muted);
-    font-size: 13px;
-    font-family: var(--font-ui);
-    cursor: pointer;
-    transition:
-      border-color var(--transition-fast),
-      color var(--transition-fast);
-
-    &:hover {
-      border-color: var(--color-primary);
-      color: var(--color-primary);
-    }
-  }
-
-  .level-popup__confirm {
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-primary);
-    background: var(--color-primary);
-    color: #000;
-    font-size: 13px;
-    font-family: var(--font-ui);
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity var(--transition-fast);
-
-    &:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
   }
 
   /* ─── Тост: успешное сохранение ──────────────────────────────────────────── */
