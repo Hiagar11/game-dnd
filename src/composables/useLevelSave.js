@@ -1,6 +1,6 @@
 // Composable для сохранения/обновления/удаления уровня (EditorLevelSection).
 // Отделяет логику персистентности от UI-логики компонента.
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onUnmounted } from 'vue'
 import { useGameStore } from '../stores/game'
 import { useScenariosStore } from '../stores/scenarios'
 
@@ -28,6 +28,9 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
   const saveError = ref('')
   const saveSuccess = ref(false)
   const saveToastMsg = ref('')
+  let successTimer = null
+
+  onUnmounted(() => clearTimeout(successTimer))
 
   function openSavePopup() {
     levelName.value = ''
@@ -58,7 +61,8 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
         exitGame()
         saveToastMsg.value = 'Уровень обновлён'
         saveSuccess.value = true
-        setTimeout(() => (saveSuccess.value = false), 3000)
+        clearTimeout(successTimer)
+        successTimer = setTimeout(() => (saveSuccess.value = false), 3000)
       }
     } catch (err) {
       saveError.value = err.message || 'Ошибка при обновлении'
@@ -90,7 +94,8 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
       closeSavePopup()
       saveToastMsg.value = 'Уровень сохранён'
       saveSuccess.value = true
-      setTimeout(() => (saveSuccess.value = false), 3000)
+      clearTimeout(successTimer)
+      successTimer = setTimeout(() => (saveSuccess.value = false), 3000)
     } catch (err) {
       saveError.value = err.message || 'Ошибка при сохранении'
     } finally {

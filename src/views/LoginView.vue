@@ -2,9 +2,11 @@
   import { ref } from 'vue'
   import { useRouter } from 'vue-router'
   import { useAuthStore } from '../stores/auth'
+  import { useSound } from '../composables/useSound'
 
   const router = useRouter()
   const auth = useAuthStore()
+  const { playHover, playClick } = useSound()
 
   const username = ref('')
   const password = ref('')
@@ -15,6 +17,7 @@
   async function handleSubmit() {
     error.value = ''
     loading.value = true
+    playClick()
 
     const err = await auth.login(username.value, password.value, remember.value)
 
@@ -74,7 +77,7 @@
           <span class="login__remember-label">Запомнить меня</span>
         </label>
 
-        <button class="login__btn" type="submit" :disabled="loading">
+        <button class="login__btn" type="submit" :disabled="loading" @mouseenter="playHover">
           <span v-if="loading" class="login__spinner" />
           <span v-else>Войти</span>
         </button>

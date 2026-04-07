@@ -1,48 +1,47 @@
 <template>
-  <!-- Центральная панель: список всех токенов для выбора + кнопка добавления -->
-  <div class="game-menu-tokens">
-    <!-- Кнопка добавления нового токена — всегда первая в списке -->
+  <!-- Вкладка «Герои» — персонажи игроков. Только admin видит кнопку «+». -->
+  <div class="game-menu-heroes">
     <button
-      class="game-menu-tokens__item game-menu-tokens__item--add"
-      title="Добавить NPC"
+      class="game-menu-heroes__item game-menu-heroes__item--add"
+      title="Добавить героя"
       @mouseenter="playHover"
-      @click="onAddToken"
+      @click="onAddHero"
     >
-      <span class="game-menu-tokens__add-icon">+</span>
+      <span class="game-menu-heroes__add-icon">+</span>
     </button>
 
-    <div v-for="token in npcTokens" :key="token.id" class="game-menu-tokens__wrap">
+    <!--
+      div-обёртка для каждого героя: position:relative — якорь для кнопки-крестика.
+      Крестик появляется при наведении на обёртку через CSS.
+    -->
+    <div v-for="token in heroTokens" :key="token.id" class="game-menu-heroes__wrap">
       <button
-        class="game-menu-tokens__item"
-        :class="{ 'game-menu-tokens__item--active': store.selectedToken?.id === token.id }"
+        class="game-menu-heroes__item game-menu-heroes__item--hero"
+        :class="{ 'game-menu-heroes__item--active': store.selectedToken?.id === token.id }"
         :title="token.name"
         draggable="false"
         @mouseenter="playHover"
-        @click="onSelectToken(token)"
+        @click="onSelectHero(token)"
         @dragstart="onDragStart($event, token)"
       >
-        <!--
-          draggable="false" на img — отключает встроенное перетаскивание картинки,
-          чтобы браузер тянул всю кнопку, а не только изображение.
-        -->
-        <img :src="token.src" :alt="token.name" class="game-menu-tokens__img" draggable="true" />
+        <img :src="token.src" :alt="token.name" class="game-menu-heroes__img" draggable="true" />
       </button>
       <button
-        class="game-menu-tokens__delete"
-        title="Удалить токен"
+        class="game-menu-heroes__delete"
+        title="Удалить героя"
         @mouseenter="playHover"
-        @click="onDeleteToken(token)"
+        @click="onDeleteHero(token)"
       >
         ✕
       </button>
     </div>
   </div>
 
-  <GameTokenEditPopup :visible="isPopupOpen" token-type="npc" @close="isPopupOpen = false" />
+  <GameTokenEditPopup :visible="isPopupOpen" token-type="hero" @close="onPopupClose" />
 </template>
 
 <script setup>
-  import { ref, computed, onMounted } from 'vue'
+  import { ref, computed, onMounted, inject } from 'vue'
   import { useTokensStore } from '../stores/tokens'
   import { useTokenDrag } from '../composables/useTokenDrag'
   import { useSound } from '../composables/useSound'
@@ -54,34 +53,45 @@
 
   const isPopupOpen = ref(false)
 
-  function onAddToken() {
+  function onAddHero() {
     isPopupOpen.value = true
     playClick()
   }
 
-  function onSelectToken(token) {
+  function onSelectHero(token) {
     store.selectToken(token.id)
     playClick()
   }
 
-  // Вкладка «Токены» — только NPC (тип npc)
-  const npcTokens = computed(() => store.tokens.filter((t) => t.tokenType !== 'hero'))
+  const heroTokens = computed(() => store.tokens.filter((t) => t.tokenType === 'hero'))
 
-  onMounted(() => store.fetchTokens())
+  // inject из GameView — явно шлёт heroes зрителям сразу после добавления.
+  // Это надёжнее чем watch: срабатывает синхронно в callback popup.
+  const emitHeroes = inject('emitHeroes', null)
 
-  async function onDeleteToken(token) {
-    if (!confirm(`Удалить шаблон «${token.name}»?`)) return
+  async function onDeleteHero(token) {
+    if (!confirm(`Удалить героя «${token.name}»?`)) return
     playClick()
     try {
       await store.deleteToken(token.id)
+      emitHeroes?.()
     } catch {
       // store.deleteToken пробрасывает ошибку — молча игнорируем в меню
     }
   }
+
+  function onPopupClose() {
+    isPopupOpen.value = false
+    // После создания нового героя — немедленно синхронизируем зрителей.
+    // nextTick не нужен: store.tokens уже обновлён к моменту закрытия попапа.
+    emitHeroes?.()
+  }
+
+  onMounted(() => store.fetchTokens())
 </script>
 
 <style scoped>
-  .game-menu-tokens {
+  .game-menu-heroes {
     flex-grow: 1;
     padding: var(--space-2);
     background-image: url('/systemImage/panel-center.jpg');
@@ -98,7 +108,8 @@
     overflow-y: auto;
   }
 
-  .game-menu-tokens__item {
+  .game-menu-heroes__item {
+    position: relative;
     width: var(--token-size);
     height: var(--token-size);
     flex-shrink: 0;
@@ -108,20 +119,30 @@
     background: var(--color-overlay);
     cursor: pointer;
     overflow: hidden;
-    transition: border-color var(--transition-fast);
+    transition:
+      border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
 
     &:hover {
-      border-color: rgb(255 255 255 / 60%);
+      border-color: rgb(255 255 255 / 70%);
     }
 
-    /* Выбранный токен — золотая обводка */
-    &--active {
+    &--hero {
       border-color: var(--color-primary);
       box-shadow: 0 0 8px var(--color-primary-glow);
+
+      &:hover {
+        box-shadow: 0 0 14px var(--color-primary-glow);
+      }
+    }
+
+    &--active {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 14px var(--color-primary-glow);
     }
   }
 
-  .game-menu-tokens__item--add {
+  .game-menu-heroes__item--add {
     border-style: dashed;
     border-color: rgb(255 255 255 / 30%);
     background: transparent;
@@ -139,25 +160,25 @@
     }
   }
 
-  .game-menu-tokens__add-icon {
+  .game-menu-heroes__add-icon {
     font-size: 28px;
     line-height: 1;
     user-select: none;
   }
 
-  .game-menu-tokens__img {
+  .game-menu-heroes__img {
     display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
   }
 
-  /* ── Обёртка + крестик удаления шаблона ─────────────────────────── */
-  .game-menu-tokens__wrap {
+  /* ── Обёртка токена-героя: якорь для кнопки удаления ────────────────────── */
+  .game-menu-heroes__wrap {
     position: relative;
   }
 
-  .game-menu-tokens__delete {
+  .game-menu-heroes__delete {
     position: absolute;
     top: -3px;
     right: -3px;
@@ -184,7 +205,7 @@
     }
   }
 
-  .game-menu-tokens__wrap:hover .game-menu-tokens__delete {
+  .game-menu-heroes__wrap:hover .game-menu-heroes__delete {
     opacity: 1;
   }
 </style>

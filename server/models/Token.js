@@ -38,8 +38,16 @@ const tokenSchema = new mongoose.Schema(
       type: statsSchema,
       default: () => ({}),
     },
+    // npc — обычные персонажи, hero — герои игроков (видны в меню зрителя)
+    tokenType: {
+      type: String,
+      enum: ['npc', 'hero'],
+      default: 'npc',
+    },
   },
   { timestamps: true }
 )
+
+tokenSchema.index({ owner: 1 })
 
 export default mongoose.model('Token', tokenSchema)

@@ -12,12 +12,18 @@
       <button
         class="token-ctx-menu__btn token-ctx-menu__btn--danger"
         title="Убрать с карты"
-        @click="$emit('remove')"
+        @mouseenter="playHover"
+        @click="onRemove"
       >
         <span class="token-ctx-menu__icon">✕</span>
       </button>
 
-      <button class="token-ctx-menu__btn" title="Редактировать" @click="$emit('edit')">
+      <button
+        class="token-ctx-menu__btn"
+        title="Редактировать"
+        @mouseenter="playHover"
+        @click="onEdit"
+      >
         <span class="token-ctx-menu__icon">≡</span>
       </button>
     </div>
@@ -25,11 +31,25 @@
 </template>
 
 <script setup>
+  import { useSound } from '../composables/useSound'
+
   defineProps({
     visible: { type: Boolean, required: true },
   })
 
-  defineEmits(['remove', 'edit'])
+  const emit = defineEmits(['remove', 'edit'])
+
+  const { playHover, playClick } = useSound()
+
+  function onRemove() {
+    emit('remove')
+    playClick()
+  }
+
+  function onEdit() {
+    emit('edit')
+    playClick()
+  }
 </script>
 
 <style scoped>

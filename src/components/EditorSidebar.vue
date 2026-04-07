@@ -16,11 +16,17 @@
         <button
           class="editor-sidebar__item"
           :class="{ 'editor-sidebar__item--active': activeId === s.id }"
-          @click="$emit('select', s)"
+          @mouseenter="playHover"
+          @click="onSelect(s)"
         >
           {{ s.name || 'Без названия' }}
         </button>
-        <button class="editor-sidebar__item-del" title="Удалить" @click="$emit('delete', s)">
+        <button
+          class="editor-sidebar__item-del"
+          title="Удалить"
+          @mouseenter="playHover"
+          @click="onDelete(s)"
+        >
           ×
         </button>
       </div>
@@ -30,6 +36,8 @@
 </template>
 
 <script setup>
+  import { useSound } from '../composables/useSound'
+
   defineProps({
     scenarios: { type: Array, required: true },
     loading: { type: Boolean, default: false },
@@ -38,7 +46,19 @@
     showBack: { type: Boolean, default: false },
   })
 
-  defineEmits(['select', 'create', 'delete'])
+  const emit = defineEmits(['select', 'create', 'delete'])
+
+  const { playHover, playClick } = useSound()
+
+  function onSelect(s) {
+    emit('select', s)
+    playClick()
+  }
+
+  function onDelete(s) {
+    emit('delete', s)
+    playClick()
+  }
 </script>
 
 <style scoped>

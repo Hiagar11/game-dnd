@@ -21,7 +21,7 @@
             <span class="lobby__campaign">{{ s.campaignName }}</span>
             <span class="lobby__master">Мастер: {{ s.adminName }}</span>
           </div>
-          <button class="lobby__join" @click="joinSession(s)">Войти</button>
+          <button class="lobby__join" @mouseenter="playHover" @click="joinSession(s)">Войти</button>
         </li>
       </ul>
     </div>
@@ -33,11 +33,13 @@
   import { useRouter } from 'vue-router'
   import { useAuthStore } from '../stores/auth'
   import { useSocket } from '../composables/useSocket'
+  import { useSound } from '../composables/useSound'
   import AppBackground from '../components/AppBackground.vue'
 
   const router = useRouter()
   const auth = useAuthStore()
   const { connect, getSocket } = useSocket()
+  const { playHover, playClick } = useSound()
 
   const sessions = ref([])
   const loading = ref(true)
@@ -80,6 +82,7 @@
   })
 
   function joinSession(session) {
+    playClick()
     router.push({
       name: 'viewer',
       params: { sessionId: session.sessionId },
@@ -89,7 +92,7 @@
   }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
   .lobby {
     position: relative;
     width: 100vw;
@@ -185,17 +188,8 @@
   .lobby__join {
     flex-shrink: 0;
     padding: var(--space-2) var(--space-4);
-    background: var(--color-primary);
-    color: #fff;
-    border: none;
-    border-radius: var(--radius-sm);
     font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: background var(--transition-fast);
 
-    &:hover {
-      background: var(--color-primary-dark);
-    }
+    @include btn-primary;
   }
 </style>

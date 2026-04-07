@@ -38,6 +38,7 @@
               class="level-card__del"
               title="Удалить уровень"
               :disabled="deletingId === s.id"
+              @mouseenter="playHover"
               @click="onDeleteLevel(s)"
             >
               {{ deletingId === s.id ? '…' : '×' }}
@@ -75,7 +76,12 @@
         <GameMenu>
           <template #right-panel>
             <div class="level-save">
-              <button class="level-save__btn" :disabled="saving" @click="onSaveBtnClick">
+              <button
+                class="level-save__btn"
+                :disabled="saving"
+                @mouseenter="playHover"
+                @click="onSave"
+              >
                 {{ isEditingLevel ? 'Обновить' : 'Сохранить уровень' }}
               </button>
             </div>
@@ -83,7 +89,7 @@
         </GameMenu>
 
         <!-- Кнопка возврата к выбору карты / назад в сценарий -->
-        <button class="level-back" @click="props.autoLoadScenario ? goBack() : exitGame()">
+        <button class="level-back" @mouseenter="playHover" @click="onLevelBack">
           {{ props.autoLoadScenario ? '← К сценарию' : '← К выбору' }}
         </button>
 
@@ -108,11 +114,12 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch, onMounted } from 'vue'
+  import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
   import { useLevelSave } from '../composables/useLevelSave'
+  import { useSound } from '../composables/useSound'
   import { useGameStore } from '../stores/game'
   import { useTokensStore } from '../stores/tokens'
   import { useScenariosStore } from '../stores/scenarios'
@@ -129,6 +136,17 @@
   const store = useScenariosStore()
   const gameStore = useGameStore()
   const tokensStore = useTokensStore()
+  const { playHover, playClick } = useSound()
+
+  function onSave() {
+    playClick()
+    onSaveBtnClick()
+  }
+
+  function onLevelBack() {
+    playClick()
+    props.autoLoadScenario ? goBack() : exitGame()
+  }
 
   const maps = computed(() => store.scenarios.filter((s) => !s.tokensCount))
   const levels = computed(() => store.scenarios.filter((s) => s.tokensCount > 0))
@@ -221,6 +239,7 @@
       !confirm(`Удалить уровень «${s.name || 'Без названия'}»?\nОн исчезнет из раздела «Играть».`)
     )
       return
+    playClick()
     deletingId.value = s.id
     deleteError.value = ''
     try {
@@ -232,7 +251,21 @@
     }
   }
 
-  onMounted(() => store.fetchScenarios())
+  onMounted(() => {
+    store.fetchScenarios()
+    window.addEventListener('keydown', onKeyDown, { capture: true })
+  })
+
+  onUnmounted(() => window.removeEventListener('keydown', onKeyDown, { capture: true }))
+
+  function onKeyDown(e) {
+    if (e.key !== 'Escape') return
+    if (selectedScenario.value) {
+      e.stopImmediatePropagation()
+      onLevelBack()
+    }
+  }
+
   watch(
     () => props.autoLoadScenario,
     async (scenario) => {
@@ -290,10 +323,39 @@
     }
   }
 
+  .level-card__del {
+    position: absolute;
+    top: var(--space-2);
+    right: var(--space-2);
+    width: 24px;
+    height: 24px;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: rgb(0 0 0 / 70%);
+    backdrop-filter: blur(4px);
+    color: var(--color-text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition:
+      opacity var(--transition-fast),
+      color var(--transition-fast);
+
+    &:hover {
+      color: var(--color-error);
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.4;
+    }
+  }
+
   .level-section__error {
     margin-block-start: var(--space-4);
     font-size: 13px;
-    color: #f87171;
+    color: var(--color-error);
   }
 
   /* ─── Игровой интерфейс: перекрывает весь экран ───────────────────────────── */

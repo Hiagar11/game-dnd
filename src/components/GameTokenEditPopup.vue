@@ -27,6 +27,7 @@
         v-if="isEditMode"
         class="token-edit-popup__btn token-edit-popup__btn--delete"
         :disabled="saving"
+        @mouseenter="playHover"
         @click="onDelete"
       >
         {{ isPlacedMode ? 'Убрать с карты' : 'Удалить' }}
@@ -34,6 +35,7 @@
       <button
         class="token-edit-popup__btn token-edit-popup__btn--cancel"
         :disabled="saving"
+        @mouseenter="playHover"
         @click="onCancel"
       >
         Отмена
@@ -41,6 +43,7 @@
       <button
         class="token-edit-popup__btn token-edit-popup__btn--save"
         :disabled="!canSave"
+        @mouseenter="playHover"
         @click="onSave"
       >
         <span v-if="saving" class="token-edit-popup__spinner" />
@@ -54,25 +57,46 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch } from 'vue'
+  import { ref, computed, watch, inject } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useTokensStore } from '../stores/tokens'
   import PopupShell from './PopupShell.vue'
   import TokenPreviewPicker from './TokenPreviewPicker.vue'
   import TokenStatsGrid from './TokenStatsGrid.vue'
+  import { useSocket } from '../composables/useSocket'
+  import { useSound } from '../composables/useSound'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
     tokenId: { type: [Number, String], default: null },
     placedUid: { type: String, default: null },
+    // Дефолтное имя при создании (приходит из вкладки — NPC или Герой)
+    defaultName: { type: String, default: '' },
+    // 'npc' | 'hero' — сохраняется в БД при создании и не меняется
+    tokenType: { type: String, default: 'npc' },
   })
 
   const emit = defineEmits(['close'])
 
   const store = useGameStore()
   const tokensStore = useTokensStore()
+  const { getSocket } = useSocket()
+  const { playHover, playClick } = useSound()
   const saving = ref(false)
   const saveError = ref('')
+
+  // Блокировка курсора мастера у зрителей пока попап открыт.
+  // inject(..., null) — безопасный fallback: если нет GameView-провайдера (напр. в редакторе) — ничего не делаем.
+  const blockCursor = inject('blockCursor', null)
+  const unblockCursor = inject('unblockCursor', null)
+
+  watch(
+    () => props.visible,
+    (val) => {
+      if (val) blockCursor?.()
+      else unblockCursor?.()
+    }
+  )
 
   const isPlacedMode = computed(() => props.placedUid !== null)
   const isEditMode = computed(() => props.tokenId !== null || isPlacedMode.value)
@@ -122,7 +146,7 @@
         previewSrc.value = src
       }
     } else {
-      form.value = { name: '', ...DEFAULT_STATS }
+      form.value = { name: props.defaultName, ...DEFAULT_STATS }
       previewSrc.value = null
       fileRef.value = null
     }
@@ -136,6 +160,7 @@
 
   async function onSave() {
     if (!canSave.value) return
+    playClick()
     saving.value = true
     saveError.value = ''
     try {
@@ -162,6 +187,7 @@
         const fd = new FormData()
         fd.append('image', fileRef.value)
         fd.append('name', name)
+        fd.append('tokenType', props.tokenType)
         fd.append('meleeDmg', meleeDmg)
         fd.append('rangedDmg', rangedDmg)
         fd.append('visionRange', visionRange)
@@ -178,14 +204,18 @@
   }
 
   function onCancel() {
+    playClick()
     if (previewSrc.value?.startsWith('blob:')) URL.revokeObjectURL(previewSrc.value)
     emit('close')
   }
 
   async function onDelete() {
+    playClick()
     if (isPlacedMode.value) {
       if (!confirm(`Убрать токен «${form.value.name}» с карты?`)) return
       store.removeToken(props.placedUid)
+      const scenarioId = String(store.currentScenario?.id ?? '')
+      if (scenarioId) getSocket()?.emit('token:remove', { scenarioId, uid: props.placedUid })
       emit('close')
       return
     }
@@ -288,7 +318,7 @@
     border-radius: var(--radius-sm);
     background: rgb(220 38 38 / 10%);
     border: 1px solid rgb(220 38 38 / 40%);
-    color: #f87171;
+    color: var(--color-error);
     font-size: 13px;
     text-align: center;
   }

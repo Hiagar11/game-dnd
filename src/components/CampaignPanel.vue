@@ -8,7 +8,8 @@
         :key="c.id"
         class="campaign-panel__item"
         :class="{ 'campaign-panel__item--active': activeCampaignId === c.id }"
-        @click="$emit('select', c)"
+        @mouseenter="playHover"
+        @click="onSelect(c)"
       >
         {{ c.name }}
       </button>
@@ -30,18 +31,24 @@
       <button
         class="campaign-panel__btn"
         :disabled="!campaignName || saving"
-        @click="$emit('save')"
+        @mouseenter="playHover"
+        @click="onSave"
       >
         {{ saving ? 'Сохраняю…' : activeCampaignId ? 'Обновить' : 'Сохранить' }}
       </button>
       <div v-if="activeCampaignId" class="campaign-panel__actions">
-        <button class="campaign-panel__btn campaign-panel__btn--secondary" @click="$emit('reset')">
+        <button
+          class="campaign-panel__btn campaign-panel__btn--secondary"
+          @mouseenter="playHover"
+          @click="onReset"
+        >
           Новый
         </button>
         <button
           class="campaign-panel__btn campaign-panel__btn--danger"
           :disabled="saving"
-          @click="$emit('delete')"
+          @mouseenter="playHover"
+          @click="onDelete"
         >
           Удалить
         </button>
@@ -53,6 +60,8 @@
 </template>
 
 <script setup>
+  import { useSound } from '../composables/useSound'
+
   defineProps({
     campaigns: { type: Array, required: true },
     loading: { type: Boolean, default: false },
@@ -63,7 +72,29 @@
     saveError: { type: String, default: '' },
   })
 
-  defineEmits(['select', 'update:campaignName', 'save', 'reset', 'delete'])
+  const emit = defineEmits(['select', 'update:campaignName', 'save', 'reset', 'delete'])
+
+  const { playHover, playClick } = useSound()
+
+  function onSelect(c) {
+    emit('select', c)
+    playClick()
+  }
+
+  function onSave() {
+    emit('save')
+    playClick()
+  }
+
+  function onReset() {
+    emit('reset')
+    playClick()
+  }
+
+  function onDelete() {
+    emit('delete')
+    playClick()
+  }
 </script>
 
 <style scoped lang="scss">

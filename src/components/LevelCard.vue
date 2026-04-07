@@ -1,5 +1,5 @@
 <template>
-  <button class="level-card" :disabled="isLoading" @click="$emit('click')">
+  <button class="level-card" :disabled="isLoading" @mouseenter="playHover" @click="onClick">
     <img v-if="scenario.mapImageUrl" :src="scenario.mapImageUrl" class="level-card__img" alt="" />
     <div v-else class="level-card__no-img">Нет карты</div>
     <p class="level-card__name">{{ scenario.name || 'Без названия' }}</p>
@@ -8,12 +8,21 @@
 </template>
 
 <script setup>
+  import { useSound } from '../composables/useSound'
+
   defineProps({
     scenario: { type: Object, required: true },
     isLoading: { type: Boolean, default: false },
   })
 
-  defineEmits(['click'])
+  const emit = defineEmits(['click'])
+
+  const { playHover, playClick } = useSound()
+
+  function onClick() {
+    emit('click')
+    playClick()
+  }
 </script>
 
 <style scoped>
@@ -59,7 +68,7 @@
   }
 
   .level-card__name {
-    color: white;
+    color: var(--color-text);
     padding: var(--space-2) var(--space-3);
     font-size: 13px;
     text-align: left;

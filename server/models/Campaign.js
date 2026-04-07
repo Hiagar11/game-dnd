@@ -49,4 +49,6 @@ const campaignSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
+campaignSchema.index({ owner: 1 })
+
 export default mongoose.model('Campaign', campaignSchema)

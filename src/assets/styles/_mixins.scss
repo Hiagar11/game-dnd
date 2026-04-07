@@ -47,7 +47,7 @@
 
   &:hover:not(:disabled) {
     background: var(--color-primary);
-    color: #000;
+    color: var(--color-on-primary);
   }
 }
 
@@ -58,7 +58,7 @@
   cursor: pointer;
   background: var(--color-primary);
   border: 1px solid var(--color-primary);
-  color: #1a1200;
+  color: var(--color-on-primary);
   font-weight: 600;
   transition:
     background var(--transition-fast),
@@ -82,7 +82,7 @@
   cursor: pointer;
   background: transparent;
   border: 1px solid rgb(220 38 38 / 50%);
-  color: #f87171;
+  color: var(--color-error);
   transition:
     background var(--transition-fast),
     border-color var(--transition-fast);
@@ -94,7 +94,7 @@
 
   &:hover:not(:disabled) {
     background: rgb(220 38 38 / 15%);
-    border-color: #f87171;
+    border-color: var(--color-error);
   }
 }
 
@@ -137,13 +137,101 @@
 /// Строка текста с ошибкой.
 @mixin text-error {
   font-size: 12px;
-  color: #f87171;
+  color: var(--color-error);
 }
 
 /// Строка текста с успехом.
 @mixin text-success {
   font-size: 12px;
   color: #4ade80;
+}
+
+// ─── Меню игры ───────────────────────────────────────────────────────────────
+
+/// Центральная панель меню с фоном panel-center.jpg и внутренними тенями.
+/// Используется в GameMenuTokens, GameMenuHeroes, GameMenuSystem, ViewerMenu.__heroes.
+@mixin menu-panel-content {
+  flex-grow: 1;
+  padding: var(--space-2);
+  background-image: url('/systemImage/panel-center.jpg');
+  background-size: 340px;
+  background-position: center;
+  box-shadow:
+    inset 15px 0 15px -5px var(--color-overlay-strong),
+    inset -15px 0 15px -5px var(--color-overlay-strong);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/// Иконка-токен в панели меню
+@mixin menu-token-item {
+  width: var(--token-size);
+  height: var(--token-size);
+  flex-shrink: 0;
+  padding: 0;
+  border: 2px solid rgb(255 255 255 / 40%);
+  border-radius: var(--radius-full);
+  background: var(--color-overlay);
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color var(--transition-fast);
+
+  &:hover {
+    border-color: rgb(255 255 255 / 60%);
+  }
+}
+
+/// Кнопка «+ добавить» в панели токенов
+@mixin menu-token-add-btn {
+  @include menu-token-item;
+
+  border-style: dashed;
+  border-color: rgb(255 255 255 / 30%);
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  transition:
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+}
+
+/// Крестик удаления токена (появляется при hovere на wrap)
+@mixin menu-token-delete-btn {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: rgb(80 0 0 / 90%);
+  color: #fff;
+  border: 1px solid rgb(160 0 0 / 80%);
+  font-size: 9px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  z-index: 2;
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast);
+
+  &:hover {
+    background-color: rgb(160 0 0);
+  }
 }
 
 // ─── Индикаторы загрузки ──────────────────────────────────────────────────────

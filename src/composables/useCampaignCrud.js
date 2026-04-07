@@ -1,6 +1,6 @@
 // Composable для управления кампанией (save/load/delete + стартовая локация).
 // Используется в EditorScenarioSection — отделяет CRUD от логики графа.
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { useCampaignsStore } from '../stores/campaigns'
 
 export function useCampaignCrud(graph) {
@@ -12,6 +12,9 @@ export function useCampaignCrud(graph) {
   const saving = ref(false)
   const saveSuccess = ref(false)
   const saveError = ref('')
+  let successTimer = null
+
+  onUnmounted(() => clearTimeout(successTimer))
 
   // ─── Загрузить кампанию в редактор ───────────────────────────────────────────
   function loadCampaign(campaign) {
@@ -58,7 +61,8 @@ export function useCampaignCrud(graph) {
         activeCampaignId.value = result.id
       }
       saveSuccess.value = true
-      setTimeout(() => (saveSuccess.value = false), 3000)
+      clearTimeout(successTimer)
+      successTimer = setTimeout(() => (saveSuccess.value = false), 3000)
     } catch (err) {
       saveError.value = err.message || 'Ошибка при сохранении'
     } finally {

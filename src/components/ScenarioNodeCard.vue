@@ -29,7 +29,8 @@
         :class="{ 'scenario-node__start-btn--active': isStart }"
         :title="isStart ? 'Снять как стартовую' : 'Назначить стартовой'"
         @mousedown.stop
-        @click.stop="$emit('toggle-start', node.scenarioId)"
+        @mouseenter="playHover"
+        @click.stop="onToggleStart"
       >
         {{ isStart ? '★' : '☆' }}
       </button>
@@ -45,7 +46,9 @@
 </template>
 
 <script setup>
-  defineProps({
+  import { useSound } from '../composables/useSound'
+
+  const props = defineProps({
     node: { type: Object, required: true },
     isStart: { type: Boolean, default: false },
     isTarget: { type: Boolean, default: false },
@@ -53,7 +56,14 @@
     nodeH: { type: Number, required: true },
   })
 
-  defineEmits(['start-connect', 'toggle-start'])
+  const emit = defineEmits(['start-connect', 'toggle-start'])
+
+  const { playHover, playClick } = useSound()
+
+  function onToggleStart() {
+    emit('toggle-start', props.node.scenarioId)
+    playClick()
+  }
 </script>
 
 <style scoped>

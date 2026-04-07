@@ -14,9 +14,13 @@ const MAX_ICON_SIZE = 256_000 // 256 KB в base64-символах
 // offsetX/offsetY — реактивные рефы из useMapPan, передаются снаружи
 export function useAdminCursor(getSocket, sessionActiveRef, offsetX, offsetY) {
   let lastEmit = 0
+  // Когда мастер находится над своим меню или открыт попап — позицию курсора не шлём
+  let menuActive = false
+  let popupBlocked = false
 
   function onMouseMove(e) {
     if (!sessionActiveRef.value) return
+    if (menuActive || popupBlocked) return
     const now = Date.now()
     if (now - lastEmit < THROTTLE_MS) return
     lastEmit = now
@@ -33,6 +37,28 @@ export function useAdminCursor(getSocket, sessionActiveRef, offsetX, offsetY) {
   function onMouseLeave() {
     if (!sessionActiveRef.value) return
     getSocket()?.emit('game:cursor', { mapX: null, mapY: null })
+  }
+
+  // Мастер навёл на своё меню — прячем курсор у зрителей на последней позиции
+  function onMenuEnter() {
+    menuActive = true
+    onMouseLeave()
+  }
+
+  // Мастер вернулся на карту — возобновляем передачу позиции
+  function onMenuLeave() {
+    menuActive = false
+  }
+
+  // Попап открылся — прячем курсор у зрителей пока попап открыт
+  function blockCursor() {
+    popupBlocked = true
+    onMouseLeave()
+  }
+
+  // Попап закрылся — снимаем блокировку
+  function unblockCursor() {
+    popupBlocked = false
   }
 
   // Отправляет Data URL (base64) выбранной иконки курсора всем зрителям.
@@ -55,5 +81,5 @@ export function useAdminCursor(getSocket, sessionActiveRef, offsetX, offsetY) {
     document.removeEventListener('mouseleave', onMouseLeave)
   })
 
-  return { setCursorIcon }
+  return { setCursorIcon, onMenuEnter, onMenuLeave, blockCursor, unblockCursor }
 }

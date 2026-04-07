@@ -21,7 +21,7 @@
   import { computed } from 'vue'
 
   const props = defineProps({
-    // Пиксель карты под курсором мастера. null = курсор вне окна.
+    // Пиксель карты под курсором мастера. null = курсор вне окна или мастер в меню.
     mapX: { type: Number, default: null },
     mapY: { type: Number, default: null },
     // Текущий сдвиг карты зрителя (из useViewerSync / useMapPan)
@@ -58,8 +58,27 @@
       transition на transform — GPU-ускорен, не конфликтует с <Transition>.
       30ms = чуть меньше интервала сокета (33ms), поэтому курсор успевает
       добраться до цели до следующего обновления без накопленного лага.
+      opacity в переходах управляется через классы <Transition> ниже.
     */
     transition: transform 30ms linear;
+  }
+
+  /*
+    Анимация появления/исчезновения курсора (название Transition = "cursor-fade").
+    Курсор исчезает на позиции последнего положения transform не меняется во время анимации —
+    элемент ещё в DOM, поэтому визуально исчезает ровно там, где находился.
+  */
+  .cursor-fade-enter-active {
+    transition: opacity 0.3s ease;
+  }
+
+  .cursor-fade-leave-active {
+    transition: opacity 0.4s ease;
+  }
+
+  .cursor-fade-enter-from,
+  .cursor-fade-leave-to {
+    opacity: 0;
   }
 
   .admin-cursor__icon {

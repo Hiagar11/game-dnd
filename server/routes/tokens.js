@@ -3,6 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
+import mongoose from 'mongoose'
 import Token from '../models/Token.js'
 import { requireAuth } from '../middleware/auth.js'
 
@@ -52,7 +53,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: 'Изображение обязательно' })
   }
 
-  const { name, meleeDmg, rangedDmg, visionRange, defense, evasion } = req.body
+  const { name, meleeDmg, rangedDmg, visionRange, defense, evasion, tokenType } = req.body
 
   if (!name?.trim()) {
     // Удаляем загруженный файл, если имя не передано
@@ -68,6 +69,7 @@ router.post('/', upload.single('image'), async (req, res) => {
       owner: req.user.id,
       name: name.trim(),
       imagePath,
+      tokenType: tokenType === 'hero' ? 'hero' : 'npc',
       stats: {
         meleeDmg: Number(meleeDmg) || 0,
         rangedDmg: Number(rangedDmg) || 0,
@@ -98,18 +100,46 @@ router.get('/', async (req, res) => {
 // ─── PUT /api/tokens/:id ──────────────────────────────────────────────────────
 // Редактирование токена. Изображение не меняется — только имя и статы.
 router.put('/:id', async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
   try {
     const token = await Token.findOne({ _id: req.params.id, owner: req.user.id })
     if (!token) return res.status(404).json({ error: 'Токен не найден' })
 
     const { name, meleeDmg, rangedDmg, visionRange, defense, evasion } = req.body
 
+    // Number(val) может вернуть NaN или Infinity — проверяем перед записью
+    const parseStat = (val) => {
+      const n = Number(val)
+      return Number.isFinite(n) && n >= 0 ? Math.floor(n) : null
+    }
+
     if (name !== undefined) token.name = name.trim()
-    if (meleeDmg !== undefined) token.stats.meleeDmg = Number(meleeDmg)
-    if (rangedDmg !== undefined) token.stats.rangedDmg = Number(rangedDmg)
-    if (visionRange !== undefined) token.stats.visionRange = Number(visionRange)
-    if (defense !== undefined) token.stats.defense = Number(defense)
-    if (evasion !== undefined) token.stats.evasion = Number(evasion)
+    if (meleeDmg !== undefined) {
+      const v = parseStat(meleeDmg)
+      if (v === null) return res.status(400).json({ error: 'meleeDmg: некорректное значение' })
+      token.stats.meleeDmg = v
+    }
+    if (rangedDmg !== undefined) {
+      const v = parseStat(rangedDmg)
+      if (v === null) return res.status(400).json({ error: 'rangedDmg: некорректное значение' })
+      token.stats.rangedDmg = v
+    }
+    if (visionRange !== undefined) {
+      const v = parseStat(visionRange)
+      if (v === null) return res.status(400).json({ error: 'visionRange: некорректное значение' })
+      token.stats.visionRange = v
+    }
+    if (defense !== undefined) {
+      const v = parseStat(defense)
+      if (v === null) return res.status(400).json({ error: 'defense: некорректное значение' })
+      token.stats.defense = v
+    }
+    if (evasion !== undefined) {
+      const v = parseStat(evasion)
+      if (v === null) return res.status(400).json({ error: 'evasion: некорректное значение' })
+      token.stats.evasion = v
+    }
 
     await token.save()
     res.json(formatToken(token, req))
@@ -120,8 +150,8 @@ router.put('/:id', async (req, res) => {
 
 // ─── DELETE /api/tokens/:id ───────────────────────────────────────────────────
 // Удаление токена и его файла с диска.
-router.delete('/:id', async (req, res) => {
-  try {
+router.delete('/:id', async (req, res) => {  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })  try {
     const token = await Token.findOne({ _id: req.params.id, owner: req.user.id })
     if (!token) return res.status(404).json({ error: 'Токен не найден' })
 
@@ -142,6 +172,7 @@ function formatToken(token, req) {
   return {
     id: token._id,
     name: token.name,
+    tokenType: token.tokenType ?? 'npc',
     imageUrl: `${req.protocol}://${req.get('host')}/${token.imagePath}`,
     stats: token.stats,
     createdAt: token.createdAt,

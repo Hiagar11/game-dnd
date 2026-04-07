@@ -1,13 +1,13 @@
 <template>
   <div class="editor-toolbar">
-    <button class="editor-toolbar__back" @click="$emit('back')">←</button>
+    <button class="editor-toolbar__back" @mouseenter="playHover" @click="onBack">←</button>
 
     <!-- Название сценария -->
     <input
       :value="name"
       type="text"
       class="editor-toolbar__name"
-      placeholder="Название сценария"
+      :placeholder="namePlaceholder"
       maxlength="80"
       @input="$emit('update:name', $event.target.value)"
     />
@@ -38,7 +38,12 @@
     <div class="editor-toolbar__sep" />
 
     <!-- Изменить карту -->
-    <button class="editor-toolbar__btn" :disabled="uploading" @click="$emit('change-map')">
+    <button
+      class="editor-toolbar__btn"
+      :disabled="uploading"
+      @mouseenter="playHover"
+      @click="onChangeMap"
+    >
       <span v-if="uploading" class="editor-toolbar__spinner" />
       <span v-else>Карта...</span>
     </button>
@@ -52,7 +57,8 @@
       v-if="scenarioId"
       class="editor-toolbar__btn editor-toolbar__btn--delete"
       :disabled="saving"
-      @click="$emit('delete')"
+      @mouseenter="playHover"
+      @click="onDelete"
     >
       Удалить
     </button>
@@ -61,7 +67,8 @@
     <button
       class="editor-toolbar__btn editor-toolbar__btn--save"
       :disabled="!canSave || saving"
-      @click="$emit('save')"
+      @mouseenter="playHover"
+      @click="onSave"
     >
       <span v-if="saving" class="editor-toolbar__spinner editor-toolbar__spinner--dark" />
       <span v-else>{{ scenarioId ? 'Сохранить' : 'Создать' }}</span>
@@ -70,8 +77,11 @@
 </template>
 
 <script setup>
+  import { useSound } from '../composables/useSound'
+
   defineProps({
     name: { type: String, required: true },
+    namePlaceholder: { type: String, default: 'Название сценария' },
     cellSize: { type: Number, required: true },
     uploading: { type: Boolean, default: false },
     saving: { type: Boolean, default: false },
@@ -92,6 +102,28 @@
     'save',
     'delete',
   ])
+
+  const { playHover, playClick } = useSound()
+
+  function onBack() {
+    emit('back')
+    playClick()
+  }
+
+  function onChangeMap() {
+    emit('change-map')
+    playClick()
+  }
+
+  function onDelete() {
+    emit('delete')
+    playClick()
+  }
+
+  function onSave() {
+    emit('save')
+    playClick()
+  }
 
   function onCellSizeChange(val) {
     emit('update:cellSize', val)
@@ -129,6 +161,10 @@
     flex-shrink: 0;
     width: 200px;
     padding: var(--space-1) var(--space-3);
+
+    &::placeholder {
+      color: rgb(255 255 255 / 45%);
+    }
   }
 
   .editor-toolbar__sep {

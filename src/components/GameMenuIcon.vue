@@ -17,21 +17,23 @@
 <script setup>
   import { computed } from 'vue'
   import { useGameStore } from '../stores/game'
+  import { useTokensStore } from '../stores/tokens'
 
-  const store = useGameStore()
+  const gameStore = useGameStore()
+  const tokensStore = useTokensStore()
 
   // Определяет, какой токен показывать в иконке.
   // Приоритет у токена выбранного на карте — он конкретнее.
   // Если ничего не выбрано на карте — показываем выбранный в меню.
   const activeToken = computed(() => {
-    if (store.selectedPlacedUid) {
+    if (gameStore.selectedPlacedUid) {
       // Находим экземпляр на карте по uid
-      const placed = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+      const placed = gameStore.placedTokens.find((t) => t.uid === gameStore.selectedPlacedUid)
       // По tokenId находим определение (src, name)
-      return placed ? store.tokens.find((t) => t.id === placed.tokenId) : null
+      return placed ? tokensStore.tokens.find((t) => t.id === placed.tokenId) : null
     }
 
-    return store.selectedToken
+    return tokensStore.selectedToken
   })
 </script>
 

@@ -13,7 +13,8 @@
             :key="item.key"
             class="editor-nav__btn"
             :class="{ 'editor-nav__btn--active': activeSection === item.key }"
-            @click="activeSection = item.key"
+            @mouseenter="playHover"
+            @click="setSection(item.key)"
           >
             {{ item.label }}
           </button>
@@ -37,11 +38,13 @@
 </template>
 
 <script setup>
-  import { ref } from 'vue'
+  import { ref, onMounted, onUnmounted } from 'vue'
+  import { useRouter } from 'vue-router'
   import AppBackground from '../components/AppBackground.vue'
   import EditorMapsSection from '../components/EditorMapsSection.vue'
   import EditorLevelSection from '../components/EditorLevelSection.vue'
   import EditorScenarioSection from '../components/EditorScenarioSection.vue'
+  import { useSound } from '../composables/useSound'
 
   const NAV_ITEMS = [
     { key: 'maps', label: 'Загрузить карты' },
@@ -49,7 +52,14 @@
     { key: 'scenarios', label: 'Создать сценарий' },
   ]
 
+  const router = useRouter()
   const activeSection = ref('maps')
+  const { playHover, playClick } = useSound()
+
+  function setSection(key) {
+    activeSection.value = key
+    playClick()
+  }
   // Сценарий, открытый двойным кликом из EditorScenarioSection.
   // Передаётся в EditorLevelSection как проп для авто-загрузки.
   const autoLoadScenario = ref(null)
@@ -62,6 +72,13 @@
   function onBackToScenario() {
     activeSection.value = 'scenarios'
     autoLoadScenario.value = null
+  }
+
+  onMounted(() => window.addEventListener('keydown', onEscKey))
+  onUnmounted(() => window.removeEventListener('keydown', onEscKey))
+
+  function onEscKey(e) {
+    if (e.key === 'Escape') router.push({ name: 'menu' })
   }
 </script>
 

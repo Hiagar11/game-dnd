@@ -63,6 +63,7 @@
   import { useGameStore } from '../stores/game'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
   import { wasDragged } from '../composables/useMapPan'
+  import { useSocket } from '../composables/useSocket'
   import GameTokenContextMenu from './GameTokenContextMenu.vue'
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
   import GameDoorPopup from './GameDoorPopup.vue'
@@ -78,6 +79,7 @@
 
   const store = useGameStore()
   const { state: ctxState, open: openContextMenu, close: closeContextMenu } = useTokenContextMenu()
+  const { getSocket } = useSocket()
   // Правый клик: выбираем токен, открываем меню.
   // Повторный правый клик по тому же токену закрывает меню (тоггл).
   // Если перед этим было перетаскивание карты — игнорируем: contextmenu
@@ -100,6 +102,8 @@
 
   function handleRemove(uid) {
     store.removeToken(uid)
+    const scenarioId = String(store.currentScenario?.id ?? '')
+    if (scenarioId) getSocket()?.emit('token:remove', { scenarioId, uid })
     closeContextMenu()
   }
 

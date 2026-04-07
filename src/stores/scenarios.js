@@ -81,6 +81,11 @@ export const useScenariosStore = defineStore('scenarios', () => {
     return result
   }
 
+  // Сбрасывает placedTokens и revealedCells к эталону редактора (перед новой игрой).
+  async function resetScenario(id) {
+    await api.post(`/api/scenarios/${id}/reset`)
+  }
+
   return {
     scenarios,
     loading,
@@ -91,5 +96,6 @@ export const useScenariosStore = defineStore('scenarios', () => {
     uploadMapImage,
     fetchScenario,
     saveLevelTokens,
+    resetScenario,
   }
 })

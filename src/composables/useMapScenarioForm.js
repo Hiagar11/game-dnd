@@ -68,7 +68,7 @@ export function useMapScenarioForm() {
   }
 
   // ─── Сохранение / обновление ─────────────────────────────────────────────────
-  async function onSave() {
+  async function onSave(onSuccess) {
     if (!canSave.value) return
     saving.value = true
     saveError.value = ''
@@ -93,6 +93,7 @@ export function useMapScenarioForm() {
         const created = await store.createScenario(payload)
         form.value.id = String(created.id)
       }
+      onSuccess?.()
     } catch (err) {
       saveError.value = err.message || 'Ошибка при сохранении'
     } finally {

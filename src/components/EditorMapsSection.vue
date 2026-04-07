@@ -59,6 +59,7 @@
       <EditorToolbar
         v-model:name="form.name"
         v-model:cell-size="form.cellSize"
+        name-placeholder="Название карты"
         :uploading="uploadingMap"
         :saving="saving"
         :can-save="canSave"
@@ -67,7 +68,7 @@
         @back="exitCanvas"
         @redraw="drawPreview"
         @change-map="triggerMapPicker"
-        @save="onSave"
+        @save="handleSave"
         @delete="handleDelete"
       />
     </div>
@@ -84,7 +85,7 @@
 </template>
 
 <script setup>
-  import { ref, onMounted, watch, nextTick } from 'vue'
+  import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
   import { useScenariosStore } from '../stores/scenarios'
   import { useEditorCanvas } from '../composables/useEditorCanvas'
   import { useMapScenarioForm } from '../composables/useMapScenarioForm'
@@ -152,11 +153,27 @@
   }
 
   function exitCanvas() {
-    clearImage()
-    form.value.mapImageUrl = null
+    newScenario()
   }
 
-  onMounted(() => store.fetchScenarios())
+  function handleSave() {
+    onSave(newScenario)
+  }
+
+  onMounted(() => {
+    store.fetchScenarios()
+    window.addEventListener('keydown', onKeyDown, { capture: true })
+  })
+
+  onUnmounted(() => window.removeEventListener('keydown', onKeyDown, { capture: true }))
+
+  function onKeyDown(e) {
+    if (e.key !== 'Escape') return
+    if (form.value.mapImageUrl) {
+      e.stopImmediatePropagation()
+      exitCanvas()
+    }
+  }
 
   watch(
     () => form.value.mapImageUrl,
@@ -171,7 +188,7 @@
   )
 </script>
 
-<style scoped>
+<style scoped lang="scss">
   .maps-section {
     position: relative;
     width: 100%;
@@ -206,32 +223,17 @@
     display: flex;
     flex-direction: column;
     gap: var(--space-2);
-    font-size: 12px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--color-text-muted);
+
+    @include field-label;
   }
 
   .maps-form__input {
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    border: 1px solid var(--color-border);
-    background: rgb(0 0 0 / 30%);
-    color: var(--color-text);
-    font-size: 14px;
-    font-family: var(--font-ui);
-    transition: border-color var(--transition-fast);
-
-    &:focus {
-      outline: none;
-      border-color: var(--color-primary);
-    }
+    @include form-input(rgb(0 0 0 / 30%), 14px);
   }
 
   .maps-form__error {
     font-size: 13px;
-    color: #f87171;
+    color: var(--color-error, #f87171);
     padding: var(--space-2) var(--space-3);
     border-radius: var(--radius-sm);
     background: rgb(220 38 38 / 10%);

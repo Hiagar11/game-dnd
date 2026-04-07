@@ -21,10 +21,10 @@ export const useTokensStore = defineStore('tokens', () => {
       selectedToken.value?.id === id ? null : (tokens.value.find((t) => t.id === id) ?? null)
   }
 
-  // Сервер возвращает { id, name, imageUrl, stats: { meleeDmg, ... } }
-  // Компоненты ожидают плоский объект { id, name, src, meleeDmg, ... }
-  function normalizeToken({ id, name, imageUrl, stats }) {
-    return { id, name, src: imageUrl, ...stats }
+  // Сервер возвращает { id, name, tokenType, imageUrl, stats: { meleeDmg, ... } }
+  // Компоненты ожидают плоский объект { id, name, tokenType, src, meleeDmg, ... }
+  function normalizeToken({ id, name, tokenType, imageUrl, stats }) {
+    return { id, name, tokenType: tokenType ?? 'npc', src: imageUrl, ...stats }
   }
 
   async function fetchTokens() {

@@ -1,11 +1,18 @@
 <script setup>
   import { ref } from 'vue'
   import GameMenuIcon from './GameMenuIcon.vue'
-  import GameMenuTokens from './GameMenuTokens.vue'
+  import GameMenuTokenList from './GameMenuTokenList.vue'
   import GameMenuSystem from './GameMenuSystem.vue'
+  import { useSound } from '../composables/useSound'
 
-  // Активная вкладка центральной панели: 'tokens' | 'system'
+  // Активная вкладка центральной панели: 'tokens' | 'system' | 'heroes'
   const activeTab = ref('tokens')
+  const { playHover, playClick } = useSound()
+
+  function setTab(tab) {
+    activeTab.value = tab
+    playClick()
+  }
 </script>
 
 <template>
@@ -19,22 +26,33 @@
         <button
           class="game-menu__tab"
           :class="{ 'game-menu__tab--active': activeTab === 'tokens' }"
-          @click="activeTab = 'tokens'"
+          @mouseenter="playHover"
+          @click="setTab('tokens')"
         >
           Токены
         </button>
         <button
           class="game-menu__tab"
           :class="{ 'game-menu__tab--active': activeTab === 'system' }"
-          @click="activeTab = 'system'"
+          @mouseenter="playHover"
+          @click="setTab('system')"
         >
           Системные
+        </button>
+        <button
+          class="game-menu__tab"
+          :class="{ 'game-menu__tab--active': activeTab === 'heroes' }"
+          @mouseenter="playHover"
+          @click="setTab('heroes')"
+        >
+          Герои
         </button>
       </nav>
 
       <!-- Контент вкладки -->
-      <GameMenuTokens v-if="activeTab === 'tokens'" />
-      <GameMenuSystem v-else />
+      <GameMenuTokenList v-if="activeTab === 'tokens'" token-type="npc" />
+      <GameMenuSystem v-else-if="activeTab === 'system'" />
+      <GameMenuTokenList v-else token-type="hero" />
     </div>
 
     <!-- Правая панель — зарезервирована под будущий функционал -->
@@ -44,7 +62,7 @@
   </aside>
 </template>
 
-<style lang="scss">
+<style lang="scss" scoped>
   .game-menu {
     position: fixed;
     bottom: 0;
@@ -115,16 +133,6 @@
       background-size: cover;
       background-position: bottom;
       border-top-left-radius: var(--menu-side-radius);
-    }
-  }
-
-  @keyframes menu-slide-in {
-    from {
-      transform: translateY(100%);
-    }
-
-    to {
-      transform: translateY(0);
     }
   }
 </style>

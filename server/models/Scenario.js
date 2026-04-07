@@ -51,8 +51,14 @@ const scenarioSchema = new mongoose.Schema(
       type: Number,
       default: 60,
     },
-    // Текущая расстановка токенов
+    // Текущая расстановка токенов (изменяется во время игры)
     placedTokens: {
+      type: [placedTokenSchema],
+      default: [],
+    },
+    // Эталонная расстановка токенов — устанавливается редактором, не меняется геймплеем.
+    // Используется для сброса к исходному состоянию при запуске новой игры.
+    defaultPlacedTokens: {
       type: [placedTokenSchema],
       default: [],
     },
@@ -66,5 +72,7 @@ const scenarioSchema = new mongoose.Schema(
   },
   { timestamps: true }
 )
+
+scenarioSchema.index({ owner: 1 })
 
 export default mongoose.model('Scenario', scenarioSchema)

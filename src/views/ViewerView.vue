@@ -24,6 +24,9 @@
 
     <router-link class="viewer-view__back" :to="{ name: 'lobby' }">← Выйти</router-link>
 
+    <!-- Меню зрителя: список героев от мастера (видно всегда, даже пока карта загружается) -->
+    <ViewerMenu />
+
     <!-- Курсор мастера — виден только зрителям (Teleport внутри компонента монтирует в body) -->
     <AdminCursorOverlay
       :map-x="cursorMapX"
@@ -42,6 +45,7 @@
   import { useSocket } from '../composables/useSocket'
   import { useViewerSync } from '../composables/useViewerSync'
   import { useGameStore } from '../stores/game'
+  import { useHeroesStore } from '../stores/heroes'
   import { useScenariosStore } from '../stores/scenarios'
   import { SYSTEM_TOKENS } from '../constants/systemTokens'
   import AppBackground from '../components/AppBackground.vue'
@@ -50,6 +54,7 @@
   import GameFog from '../components/GameFog.vue'
   import GameTokens from '../components/GameTokens.vue'
   import AdminCursorOverlay from '../components/AdminCursorOverlay.vue'
+  import ViewerMenu from '../components/ViewerMenu.vue'
 
   // Базовый URL сервера — для построения imageUrl из imagePath
   const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
@@ -58,6 +63,7 @@
   const auth = useAuthStore()
   const { connect } = useSocket()
   const gameStore = useGameStore()
+  const heroesStore = useHeroesStore()
   const scenariosStore = useScenariosStore()
 
   const mapRef = ref(null)
@@ -116,6 +122,9 @@
         cursorMapX.value = res.session.cursorMapX ?? null
         cursorMapY.value = res.session.cursorMapY ?? null
         cursorIconUrl.value = res.session.cursorIconDataUrl ?? ''
+
+        // Инициализируем список героев из текущего состояния сессии
+        heroesStore.setHeroes(res.session.heroes ?? [])
 
         // Резервный путь: если scenarioId не было в URL (прямой переход по ссылке)
         if (!scenarioIdFromRoute && !ready.value) {

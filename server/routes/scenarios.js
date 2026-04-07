@@ -88,6 +88,7 @@ router.post('/', requireAdmin, async (req, res) => {
       mapImagePath: mapImagePath || '',
       cellSize: Number(cellSize) || 60,
       placedTokens: normalizedTokens,
+      defaultPlacedTokens: normalizedTokens,
     })
     res.status(201).json(formatScenario(scenario, req))
   } catch (err) {
@@ -115,6 +116,8 @@ router.get('/', async (req, res) => {
 // ─── GET /api/scenarios/:id ───────────────────────────────────────────────────
 // Полные данные сценария. Player получает отфильтрованную версию (без hidden токенов).
 router.get('/:id', async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
   try {
     const scenario = await Scenario.findById(req.params.id).populate(
       'placedTokens.tokenId',
@@ -122,6 +125,10 @@ router.get('/:id', async (req, res) => {
     )
 
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
+
+    // Admin видит только свои сценарии
+    if (req.user.role === 'admin' && String(scenario.owner) !== String(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа' })
 
     const isAdmin = req.user.role === 'admin'
     res.json(formatScenario(scenario, req, { full: true, showHidden: isAdmin }))
@@ -133,9 +140,13 @@ router.get('/:id', async (req, res) => {
 // ─── PUT /api/scenarios/:id ───────────────────────────────────────────────────
 // Обновление мета-данных сценария (имя, карта, размер клетки). Только admin.
 router.put('/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
   try {
     const scenario = await Scenario.findById(req.params.id)
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
+    if (String(scenario.owner) !== String(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа' })
 
     const { name, mapImagePath, cellSize } = req.body
     if (name !== undefined) scenario.name = name.trim()
@@ -151,11 +162,14 @@ router.put('/:id', requireAdmin, async (req, res) => {
 
 // ─── PATCH /api/scenarios/:id/placed-tokens ───────────────────────────────────────
 // Сохраняет расстановку токенов и опционально обновляет имя сценария.
-// Роут защищён requireAdmin — дополнительная проверка владельца не нужна.
 router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
   try {
     const scenario = await Scenario.findById(req.params.id)
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
+    if (String(scenario.owner) !== String(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа' })
 
     const { placedTokens, name } = req.body
     if (!Array.isArray(placedTokens)) {
@@ -181,6 +195,8 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
         hidden,
       })
     )
+    // Редактор устанавливает эталон — синхронно обновляем defaultPlacedTokens
+    scenario.defaultPlacedTokens = scenario.placedTokens
 
     await scenario.save()
     res.json({ ok: true, count: scenario.placedTokens.length, name: scenario.name })
@@ -189,13 +205,37 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
   }
 })
 
+// ─── POST /api/scenarios/:id/reset ───────────────────────────────────────────
+// Сбрасывает placedTokens и revealedCells к эталонному состоянию редактора.
+// Вызывается перед запуском новой игры, чтобы не затронуть сохранённые сессии.
+router.post('/:id/reset', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
+  try {
+    const scenario = await Scenario.findById(req.params.id)
+    if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
+    if (String(scenario.owner) !== String(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа' })
+
+    scenario.placedTokens = scenario.defaultPlacedTokens
+    scenario.revealedCells = []
+    await scenario.save()
+
+    res.json({ ok: true })
+  } catch {
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+})
+
 // ─── DELETE /api/scenarios/:id ────────────────────────────────────────────────
-// Удаление сценария. Только admin.
 // Вместе со сценарием удаляем файл карты с диска, чтобы не засорять uploads/.
 router.delete('/:id', requireAdmin, async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
   try {
-    const scenario = await Scenario.findByIdAndDelete(req.params.id)
+    const scenario = await Scenario.findOne({ _id: req.params.id, owner: req.user.id })
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
+    await scenario.deleteOne()
 
     // Если у сценария была карта — удаляем файл. Ошибку игнорируем:
     // файл мог быть уже удалён вручную или путь мог не совпасть.

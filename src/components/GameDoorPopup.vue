@@ -26,10 +26,19 @@
     </div>
 
     <div class="door-popup__footer">
-      <button class="door-popup__btn door-popup__btn--cancel" @click="$emit('close')">
+      <button
+        class="door-popup__btn door-popup__btn--cancel"
+        @mouseenter="playHover"
+        @click="onClose"
+      >
         Отмена
       </button>
-      <button class="door-popup__btn door-popup__btn--save" :disabled="!targetId" @click="onApply">
+      <button
+        class="door-popup__btn door-popup__btn--save"
+        :disabled="!targetId"
+        @mouseenter="playHover"
+        @click="onApply"
+      >
         Применить
       </button>
     </div>
@@ -42,6 +51,7 @@
   import { useScenariosStore } from '../stores/scenarios'
   import { useCampaignsStore } from '../stores/campaigns'
   import PopupShell from './PopupShell.vue'
+  import { useSound } from '../composables/useSound'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
@@ -54,6 +64,12 @@
   const gameStore = useGameStore()
   const scenariosStore = useScenariosStore()
   const campaignsStore = useCampaignsStore()
+  const { playHover, playClick } = useSound()
+
+  function onClose() {
+    playClick()
+    emit('close')
+  }
 
   // Название текущей локации
   const currentName = computed(() => gameStore.currentScenario?.name || 'Текущая локация')
@@ -93,6 +109,7 @@
   )
 
   function onApply() {
+    playClick()
     gameStore.setDoorTarget(props.placedUid, targetId.value)
     emit('close')
   }
@@ -169,13 +186,10 @@
       border-color var(--transition-fast);
 
     &--cancel {
-      background: rgb(255 255 255 / 6%);
-      border-color: rgb(255 255 255 / 15%);
-      color: var(--color-text);
+      @include btn-ghost;
 
-      &:hover {
-        background: rgb(255 255 255 / 12%);
-      }
+      padding: var(--space-2) var(--space-6);
+      font-size: 14px;
     }
 
     &--save {

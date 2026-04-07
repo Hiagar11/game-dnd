@@ -257,6 +257,7 @@ export function setupSocket(io) {
         cursorMapX: null,
         cursorMapY: null,
         cursorIconDataUrl: null,
+        heroes: [],
       })
 
       socket.join(`viewer:${sessionId}`)
@@ -320,6 +321,18 @@ export function setupSocket(io) {
       socket
         .to(`viewer:${sessionId}`)
         .emit('game:cursor:icon', { iconDataUrl: session.cursorIconDataUrl })
+    })
+
+    // ─── Список героев сессии (admin) ────────────────────────────────────────────
+    // Событие: game:heroes:set { heroes: [{id, name, src, ...stats}] }
+    // Мастер обновил список токенов-героев — транслируем зрителям.
+    socket.on('game:heroes:set', ({ heroes }) => {
+      if (role !== 'admin') return
+      const sessionId = socket.user.id
+      const session = sessions.get(sessionId)
+      if (!session) return
+      session.heroes = Array.isArray(heroes) ? heroes : []
+      socket.to(`viewer:${sessionId}`).emit('game:heroes:updated', { heroes: session.heroes })
     })
 
     // ─── Синхронизация панорамы (admin) ──────────────────────────────────────
@@ -386,6 +399,7 @@ export function setupSocket(io) {
             cursorMapX: session.cursorMapX ?? null,
             cursorMapY: session.cursorMapY ?? null,
             cursorIconDataUrl: session.cursorIconDataUrl ?? null,
+            heroes: session.heroes ?? [],
           },
           scenario: {
             id: String(scenario._id),

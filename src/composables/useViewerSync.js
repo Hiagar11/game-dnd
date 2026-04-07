@@ -4,6 +4,7 @@
 
 import { ref } from 'vue'
 import { useGameStore } from '../stores/game'
+import { useHeroesStore } from '../stores/heroes'
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
@@ -20,6 +21,10 @@ export function useViewerSync(socket) {
   const cursorMapY = ref(null)
   // Data URL или '' = использовать дефолтную иконку
   const cursorIconUrl = ref('')
+
+  // Список токенов-героев, транслируемый мастером зрителям.
+  // Хранится в heroesStore — тот же store доступен ViewerMenu для отображения.
+  const heroesStore = useHeroesStore()
 
   // Колбэк, вызываемый при смене сценария (ViewerView перезагружает карту)
   let _onScenarioChange = null
@@ -118,6 +123,11 @@ export function useViewerSync(socket) {
     socket.on('game:cursor:icon', ({ iconDataUrl }) => {
       cursorIconUrl.value = iconDataUrl ?? ''
     })
+
+    // Список героев обновлён мастером
+    socket.on('game:heroes:updated', ({ heroes }) => {
+      heroesStore.setHeroes(heroes)
+    })
   }
 
   // ── Отписка (при размонтировании ViewerView) ──────────────────────────────
@@ -130,6 +140,7 @@ export function useViewerSync(socket) {
     socket.off('token:hiddenChanged')
     socket.off('game:cursor')
     socket.off('game:cursor:icon')
+    socket.off('game:heroes:updated')
   }
 
   return {

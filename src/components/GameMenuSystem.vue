@@ -34,6 +34,7 @@
         v-if="cursorIconUrl"
         class="game-menu-system__cursor-btn game-menu-system__cursor-btn--reset"
         title="Сбросить иконку"
+        @mouseenter="playHover"
         @click="resetIcon"
       >
         ✕
@@ -47,6 +48,7 @@
       class="game-menu-system__item"
       :title="token.name"
       draggable="false"
+      @mouseenter="playHover"
       @dragstart="onDragStart($event, token)"
     >
       <img :src="token.src" :alt="token.name" class="game-menu-system__img" draggable="true" />
@@ -57,6 +59,7 @@
 <script setup>
   import { ref, inject } from 'vue'
   import { SYSTEM_TOKENS } from '../stores/game'
+  import { useSound } from '../composables/useSound'
 
   // inject получает функцию setCursorIcon из GameView через provide.
   // Если компонент используется вне GameView — fallback на пустую функцию.
@@ -64,6 +67,7 @@
 
   // Превью выбранной иконки (хранится только в памяти, не в БД)
   const cursorIconUrl = ref('')
+  const { playHover, playClick } = useSound()
 
   // Пользователь выбрал файл — читаем как base64 через FileReader
   function onIconUpload(e) {
@@ -84,6 +88,7 @@
 
   // Убираем кастомную иконку — зрители увидят дефолтный эмодзи 🎲
   function resetIcon() {
+    playClick()
     cursorIconUrl.value = ''
     setCursorIcon(null)
   }
@@ -96,22 +101,9 @@
   }
 </script>
 
-<style scoped>
+<style scoped lang="scss">
   .game-menu-system {
-    flex-grow: 1;
-    padding: var(--space-2);
-    background-image: url('/systemImage/panel-center.jpg');
-    background-size: 340px;
-    background-position: center;
-    box-shadow:
-      inset 15px 0 15px -5px var(--color-overlay-strong),
-      inset -15px 0 15px -5px var(--color-overlay-strong);
-    display: flex;
-    flex-wrap: wrap;
-    align-content: flex-start;
-    gap: var(--space-2);
-    min-height: 0;
-    overflow-y: auto;
+    @include menu-panel-content;
   }
 
   /* ── Секция выбора иконки курсора ──────────────────────────────────────── */

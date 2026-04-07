@@ -33,12 +33,7 @@
         </p>
 
         <!-- SVG: рёбра графа -->
-        <svg
-          class="scenario-canvas__svg"
-          style="position: absolute; inset: 0; pointer-events: none"
-          width="3000"
-          height="2000"
-        >
+        <svg class="scenario-canvas__svg" width="3000" height="2000">
           <!-- Существующие связи -->
           <g v-for="edge in displayEdges" :key="edge.key">
             <!-- Видимая линия -->
@@ -225,6 +220,12 @@
     position: relative;
     width: 3000px;
     height: 2000px;
+  }
+
+  .scenario-canvas__svg {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
   }
 
   .scenario-canvas__hint {
