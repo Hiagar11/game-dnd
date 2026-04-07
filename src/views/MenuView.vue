@@ -13,18 +13,21 @@
       >
         {{ item.label }}
       </router-link>
+      <button class="menu__link menu__logout" @mouseenter="playHover" @click="logout">Выйти</button>
     </nav>
   </div>
 </template>
 
 <script setup>
   import { computed } from 'vue'
+  import { useRouter } from 'vue-router'
   import { useSound } from '../composables/useSound'
   import { useAuthStore } from '../stores/auth'
   import AppBackground from '../components/AppBackground.vue'
 
   const { playHover, playClick } = useSound()
   const auth = useAuthStore()
+  const router = useRouter()
 
   // Игрок видит только «Играть» → лобби. Мастер (admin) видит «Играть» → игра и «Редактор».
   const menuItems = computed(() => {
@@ -36,6 +39,12 @@
     }
     return [{ to: '/lobby', label: 'Играть' }]
   })
+
+  function logout() {
+    playClick()
+    auth.logout()
+    router.push({ name: 'login' })
+  }
 </script>
 
 <style scoped>
@@ -67,5 +76,20 @@
 
   .menu__link:hover {
     color: var(--color-primary);
+  }
+
+  .menu__logout {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--color-text-muted);
+    font-size: 1rem;
+    font-weight: 500;
+
+    &:hover {
+      color: var(--color-danger, #e55);
+    }
   }
 </style>

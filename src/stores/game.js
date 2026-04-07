@@ -53,8 +53,9 @@ export const useGameStore = defineStore('game', () => {
   function placeToken(tokenId, col, row) {
     const tokensStore = useTokensStore()
     const def = tokensStore.tokens.find((t) => t.id === tokenId)
+    const uid = crypto.randomUUID()
     placedTokens.value.push({
-      uid: crypto.randomUUID(),
+      uid,
       tokenId,
       col,
       row,
@@ -66,13 +67,15 @@ export const useGameStore = defineStore('game', () => {
       defense: def?.defense ?? 0,
       evasion: def?.evasion ?? 0,
     })
+    return uid
   }
 
   function placeSystemToken(systemTokenId, col, row) {
     const def = SYSTEM_TOKENS.find((t) => t.id === systemTokenId)
-    if (!def) return
+    if (!def) return null
+    const uid = crypto.randomUUID()
     placedTokens.value.push({
-      uid: crypto.randomUUID(),
+      uid,
       tokenId: null,
       systemToken: systemTokenId,
       targetScenarioId: null,
@@ -87,6 +90,7 @@ export const useGameStore = defineStore('game', () => {
       defense: 0,
       evasion: 0,
     })
+    return uid
   }
 
   function removeToken(uid) {

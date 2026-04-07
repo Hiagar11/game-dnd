@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import Scenario from '../models/Scenario.js'
+import Token from '../models/Token.js'
 
 // ─── Socket.io обработчики событий ───────────────────────────────────────────
 // Эта функция принимает io (сервер Socket.io) и навешивает все обработчики.
@@ -59,17 +60,34 @@ export function setupSocket(io) {
       if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
 
       try {
-        const { scenarioId, tokenId, uid, col, row, hidden = false } = data
+        const { scenarioId, tokenId, uid, col, row, hidden = false, systemToken = null } = data
 
         const scenario = await Scenario.findById(scenarioId)
         if (!scenario) return ackError(ack, 'Сценарий не найден')
 
-        const placed = { uid, tokenId, col, row, hidden }
+        const placed = { uid, tokenId: tokenId ?? null, systemToken, col, row, hidden }
         scenario.placedTokens.push(placed)
         await scenario.save()
 
-        // Отправляем всем в комнате (включая отправителя)
-        io.to(scenarioId).emit('token:placed', placed)
+        // Добавляем данные токена для зрителей (изображение + имя) чтобы не делать доп. запрос
+        let tokenName = null
+        let tokenImagePath = null
+        if (tokenId) {
+          const tokenDoc = await Token.findById(tokenId).select('name imagePath').lean()
+          tokenName = tokenDoc?.name ?? null
+          tokenImagePath = tokenDoc?.imagePath ?? null
+        }
+
+        io.to(scenarioId).emit('token:placed', {
+          uid,
+          col,
+          row,
+          hidden,
+          tokenId: tokenId ?? null,
+          systemToken,
+          tokenName,
+          tokenImagePath,
+        })
         ack?.({ ok: true })
       } catch {
         ackError(ack, 'Ошибка сервера')

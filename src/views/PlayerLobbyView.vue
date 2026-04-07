@@ -9,6 +9,8 @@
 
       <p v-if="loading" class="lobby__hint">Подключение…</p>
 
+      <p v-else-if="connectError" class="lobby__error">{{ connectError }}</p>
+
       <p v-else-if="!sessions.length" class="lobby__hint">
         Ни одной игры пока нет. Подождите, пока Мастер начнёт сессию.
       </p>
@@ -19,7 +21,7 @@
             <span class="lobby__campaign">{{ s.campaignName }}</span>
             <span class="lobby__master">Мастер: {{ s.adminName }}</span>
           </div>
-          <button class="lobby__join" @click="joinSession(s.sessionId)">Войти</button>
+          <button class="lobby__join" @click="joinSession(s)">Войти</button>
         </li>
       </ul>
     </div>
@@ -39,13 +41,29 @@
 
   const sessions = ref([])
   const loading = ref(true)
+  const connectError = ref('')
+
+  function fetchSessions(socket) {
+    socket.emit('game:sessions:list', (res) => {
+      if (res?.ok) sessions.value = res.sessions
+      loading.value = false
+    })
+  }
 
   onMounted(() => {
     const socket = connect(auth.token)
 
-    // Запрашиваем текущий список сессий
-    socket.emit('game:sessions:list', (res) => {
-      if (res?.ok) sessions.value = res.sessions
+    // Если сокет уже подключён (переход назад/вперёд) — запрашиваем сразу.
+    // Иначе ждём событие connect: эмит до подключения может потерять ack при ошибке.
+    if (socket.connected) {
+      fetchSessions(socket)
+    } else {
+      socket.once('connect', () => fetchSessions(socket))
+    }
+
+    // Ошибка подключения (JWT невалидный, сервер недоступен и т.д.)
+    socket.once('connect_error', (err) => {
+      connectError.value = `Не удалось подключиться: ${err.message}`
       loading.value = false
     })
 
@@ -56,12 +74,18 @@
   })
 
   onUnmounted(() => {
-    // Снимаем только этот обработчик, не трогаем сокет целиком
-    getSocket()?.off('sessions:updated')
+    const socket = getSocket()
+    socket?.off('sessions:updated')
+    socket?.off('connect_error')
   })
 
-  function joinSession(sessionId) {
-    router.push({ name: 'viewer', params: { sessionId } })
+  function joinSession(session) {
+    router.push({
+      name: 'viewer',
+      params: { sessionId: session.sessionId },
+      // scenarioId в query — ViewerView загрузит карту через REST до подключения сокета
+      query: { scenarioId: session.scenarioId },
+    })
   }
 </script>
 
@@ -114,6 +138,12 @@
     margin: 0;
     font-size: 14px;
     color: var(--color-text-muted);
+  }
+
+  .lobby__error {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-danger, #e55);
   }
 
   .lobby__list {

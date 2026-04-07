@@ -102,18 +102,19 @@
   // Флаг: открыта ли активная сессия трансляции для зрителей
   const sessionActive = ref(false)
 
-  // Дебаунс-таймер для game:pan (не шлём на каждый пиксель)
-  let panTimer = null
+  // Throttle для game:pan — шлём не чаще 30fps (32ms), чтобы не перегружать сокет.
+  // Используем throttle вместо debounce: debounce ждёт паузы (плохо при плавном панорамировании),
+  // throttle — шлёт регулярно ПОКА идёт движение.
+  let panLastEmit = 0
   watch([offsetX, offsetY], ([x, y]) => {
     if (!sessionActive.value) return
-    clearTimeout(panTimer)
-    panTimer = setTimeout(() => {
-      getSocket()?.emit('game:pan', { offsetX: x, offsetY: y })
-    }, 50)
+    const now = Date.now()
+    if (now - panLastEmit < 32) return
+    panLastEmit = now
+    getSocket()?.emit('game:pan', { offsetX: x, offsetY: y })
   })
 
   onUnmounted(() => {
-    clearTimeout(panTimer)
     if (sessionActive.value) {
       getSocket()?.emit('game:session:close')
       sessionActive.value = false

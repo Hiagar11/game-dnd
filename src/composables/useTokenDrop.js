@@ -5,6 +5,7 @@
 // Нужны чтобы пересчитать viewport-координаты курсора в координаты на карте.
 
 import { useGameStore } from '../stores/game'
+import { useSocket } from './useSocket'
 
 export function useTokenDrop(offsetX, offsetY) {
   function onDragOver(e) {
@@ -20,6 +21,7 @@ export function useTokenDrop(offsetX, offsetY) {
     e.preventDefault()
 
     const store = useGameStore()
+    const { getSocket } = useSocket()
 
     const mapX = e.clientX - offsetX.value
     const mapY = e.clientY - offsetY.value
@@ -27,15 +29,27 @@ export function useTokenDrop(offsetX, offsetY) {
     const row = Math.floor(mapY / store.cellSize)
     if (col < 0 || row < 0) return
 
+    const scenarioId = String(store.currentScenario?.id ?? '')
+
     // Сначала проверяем системный токен — у него свой action
     const systemToken = e.dataTransfer.getData('systemToken')
     if (systemToken) {
-      store.placeSystemToken(systemToken, col, row)
+      const uid = store.placeSystemToken(systemToken, col, row)
+      // Транслируем размещение зрителям через сокет
+      if (uid && scenarioId) {
+        getSocket()?.emit('token:place', { scenarioId, systemToken, uid, col, row, hidden: false })
+      }
       return
     }
 
     const tokenId = e.dataTransfer.getData('tokenId')
-    if (tokenId) store.placeToken(tokenId, col, row)
+    if (tokenId) {
+      const uid = store.placeToken(tokenId, col, row)
+      // Транслируем размещение зрителям через сокет
+      if (uid && scenarioId) {
+        getSocket()?.emit('token:place', { scenarioId, tokenId, uid, col, row, hidden: false })
+      }
+    }
   }
 
   return { onDragOver, onDrop }
