@@ -21,10 +21,16 @@
       </nav>
 
       <!-- Правая область: текущий раздел -->
+      <!-- v-if для maps/levels: не нужно хранить состояние -->
+      <!-- v-show для scenarios: хранит граф (рёбра, позиции узлов) при переходе на редактирование уровня -->
       <main class="editor-content">
         <EditorMapsSection v-if="activeSection === 'maps'" />
-        <EditorLevelSection v-else-if="activeSection === 'levels'" />
-        <EditorScenarioSection v-else />
+        <EditorLevelSection
+          v-if="activeSection === 'levels'"
+          :auto-load-scenario="autoLoadScenario"
+          @back-to-scenario="onBackToScenario"
+        />
+        <EditorScenarioSection v-show="activeSection === 'scenarios'" @open-level="onOpenLevel" />
       </main>
     </div>
   </div>
@@ -44,6 +50,19 @@
   ]
 
   const activeSection = ref('maps')
+  // Сценарий, открытый двойным кликом из EditorScenarioSection.
+  // Передаётся в EditorLevelSection как проп для авто-загрузки.
+  const autoLoadScenario = ref(null)
+
+  function onOpenLevel({ scenario }) {
+    autoLoadScenario.value = scenario
+    activeSection.value = 'levels'
+  }
+
+  function onBackToScenario() {
+    activeSection.value = 'scenarios'
+    autoLoadScenario.value = null
+  }
 </script>
 
 <style scoped>

@@ -75,6 +75,7 @@ router.post('/', requireAdmin, async (req, res) => {
             targetScenarioId: targetScenarioId
               ? new mongoose.Types.ObjectId(String(targetScenarioId))
               : null,
+            col: Number(col),
             row: Number(row),
             hidden: Boolean(hidden),
           })

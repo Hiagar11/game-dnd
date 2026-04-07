@@ -4,7 +4,7 @@
 </template>
 
 <script setup>
-  import { ref, onMounted } from 'vue'
+  import { ref, onMounted, watch } from 'vue'
 
   const props = defineProps({
     // Путь к изображению карты (относительно папки public/)
@@ -17,24 +17,27 @@
 
   const canvasRef = ref(null)
 
-  onMounted(() => {
+  function drawMap(src) {
     const canvas = canvasRef.value
+    if (!canvas) return
     const ctx = canvas.getContext('2d')
 
     const img = new Image()
-    img.src = props.mapSrc
+    img.src = src
 
     img.onload = () => {
-      // Задаём canvas размер по пикселям изображения, а не по CSS —
-      // это гарантирует правильные пропорции без растяжки.
       canvas.width = img.naturalWidth
       canvas.height = img.naturalHeight
       ctx.drawImage(img, 0, 0)
-
-      // Карта готова — отдаём canvas родителю
       emit('ready', canvas)
     }
-  })
+  }
+
+  onMounted(() => drawMap(props.mapSrc))
+  watch(
+    () => props.mapSrc,
+    (src) => drawMap(src)
+  )
 </script>
 
 <style scoped>

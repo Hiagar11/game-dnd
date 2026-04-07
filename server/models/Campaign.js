@@ -1,0 +1,52 @@
+import mongoose from 'mongoose'
+
+// Позиция узла в визуальном редакторе сценария (для каждой заполненной карты)
+const nodeSchema = new mongoose.Schema(
+  {
+    scenarioId: { type: mongoose.Schema.Types.ObjectId, ref: 'Scenario', required: true },
+    x: { type: Number, default: 0 },
+    y: { type: Number, default: 0 },
+  },
+  { _id: false }
+)
+
+// Ребро графа — двунаправленная связь между двумя картами
+const edgeSchema = new mongoose.Schema(
+  {
+    from: { type: mongoose.Schema.Types.ObjectId, ref: 'Scenario', required: true },
+    to: { type: mongoose.Schema.Types.ObjectId, ref: 'Scenario', required: true },
+  },
+  { _id: false }
+)
+
+// Сценарий (кампания) — именованный набор связей между заполненными картами.
+// Визуально редактируется в разделе «Создать сценарий» и используется для
+// фильтрации переходов через двери во время игры.
+const campaignSchema = new mongoose.Schema(
+  {
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 80,
+    },
+    // Позиции карточек в визуальном редакторе (scenarioId → {x, y})
+    nodes: { type: [nodeSchema], default: [] },
+    // Связи между картами (двунаправленные)
+    edges: { type: [edgeSchema], default: [] },
+    // Стартовая локация — с неё начинается игра при запуске сценария
+    startScenarioId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Scenario',
+      default: null,
+    },
+  },
+  { timestamps: true }
+)
+
+export default mongoose.model('Campaign', campaignSchema)

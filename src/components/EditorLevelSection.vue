@@ -90,13 +90,14 @@
               <button class="level-save__btn" :disabled="saving" @click="onSaveBtnClick">
                 {{ isEditingLevel ? 'Обновить' : 'Сохранить уровень' }}
               </button>
-              <p v-if="doorHint" class="level-save__door-hint">{{ doorHint }}</p>
             </div>
           </template>
         </GameMenu>
 
-        <!-- Кнопка возврата к выбору карты -->
-        <button class="level-back" @click="exitGame">← К выбору</button>
+        <!-- Кнопка возврата к выбору карты / назад в сценарий -->
+        <button class="level-back" @click="props.autoLoadScenario ? goBack() : exitGame()">
+          {{ props.autoLoadScenario ? '← К сценарию' : '← К выбору' }}
+        </button>
 
         <!-- Попап: имя сохранения ─────────────────────────────────────────── -->
         <div v-if="showSavePopup" class="level-popup-overlay" @click.self="closeSavePopup">
@@ -137,7 +138,7 @@
 </template>
 
 <script setup>
-  import { ref, computed, nextTick, onMounted } from 'vue'
+  import { ref, computed, watch, nextTick, onMounted } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
@@ -147,6 +148,13 @@
   import GameGrid from './GameGrid.vue'
   import GameTokens from './GameTokens.vue'
   import GameMenu from './GameMenu.vue'
+
+  // autoLoadScenario: предаётся из EditorScenarioSection через ScenarioEditorView
+  // при двойном клике по узлу графа. Ѐback-to-scenario — возвращает назад.
+  const props = defineProps({
+    autoLoadScenario: { type: Object, default: null },
+  })
+  const emit = defineEmits(['back-to-scenario'])
 
   const store = useScenariosStore()
   const gameStore = useGameStore()
@@ -169,9 +177,6 @@
   const saveToastMsg = ref('')
   const deletingId = ref(null)
   const deleteError = ref('')
-
-  // Подсказка валидации: дверь без назначенной локации
-  const doorHint = ref('')
 
   // Флаг: открыт существующий уровень — кнопка станет «Обновить»
   const isEditingLevel = ref(false)
@@ -207,7 +212,16 @@
 
   // ─── Жизненный цикл ─────────────────────────────────────────────────────────
   onMounted(() => store.fetchScenarios())
-
+  // Когда ScenarioEditorView передаёт сценарий через prop, автоматически открываем его в режиме редактирования.
+  // GameDoorPopup в тот момент уже читает gameStore.activeCampaign (выставлено в EditorScenarioSection),
+  // так что ему доступны только связанные локации из текущей схемы сценария.
+  watch(
+    () => props.autoLoadScenario,
+    async (scenario) => {
+      if (scenario) await editLevel(scenario)
+    },
+    { immediate: true }
+  )
   // ─── Выбор карты ────────────────────────────────────────────────────────────
   async function selectScenario(s) {
     loadingId.value = s.id
@@ -244,6 +258,13 @@
     isEditingLevel.value = false
   }
 
+  // ВозвраТ в режим редактора сценария: ресет состояния редактора + сообщаем родителю.
+  function goBack() {
+    exitGame()
+    gameStore.setActiveCampaign(null)
+    emit('back-to-scenario')
+  }
+
   // ─── Открытие уровня для редактирования ─────────────────────────────────────
   // То же что selectScenario, но ставит флаг isEditingLevel = true.
   async function editLevel(s) {
@@ -254,6 +275,7 @@
       const full = await store.fetchScenario(s.id)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.initPlacedTokens(full.placedTokens ?? [])
+      gameStore.currentScenario = full
       selectedScenario.value = full
       isEditingLevel.value = true
     } catch (err) {
@@ -263,24 +285,10 @@
     }
   }
 
-  // Проверяет наличие дверей без назначенной локации перехода.
-  // Если найдена такая дверь — трясёт её и показывает подсказку.
-  function validateDoors() {
-    const bad = gameStore.placedTokens.find((t) => t.systemToken === 'door' && !t.targetScenarioId)
-    if (bad) {
-      gameStore.shakeToken(bad.uid)
-      doorHint.value = 'Выберите локацию перехода для каждой двери'
-      return false
-    }
-    doorHint.value = ''
-    return true
-  }
-
   // Обработка кнопки сохранения ─────────────────────────────────────────────
   // В режиме редактирования (уровень) — сразу обновляем, без попапа.
   // В режиме создания — открываем попап для ввода названия.
   function onSaveBtnClick() {
-    if (!validateDoors()) return
     if (isEditingLevel.value) {
       onUpdateLevel()
     } else {
@@ -305,12 +313,17 @@
         })
       )
       await store.saveLevelTokens(selectedScenario.value.id, tokens)
-      exitGame()
-      saveToastMsg.value = 'Уровень обновлён'
-      saveSuccess.value = true
-      setTimeout(() => {
-        saveSuccess.value = false
-      }, 3000)
+      if (props.autoLoadScenario) {
+        // Возвращаемся в редактор сценария без потери счётчика сценария и связей
+        goBack()
+      } else {
+        exitGame()
+        saveToastMsg.value = 'Уровень обновлён'
+        saveSuccess.value = true
+        setTimeout(() => {
+          saveSuccess.value = false
+        }, 3000)
+      }
     } catch (err) {
       saveError.value = err.message || 'Ошибка при обновлении'
     } finally {
@@ -593,14 +606,6 @@
     font-size: 11px;
     color: #f87171;
     text-align: center;
-  }
-
-  .level-save__door-hint {
-    font-size: 11px;
-    color: #fbbf24;
-    text-align: center;
-    max-inline-size: 120px;
-    line-height: 1.4;
   }
 
   /* ─── Кнопка «К выбору» ──────────────────────────────────────────────────── */

@@ -50,6 +50,7 @@
   import { ref, computed, watch } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useScenariosStore } from '../stores/scenarios'
+  import { useCampaignsStore } from '../stores/campaigns'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
@@ -61,14 +62,30 @@
 
   const gameStore = useGameStore()
   const scenariosStore = useScenariosStore()
+  const campaignsStore = useCampaignsStore()
 
   // Название текущей локации
   const currentName = computed(() => gameStore.currentScenario?.name || 'Текущая локация')
 
-  // Все заполненные карты, кроме текущей
+  // Доступные для перехода локации:
+  // если активна кампания — показываем только связанные боком мапа;
+  // иначе — все заполненные карты кроме текущей.
   const otherLevels = computed(() => {
-    const currentId = gameStore.currentScenario?.id
-    return scenariosStore.scenarios.filter((s) => s.tokensCount > 0 && s.id !== currentId)
+    const currentId = String(gameStore.currentScenario?.id ?? '')
+    const campaign = gameStore.activeCampaign
+
+    const all = scenariosStore.scenarios.filter(
+      (s) => s.tokensCount > 0 && String(s.id) !== currentId
+    )
+
+    if (campaign) {
+      const connectedIds = campaignsStore.getConnectedIds(campaign, currentId)
+      // Если кампания есть но связей нет — отображаем все как запасной вариант
+      if (connectedIds.length) {
+        return all.filter((s) => connectedIds.includes(String(s.id)))
+      }
+    }
+    return all
   })
 
   const targetId = ref('')

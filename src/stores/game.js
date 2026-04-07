@@ -38,6 +38,13 @@ export const useGameStore = defineStore('game', () => {
   // Текущий загруженный сценарий (для отображения имени локации в дверном попапе)
   const currentScenario = ref(null)
 
+  // Активная кампания — определяет доступные переходы через двери
+  const activeCampaign = ref(null)
+
+  function setActiveCampaign(campaign) {
+    activeCampaign.value = campaign ?? null
+  }
+
   // uid токена, который сейчас трясётся (анимация валидации)
   const shakingTokenUid = ref(null)
 
@@ -266,6 +273,7 @@ export const useGameStore = defineStore('game', () => {
     placedTokens,
     selectedPlacedUid,
     currentScenario,
+    activeCampaign,
     shakingTokenUid,
     cellSizePx,
     setCellSize,
@@ -276,6 +284,7 @@ export const useGameStore = defineStore('game', () => {
     placeSystemToken,
     setDoorTarget,
     shakeToken,
+    setActiveCampaign,
     removeToken,
     moveToken,
     editPlacedToken,

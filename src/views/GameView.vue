@@ -13,25 +13,24 @@
     <template v-if="!selectedScenario">
       <div class="game-picker">
         <router-link class="game-picker__back" :to="{ name: 'menu' }">← Меню</router-link>
-        <h2 class="game-picker__title">Выберите карту</h2>
 
-        <p v-if="scenariosStore.loading" class="game-picker__hint">Загрузка…</p>
-        <p v-else-if="!levels.length" class="game-picker__hint">
-          Нет доступных уровней. Мастер должен расставить токены в редакторе.
+        <h2 class="game-picker__title">Выберите сценарий</h2>
+        <p v-if="campaignsStore.loading" class="game-picker__hint">Загрузка…</p>
+        <p v-else-if="!campaignsStore.campaigns.length" class="game-picker__hint">
+          Нет сценариев. Мастер должен создать сценарий в редакторе.
         </p>
-
         <div v-else class="game-picker__grid">
           <button
-            v-for="s in levels"
-            :key="s.id"
+            v-for="c in campaignsStore.campaigns"
+            :key="c.id"
             class="game-card"
-            :disabled="loadingId === s.id"
-            @click="selectScenario(s)"
+            :disabled="loadingId === c.id"
+            @click="selectCampaign(c)"
           >
-            <img v-if="s.mapImageUrl" :src="s.mapImageUrl" class="game-card__img" alt="" />
-            <div v-else class="game-card__no-img">Нет карты</div>
-            <p class="game-card__name">{{ s.name || 'Без названия' }}</p>
-            <span v-if="loadingId === s.id" class="game-card__loading">Загрузка…</span>
+            <div class="game-card__campaign-icon">🗺️</div>
+            <p class="game-card__name">{{ c.name }}</p>
+            <p class="game-card__meta">{{ campaignLevelCount(c) }} карт</p>
+            <span v-if="loadingId === c.id" class="game-card__loading">Загрузка…</span>
           </button>
         </div>
 
@@ -51,7 +50,11 @@
       >
         <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
         <GameGrid :width="mapSize.width" :height="mapSize.height" />
-        <GameTokens :width="mapSize.width" :height="mapSize.height" />
+        <GameTokens
+          :width="mapSize.width"
+          :height="mapSize.height"
+          @door-transition="onDoorTransition"
+        />
         <GameFog :width="mapSize.width" :height="mapSize.height" />
       </div>
 
@@ -64,10 +67,11 @@
 </template>
 
 <script setup>
-  import { ref, computed, onMounted } from 'vue'
+  import { ref, onMounted } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useGameStore } from '../stores/game'
   import { useScenariosStore } from '../stores/scenarios'
+  import { useCampaignsStore } from '../stores/campaigns'
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
@@ -91,16 +95,52 @@
 
   const gameStore = useGameStore()
   const scenariosStore = useScenariosStore()
+  const campaignsStore = useCampaignsStore()
 
   const mapSize = ref({ width: 0, height: 0 })
   const selectedScenario = ref(null)
   const loadingId = ref(null)
   const loadError = ref('')
 
-  onMounted(() => scenariosStore.fetchScenarios())
+  onMounted(() => {
+    scenariosStore.fetchScenarios()
+    campaignsStore.fetchCampaigns()
+  })
 
-  // Только сценарии с расставленными токенами — это готовые уровни для игры
-  const levels = computed(() => scenariosStore.scenarios.filter((s) => s.tokensCount > 0))
+  // Количество уровней в кампании — для подписи на карточке
+  function campaignLevelCount(campaign) {
+    const nodeIds = new Set(campaign.nodes.map((n) => String(n.scenarioId)))
+    return scenariosStore.scenarios.filter((s) => s.tokensCount > 0 && nodeIds.has(String(s.id)))
+      .length
+  }
+
+  function backToCampaigns() {
+    gameStore.setActiveCampaign(null)
+  }
+
+  // Выбор сценария: сразу открываем стартовую локацию
+  async function selectCampaign(campaign) {
+    loadError.value = ''
+    gameStore.setActiveCampaign(campaign)
+
+    if (!campaign.startScenarioId) {
+      loadError.value =
+        'У этого сценария не задана стартовая локация. Мастер должен отметить её в редакторе сценария.'
+      return
+    }
+
+    const startScenario = scenariosStore.scenarios.find(
+      (s) => String(s.id) === String(campaign.startScenarioId)
+    )
+    if (!startScenario) {
+      loadError.value = 'Стартовая локация не найдена.'
+      return
+    }
+
+    loadingId.value = campaign.id
+    await selectScenario(startScenario)
+    loadingId.value = null
+  }
 
   // ─── Выбор карты ─────────────────────────────────────────────────────────────
   async function selectScenario(s) {
@@ -123,6 +163,34 @@
   function exitGame() {
     selectedScenario.value = null
     gameStore.currentScenario = null
+    // Остаёмся в рамках того же сценария: возвращаемся к выбору уровня, не на старт
+  }
+
+  // Переход через дверь: двойной клик по токену-двери с привязанным targetScenarioId
+  async function onDoorTransition({ targetScenarioId, sourceScenarioId }) {
+    const target = scenariosStore.scenarios.find((s) => String(s.id) === String(targetScenarioId))
+    if (!target) return
+    mapSize.value = { width: 0, height: 0 }
+    await selectScenario(target)
+
+    // Найти дверь на новой карте, которая ведёт обратно в исходный сценарий
+    const backDoor = gameStore.placedTokens.find(
+      (t) => t.systemToken === 'door' && String(t.targetScenarioId) === String(sourceScenarioId)
+    )
+    if (backDoor) {
+      centerOnToken(backDoor)
+    }
+  }
+
+  // Центрирует вид на токене по его позиции в сетке
+  function centerOnToken(placed) {
+    const cell = gameStore.cellSize
+    const tokenX = placed.col * cell + cell / 2
+    const tokenY = placed.row * cell + cell / 2
+    const viewW = viewRef.value?.offsetWidth ?? window.innerWidth
+    const viewH = viewRef.value?.offsetHeight ?? window.innerHeight
+    offsetX.value = viewW / 2 - tokenX
+    offsetY.value = viewH / 2 - tokenY
   }
 
   // GameMap вызывает emit('ready', canvas) когда изображение нарисовано
@@ -179,6 +247,29 @@
     color: var(--color-text-muted);
   }
 
+  .game-picker__level-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+  }
+
+  .game-picker__campaign-back {
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: transparent;
+    color: var(--color-text-muted);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color var(--transition-fast);
+
+    &:hover {
+      color: var(--color-text);
+    }
+  }
+
   .game-picker__grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -213,6 +304,12 @@
     }
   }
 
+  .game-card__campaign-icon {
+    font-size: 40px;
+    padding: var(--space-6) 0 var(--space-2);
+    text-align: center;
+  }
+
   .game-card__img {
     width: 100%;
     aspect-ratio: 16 / 9;
@@ -234,6 +331,14 @@
     color: white;
     padding: var(--space-2) var(--space-3);
     font-size: 13px;
+    text-align: left;
+    font-weight: 500;
+  }
+
+  .game-card__meta {
+    padding: 0 var(--space-3) var(--space-2);
+    font-size: 11px;
+    color: var(--color-text-muted);
     text-align: left;
   }
 

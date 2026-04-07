@@ -21,6 +21,7 @@
         height: `${store.cellSize}px`,
       }"
       @click.stop="(store.selectPlacedToken(placed.uid), closeContextMenu())"
+      @dblclick.stop="onDblClick(placed)"
       @contextmenu.stop.prevent="onContextMenu(placed)"
     >
       <!--
@@ -68,6 +69,8 @@
     height: { type: Number, required: true },
   })
 
+  const emit = defineEmits(['door-transition'])
+
   const store = useGameStore()
   const { state: ctxState, open: openContextMenu, close: closeContextMenu } = useTokenContextMenu()
   // Правый клик: выбираем токен, открываем меню.
@@ -105,6 +108,13 @@
       doorPlacedUid.value = uid
     } else {
       editPlacedUid.value = uid
+    }
+  }
+
+  function onDblClick(placed) {
+    if (placed.systemToken === 'door' && placed.targetScenarioId) {
+      const sourceScenarioId = store.currentScenario?.id ?? null
+      emit('door-transition', { targetScenarioId: placed.targetScenarioId, sourceScenarioId })
     }
   }
 </script>
@@ -191,12 +201,33 @@
   }
 
   @keyframes token-shake {
-    0%, 100% { transform: translateX(0) rotate(0); }
-    15%       { transform: translateX(-7px) rotate(-4deg); }
-    30%       { transform: translateX(7px) rotate(4deg); }
-    45%       { transform: translateX(-6px) rotate(-3deg); }
-    60%       { transform: translateX(6px) rotate(3deg); }
-    75%       { transform: translateX(-3px) rotate(-1deg); }
-    90%       { transform: translateX(3px) rotate(1deg); }
+    0%,
+    100% {
+      transform: translateX(0) rotate(0);
+    }
+
+    15% {
+      transform: translateX(-7px) rotate(-4deg);
+    }
+
+    30% {
+      transform: translateX(7px) rotate(4deg);
+    }
+
+    45% {
+      transform: translateX(-6px) rotate(-3deg);
+    }
+
+    60% {
+      transform: translateX(6px) rotate(3deg);
+    }
+
+    75% {
+      transform: translateX(-3px) rotate(-1deg);
+    }
+
+    90% {
+      transform: translateX(3px) rotate(1deg);
+    }
   }
 </style>
