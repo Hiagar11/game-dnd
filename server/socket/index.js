@@ -252,8 +252,11 @@ export function setupSocket(io) {
         campaignId,
         campaignName,
         scenarioId,
-        offsetX: 0,
-        offsetY: 0,
+        mapCenterX: null,
+        mapCenterY: null,
+        cursorMapX: null,
+        cursorMapY: null,
+        cursorIconDataUrl: null,
       })
 
       socket.join(`viewer:${sessionId}`)
@@ -273,8 +276,8 @@ export function setupSocket(io) {
 
       const oldScenarioId = session.scenarioId
       session.scenarioId = scenarioId
-      session.offsetX = 0
-      session.offsetY = 0
+      session.mapCenterX = null
+      session.mapCenterY = null
 
       // Переводим зрителей в комнату нового сценария
       const viewerRoom = `viewer:${sessionId}`
@@ -290,19 +293,49 @@ export function setupSocket(io) {
       ack?.({ ok: true })
     })
 
+    // ─── Позиция курсора мастера (admin) ────────────────────────────────────
+    // Событие: game:cursor { x, y }  (x, y — доли экрана 0..1, или -1 = вне окна)
+    // Fire-and-forget: транслируем всем зрителям без сохранения в БД.
+    socket.on('game:cursor', ({ mapX, mapY }) => {
+      if (role !== 'admin') return
+      const sessionId = socket.user.id
+      const session = sessions.get(sessionId)
+      if (!session) return
+      session.cursorMapX = mapX ?? null
+      session.cursorMapY = mapY ?? null
+      socket.to(`viewer:${sessionId}`).emit('game:cursor', { mapX, mapY })
+    })
+
+    // ─── Иконка курсора мастера (admin) ──────────────────────────────────────
+    // Событие: game:cursor:icon { iconDataUrl }  (base64 Data URL или null = сброс)
+    // Хранится в памяти сессии, передаётся новым зрителям при входе.
+    // Лимит: 256 КБ — проверяем на клиенте, дублируем на сервере для безопасности.
+    socket.on('game:cursor:icon', ({ iconDataUrl }) => {
+      if (role !== 'admin') return
+      const sessionId = socket.user.id
+      const session = sessions.get(sessionId)
+      if (!session) return
+      if (iconDataUrl && iconDataUrl.length > 256_000) return // защита от слишком больших данных
+      session.cursorIconDataUrl = iconDataUrl ?? null
+      socket
+        .to(`viewer:${sessionId}`)
+        .emit('game:cursor:icon', { iconDataUrl: session.cursorIconDataUrl })
+    })
+
     // ─── Синхронизация панорамы (admin) ──────────────────────────────────────
-    // Событие: game:pan { offsetX, offsetY }
-    // Транслирует позицию камеры всем зрителям (без ack — fire-and-forget).
-    socket.on('game:pan', ({ offsetX, offsetY }) => {
+    // Событие: game:pan { mapCenterX, mapCenterY }
+    // mapCenter — пиксель карты, видимый в центре экрана мастера.
+    // Каждый клиент сам пересчитывает offset = viewW/2 - mapCenterX под свой экран.
+    socket.on('game:pan', ({ mapCenterX, mapCenterY }) => {
       if (role !== 'admin') return
 
       const sessionId = socket.user.id
       const session = sessions.get(sessionId)
       if (!session) return
 
-      session.offsetX = offsetX
-      session.offsetY = offsetY
-      socket.to(`viewer:${sessionId}`).emit('game:panned', { offsetX, offsetY })
+      session.mapCenterX = mapCenterX
+      session.mapCenterY = mapCenterY
+      socket.to(`viewer:${sessionId}`).emit('game:panned', { mapCenterX, mapCenterY })
     })
 
     // ─── Закрытие сессии (admin) ──────────────────────────────────────────────
@@ -348,8 +381,11 @@ export function setupSocket(io) {
             campaignId: session.campaignId,
             campaignName: session.campaignName,
             scenarioId: session.scenarioId,
-            offsetX: session.offsetX,
-            offsetY: session.offsetY,
+            mapCenterX: session.mapCenterX ?? null,
+            mapCenterY: session.mapCenterY ?? null,
+            cursorMapX: session.cursorMapX ?? null,
+            cursorMapY: session.cursorMapY ?? null,
+            cursorIconDataUrl: session.cursorIconDataUrl ?? null,
           },
           scenario: {
             id: String(scenario._id),

@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -n \"vite,server\" -c \"cyan,yellow\" \"vite\" \"node --watch server/index.js\"",
+    "dev:client": "vite",
     "dev:server": "node --watch server/index.js",
     "build": "vite build",
     "preview": "vite preview",
@@ -26,6 +27,7 @@
     "@eslint/js": "^10.0.1",
     "@vitejs/plugin-vue": "^6.0.5",
     "autoprefixer": "^10.4.27",
+    "concurrently": "^9.2.1",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-vue": "^10.8.0",

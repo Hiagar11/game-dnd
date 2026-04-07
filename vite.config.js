@@ -5,6 +5,9 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
+  server: {
+    host: true, // слушать 0.0.0.0, чтобы VPN не блокировал доступ через localhost
+  },
   css: {
     preprocessorOptions: {
       scss: {

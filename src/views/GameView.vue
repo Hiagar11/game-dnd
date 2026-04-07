@@ -67,7 +67,7 @@
 </template>
 
 <script setup>
-  import { ref, onMounted, watch, onUnmounted } from 'vue'
+  import { ref, onMounted, watch, onUnmounted, provide } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useGameStore } from '../stores/game'
   import { useTokensStore } from '../stores/tokens'
@@ -75,6 +75,7 @@
   import { useCampaignsStore } from '../stores/campaigns'
   import { useAuthStore } from '../stores/auth'
   import { useSocket } from '../composables/useSocket'
+  import { useAdminCursor } from '../composables/useAdminCursor'
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
@@ -102,16 +103,36 @@
   // Флаг: открыта ли активная сессия трансляции для зрителей
   const sessionActive = ref(false)
 
+  // Трансляция курсора мастера зрителям.
+  // setCursorIcon передаём через provide, чтобы GameMenuSystem мог вызвать его без пропсов.
+  // provide/inject — это встроенный механизм Vue для передачи данных от родителя к потомкам,
+  // минуя цепочки пропсов (нет необходимости пробрасывать setCursorIcon через GameMenu → GameMenuSystem).
+  const { setCursorIcon } = useAdminCursor(getSocket, sessionActive, offsetX, offsetY)
+  provide('setCursorIcon', setCursorIcon)
+
   // Throttle для game:pan — шлём не чаще 30fps (32ms), чтобы не перегружать сокет.
   // Используем throttle вместо debounce: debounce ждёт паузы (плохо при плавном панорамировании),
   // throttle — шлёт регулярно ПОКА идёт движение.
+  //
+  // Вместо сырых пикселей шлём mapCenterX/Y — координату пикселя карты,
+  // которая видна в центре экрана мастера. Каждый зритель пересчитывает
+  // оффсет под свой размер экрана: offsetX = viewW/2 - mapCenterX.
+  // Это гарантирует, что все видят одну и ту же точку карты в центре.
   let panLastEmit = 0
+  function emitPan(x, y) {
+    const viewW = viewRef.value?.offsetWidth ?? window.innerWidth
+    const viewH = viewRef.value?.offsetHeight ?? window.innerHeight
+    getSocket()?.emit('game:pan', {
+      mapCenterX: viewW / 2 - x,
+      mapCenterY: viewH / 2 - y,
+    })
+  }
   watch([offsetX, offsetY], ([x, y]) => {
     if (!sessionActive.value) return
     const now = Date.now()
     if (now - panLastEmit < 32) return
     panLastEmit = now
-    getSocket()?.emit('game:pan', { offsetX: x, offsetY: y })
+    emitPan(x, y)
   })
 
   onUnmounted(() => {
@@ -200,7 +221,12 @@
                 scenarioId: String(full.id),
               },
               (res) => {
-                if (res?.ok) sessionActive.value = true
+                if (res?.ok) {
+                  sessionActive.value = true
+                  // Сразу шлём текущее положение камеры —
+                  // watch не сработает если мастер ещё не двигал карту.
+                  emitPan(offsetX.value, offsetY.value)
+                }
               }
             )
           } else {

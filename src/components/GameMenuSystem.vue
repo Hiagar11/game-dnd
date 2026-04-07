@@ -1,6 +1,46 @@
 <template>
-  <!-- Центральная панель: список системных токенов (двери, ловушки и т.д.) -->
   <div class="game-menu-system">
+    <!-- ── Секция: иконка курсора мастера ──────────────────────────────────── -->
+    <div class="game-menu-system__cursor-section">
+      <span class="game-menu-system__cursor-label">Курсор мастера</span>
+
+      <!-- Превью текущей иконки (или эмодзи по умолчанию) -->
+      <div
+        class="game-menu-system__cursor-preview"
+        :title="cursorIconUrl ? 'Текущая иконка' : 'Иконка по умолчанию'"
+      >
+        <img
+          v-if="cursorIconUrl"
+          :src="cursorIconUrl"
+          alt="Иконка курсора"
+          class="game-menu-system__cursor-img"
+        />
+        <span v-else class="game-menu-system__cursor-emoji">🎲</span>
+      </div>
+
+      <!-- Кнопка выбора файла — скрытый input активируется кликом по кнопке -->
+      <label class="game-menu-system__cursor-btn" title="Загрузить иконку курсора">
+        📂
+        <input
+          type="file"
+          accept="image/*"
+          class="game-menu-system__cursor-input"
+          @change="onIconUpload"
+        />
+      </label>
+
+      <!-- Сброс иконки до дефолтной -->
+      <button
+        v-if="cursorIconUrl"
+        class="game-menu-system__cursor-btn game-menu-system__cursor-btn--reset"
+        title="Сбросить иконку"
+        @click="resetIcon"
+      >
+        ✕
+      </button>
+    </div>
+
+    <!-- ── Системные токены (двери, ловушки и т.д.) ────────────────────────── -->
     <button
       v-for="token in SYSTEM_TOKENS"
       :key="token.id"
@@ -15,7 +55,38 @@
 </template>
 
 <script setup>
+  import { ref, inject } from 'vue'
   import { SYSTEM_TOKENS } from '../stores/game'
+
+  // inject получает функцию setCursorIcon из GameView через provide.
+  // Если компонент используется вне GameView — fallback на пустую функцию.
+  const setCursorIcon = inject('setCursorIcon', () => {})
+
+  // Превью выбранной иконки (хранится только в памяти, не в БД)
+  const cursorIconUrl = ref('')
+
+  // Пользователь выбрал файл — читаем как base64 через FileReader
+  function onIconUpload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result
+      cursorIconUrl.value = dataUrl
+      setCursorIcon(dataUrl)
+    }
+    reader.readAsDataURL(file)
+
+    // Сбрасываем input чтобы можно было загрузить тот же файл повторно
+    e.target.value = ''
+  }
+
+  // Убираем кастомную иконку — зрители увидят дефолтный эмодзи 🎲
+  function resetIcon() {
+    cursorIconUrl.value = ''
+    setCursorIcon(null)
+  }
 
   // Drag системного токена: пишем в dataTransfer ключ 'systemToken' со строковым id.
   // В useTokenDrop этот ключ отличается от обычного 'tokenId' и роутится в placeSystemToken.
@@ -43,6 +114,84 @@
     overflow-y: auto;
   }
 
+  /* ── Секция выбора иконки курсора ──────────────────────────────────────── */
+  .game-menu-system__cursor-section {
+    /* Занимает всю ширину, располагается перед токенами */
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    background: rgb(0 0 0 / 30%);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgb(255 255 255 / 15%);
+  }
+
+  .game-menu-system__cursor-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  /* Круглое превью текущей иконки */
+  .game-menu-system__cursor-preview {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 2px solid rgb(255 255 255 / 30%);
+    background: var(--color-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .game-menu-system__cursor-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .game-menu-system__cursor-emoji {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  /* Кнопка загрузки файла — label со скрытым <input> */
+  .game-menu-system__cursor-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgb(255 255 255 / 30%);
+    border-radius: var(--radius-sm);
+    background: var(--color-overlay);
+    color: var(--color-text);
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color var(--transition-fast);
+
+    &:hover {
+      border-color: rgb(255 255 255 / 70%);
+    }
+  }
+
+  .game-menu-system__cursor-btn--reset {
+    font-size: 11px;
+    color: var(--color-text-muted);
+  }
+
+  /* Скрытый file input — визуальная кнопка это label */
+  .game-menu-system__cursor-input {
+    display: none;
+  }
+
+  /* ── Системные токены ───────────────────────────────────────────────────── */
   .game-menu-system__item {
     width: var(--token-size);
     height: var(--token-size);
