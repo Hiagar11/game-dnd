@@ -43,7 +43,12 @@
     </div>
   </div>
 
-  <GameTokenEditPopup :visible="isPopupOpen" :token-type="tokenType" @close="onPopupClose" />
+  <GameTokenEditPopup
+    :visible="isPopupOpen"
+    :token-type="tokenType"
+    :default-attitude="attitude"
+    @close="onPopupClose"
+  />
 </template>
 
 <script setup>
@@ -59,6 +64,12 @@
       default: 'npc',
       validator: (v) => ['npc', 'hero'].includes(v),
     },
+    // attitude: фильтр для вкладки НПС ('hostile' | 'neutral' | 'friendly').
+    // null — показывать все НПС (используется для вкладки героев).
+    attitude: {
+      type: String,
+      default: null,
+    },
   })
 
   const store = useTokensStore()
@@ -71,11 +82,12 @@
   // null-fallback: компонент работает и вне GameView (например в редакторе).
   const emitHeroes = inject('emitHeroes', null)
 
-  const filteredTokens = computed(() =>
-    props.tokenType === 'hero'
-      ? store.tokens.filter((t) => t.tokenType === 'hero')
-      : store.tokens.filter((t) => t.tokenType !== 'hero')
-  )
+  const filteredTokens = computed(() => {
+    if (props.tokenType === 'hero') return store.tokens.filter((t) => t.tokenType === 'hero')
+    const npcs = store.tokens.filter((t) => t.tokenType !== 'hero')
+    if (!props.attitude) return npcs
+    return npcs.filter((t) => (t.attitude ?? 'neutral') === props.attitude)
+  })
 
   function onAdd() {
     isPopupOpen.value = true

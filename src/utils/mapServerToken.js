@@ -60,6 +60,8 @@ export function mapServerToken(serverToken, clientTokens) {
     hidden: hidden ?? false,
     name: def?.name ?? tokenObj?.name ?? 'Неизвестный',
     src: def?.src ?? fallbackSrc,
+    tokenType: def?.tokenType ?? tokenObj?.tokenType ?? 'npc',
+    attitude: def?.attitude ?? tokenObj?.attitude ?? 'neutral',
     strength: def?.strength ?? tokenObj?.stats?.strength ?? 0,
     agility: def?.agility ?? tokenObj?.stats?.agility ?? 0,
     intellect: def?.intellect ?? tokenObj?.stats?.intellect ?? 0,

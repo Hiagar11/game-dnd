@@ -5,6 +5,7 @@ import fs from 'fs/promises'
 import { fileURLToPath } from 'url'
 import mongoose from 'mongoose'
 import Token from '../models/Token.js'
+import Scenario from '../models/Scenario.js'
 import { requireAuth } from '../middleware/auth.js'
 
 const router = Router()
@@ -53,7 +54,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: 'Изображение обязательно' })
   }
 
-  const { name, strength, agility, intellect, charisma, tokenType } = req.body
+  const { name, strength, agility, intellect, charisma, tokenType, attitude } = req.body
 
   if (!name?.trim()) {
     // Удаляем загруженный файл, если имя не передано
@@ -70,6 +71,7 @@ router.post('/', upload.single('image'), async (req, res) => {
       name: name.trim(),
       imagePath,
       tokenType: tokenType === 'hero' ? 'hero' : 'npc',
+      attitude: ['neutral', 'friendly', 'hostile'].includes(attitude) ? attitude : 'neutral',
       stats: {
         strength: Number(strength) || 0,
         agility: Number(agility) || 0,
@@ -105,7 +107,7 @@ router.put('/:id', async (req, res) => {
     const token = await Token.findOne({ _id: req.params.id, owner: req.user.id })
     if (!token) return res.status(404).json({ error: 'Токен не найден' })
 
-    const { name, strength, agility, intellect, charisma } = req.body
+    const { name, strength, agility, intellect, charisma, attitude } = req.body
 
     // Number(val) может вернуть NaN или Infinity — проверяем перед записью
     const parseStat = (val) => {
@@ -134,6 +136,9 @@ router.put('/:id', async (req, res) => {
       if (v === null) return res.status(400).json({ error: 'charisma: некорректное значение' })
       token.stats.charisma = v
     }
+    if (attitude !== undefined && ['neutral', 'friendly', 'hostile'].includes(attitude)) {
+      token.attitude = attitude
+    }
 
     await token.save()
     res.json(formatToken(token, req))
@@ -156,6 +161,20 @@ router.delete('/:id', async (req, res) => {
     await fs.unlink(filePath).catch(() => {})
 
     await token.deleteOne()
+
+    // Удаляем все размещённые экземпляры этого шаблона изо всех сценариев.
+    // $pull — атомарная операция MongoDB: удаляет все элементы, совпадающие с условием.
+    // updateMany — затрагивает все сценарии сразу, без перебора в JS.
+    const tokenObjId = token._id
+    await Scenario.updateMany(
+      { 'placedTokens.tokenId': tokenObjId },
+      {
+        $pull: {
+          placedTokens: { tokenId: tokenObjId },
+          defaultPlacedTokens: { tokenId: tokenObjId },
+        },
+      }
+    )
     res.status(204).end()
   } catch {
     res.status(500).json({ error: 'Ошибка сервера' })
@@ -169,6 +188,7 @@ function formatToken(token, req) {
     id: token._id,
     name: token.name,
     tokenType: token.tokenType ?? 'npc',
+    attitude: token.attitude ?? 'neutral',
     imageUrl: `${req.protocol}://${req.get('host')}/${token.imagePath}`,
     stats: token.stats,
     createdAt: token.createdAt,

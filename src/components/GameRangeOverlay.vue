@@ -18,14 +18,17 @@
     @mousemove="onMouseMove"
     @click.stop="onClick"
     @mouseleave="cursorInRange = false"
+    @dragover="onDragOver"
+    @drop="onDrop"
   />
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
+  import { ref, computed, inject } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useSocket } from '../composables/useSocket'
   import { buildReachableCells, findPath } from '../composables/useTokenMove'
+  import { useTokenDrop } from '../composables/useTokenDrop'
 
   defineProps({
     // Размеры карты — оверлей должен покрывать её полностью
@@ -35,6 +38,11 @@
 
   const store = useGameStore()
   const { getSocket } = useSocket()
+
+  // Получаем смещение карты от GameView (provide/inject) — нужно для useTokenDrop
+  const offsetX = inject('offsetX')
+  const offsetY = inject('offsetY')
+  const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
 
   // true — курсор сейчас над клеткой в зоне хода → показываем следы
   const cursorInRange = ref(false)

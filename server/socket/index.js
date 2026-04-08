@@ -72,10 +72,16 @@ export function setupSocket(io) {
         // Добавляем данные токена для зрителей (изображение + имя) чтобы не делать доп. запрос
         let tokenName = null
         let tokenImagePath = null
+        let tokenAttitude = 'neutral'
+        let tokenType = 'npc'
         if (tokenId) {
-          const tokenDoc = await Token.findById(tokenId).select('name imagePath').lean()
+          const tokenDoc = await Token.findById(tokenId)
+            .select('name imagePath attitude tokenType')
+            .lean()
           tokenName = tokenDoc?.name ?? null
           tokenImagePath = tokenDoc?.imagePath ?? null
+          tokenAttitude = tokenDoc?.attitude ?? 'neutral'
+          tokenType = tokenDoc?.tokenType ?? 'npc'
         }
 
         io.to(scenarioId).emit('token:placed', {
@@ -87,6 +93,8 @@ export function setupSocket(io) {
           systemToken,
           tokenName,
           tokenImagePath,
+          attitude: tokenAttitude,
+          tokenType,
         })
         ack?.({ ok: true })
       } catch {
@@ -213,7 +221,7 @@ export function setupSocket(io) {
       try {
         const scenario = await Scenario.findById(data.scenarioId).populate(
           'placedTokens.tokenId',
-          'name imagePath stats'
+          'name imagePath stats attitude tokenType'
         )
 
         if (!scenario) return ackError(ack, 'Сценарий не найден')
@@ -393,7 +401,7 @@ export function setupSocket(io) {
       try {
         const scenario = await Scenario.findById(session.scenarioId).populate(
           'placedTokens.tokenId',
-          'name imagePath'
+          'name imagePath stats attitude tokenType'
         )
         if (!scenario) return ackError(ack, 'Сценарий не найден')
 

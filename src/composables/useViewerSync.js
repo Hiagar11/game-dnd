@@ -61,7 +61,18 @@ export function useViewerSync(socket) {
     // Серверный broadcast включает tokenName + tokenImagePath — не нужен tokensStore.
     socket.on(
       'token:placed',
-      ({ uid, tokenId, systemToken, col, row, hidden, tokenName, tokenImagePath }) => {
+      ({
+        uid,
+        tokenId,
+        systemToken,
+        col,
+        row,
+        hidden,
+        tokenName,
+        tokenImagePath,
+        attitude,
+        tokenType,
+      }) => {
         if (hidden) return // игроки не видят скрытые токены
 
         const gameStore = useGameStore()
@@ -95,6 +106,8 @@ export function useViewerSync(socket) {
           hidden: false,
           name: tokenName ?? 'Неизвестный',
           src,
+          tokenType: tokenType ?? 'npc',
+          attitude: attitude ?? 'neutral',
           strength: 0,
           agility: 0,
           intellect: 0,

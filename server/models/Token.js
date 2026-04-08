@@ -88,6 +88,13 @@ const tokenSchema = new mongoose.Schema(
       enum: ['npc', 'hero'],
       default: 'npc',
     },
+    // Отношение НПС к героям — влияет на цвет рамки токена на карте.
+    // Применимо только к tokenType === 'npc'.
+    attitude: {
+      type: String,
+      enum: ['neutral', 'friendly', 'hostile'],
+      default: 'neutral',
+    },
   },
   { timestamps: true }
 )

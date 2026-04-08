@@ -21,10 +21,17 @@ export const useTokensStore = defineStore('tokens', () => {
       selectedToken.value?.id === id ? null : (tokens.value.find((t) => t.id === id) ?? null)
   }
 
-  // Сервер возвращает { id, name, tokenType, imageUrl, stats: { strength, agility, intellect, charisma } }
-  // Компоненты ожидают плоский объект { id, name, tokenType, src, strength, ... }
-  function normalizeToken({ id, name, tokenType, imageUrl, stats }) {
-    return { id, name, tokenType: tokenType ?? 'npc', src: imageUrl, ...stats }
+  // Сервер возвращает { id, name, tokenType, imageUrl, stats: { strength, agility, intellect, charisma }, attitude }
+  // Компоненты ожидают плоский объект { id, name, tokenType, attitude, src, strength, ... }
+  function normalizeToken({ id, name, tokenType, imageUrl, stats, attitude }) {
+    return {
+      id,
+      name,
+      tokenType: tokenType ?? 'npc',
+      attitude: attitude ?? 'neutral',
+      src: imageUrl,
+      ...stats,
+    }
   }
 
   async function fetchTokens() {
@@ -53,6 +60,12 @@ export const useTokensStore = defineStore('tokens', () => {
     const idx = tokens.value.findIndex((t) => t.id === id)
     if (idx !== -1) tokens.value.splice(idx, 1)
     if (selectedToken.value?.id === id) selectedToken.value = null
+
+    // Если сейчас открыт сценарий — убираем все размещённые экземпляры этого шаблона.
+    // Сервер уже удалил их из БД; здесь синхронизируем локальное состояние.
+    const { useGameStore } = await import('./game')
+    const gameStore = useGameStore()
+    gameStore.placedTokens = gameStore.placedTokens.filter((t) => t.tokenId !== id)
   }
 
   return { tokens, selectedToken, selectToken, fetchTokens, addToken, editToken, deleteToken }

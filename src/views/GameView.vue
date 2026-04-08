@@ -123,6 +123,8 @@
   provide('setCursorIcon', setCursorIcon)
   provide('blockCursor', blockCursor)
   provide('unblockCursor', unblockCursor)
+  provide('offsetX', offsetX)
+  provide('offsetY', offsetY)
 
   // Throttle для game:pan — шлём не чаще 30fps (32ms), чтобы не перегружать сокет.
   // Используем throttle вместо debounce: debounce ждёт паузы (плохо при плавном панорамировании),

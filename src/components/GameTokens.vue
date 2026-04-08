@@ -18,6 +18,16 @@
           props.viewerMode && heroesStore.adminSelectedUid === placed.uid,
         'game-tokens__token--shaking': store.shakingTokenUid === placed.uid,
         'game-tokens__token--fog-hidden': fogHiddenKeys.has(`${placed.col}:${placed.row}`),
+        // Золотое свечение для героев — всегда, во всех режимах
+        'game-tokens__token--hero': placed.tokenType === 'hero',
+        // Цветная рамка по отношению — только для пользовательских НПС (не системные, не герои)
+        'game-tokens__token--hostile': placed.tokenType === 'npc' && placed.attitude === 'hostile',
+        'game-tokens__token--friendly':
+          placed.tokenType === 'npc' && placed.attitude === 'friendly',
+        'game-tokens__token--neutral':
+          placed.tokenType === 'npc' &&
+          placed.attitude !== 'hostile' &&
+          placed.attitude !== 'friendly',
       }"
       :style="{
         left: `${placed.col * store.cellSize}px`,
@@ -249,6 +259,39 @@
   .game-tokens__token--fog-hidden {
     visibility: hidden;
     pointer-events: none;
+  }
+
+  /*
+    Цветная рамка отношения НПС — outline на самом диве токена.
+    outline не сдвигает layout (в отличие от border) и рисуется поверх padding, поэтому
+    всегда виден независимо от других псевдоэлементов.
+    Дефолт (neutral) — синий, friendly — зелёный, hostile — красный.
+  */
+
+  /* Герои — золотое свечение, всегда видно на карте */
+  .game-tokens__token--hero {
+    outline: 2px solid rgb(250 204 21 / 95%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
+    filter: drop-shadow(0 0 5px rgb(250 204 21 / 65%));
+  }
+
+  .game-tokens__token--neutral {
+    outline: 2px solid rgb(96 165 250 / 80%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
+  }
+
+  .game-tokens__token--hostile {
+    outline: 2px solid rgb(248 113 113 / 90%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
+  }
+
+  .game-tokens__token--friendly {
+    outline: 2px solid rgb(74 222 128 / 90%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
   }
 
   .game-tokens__img {

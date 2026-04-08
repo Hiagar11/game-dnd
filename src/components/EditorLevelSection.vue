@@ -35,6 +35,7 @@
         >
           <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
           <GameGrid :width="mapSize.width" :height="mapSize.height" editor-mode />
+          <GameRangeOverlay :width="mapSize.width" :height="mapSize.height" />
           <GameTokens :width="mapSize.width" :height="mapSize.height" />
           <GameWallPainter :width="mapSize.width" :height="mapSize.height" />
         </div>
@@ -77,7 +78,7 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+  import { ref, computed, watch, onMounted, onUnmounted, provide } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
@@ -88,6 +89,7 @@
   import { useScenariosStore } from '../stores/scenarios'
   import GameMap from './GameMap.vue'
   import GameGrid from './GameGrid.vue'
+  import GameRangeOverlay from './GameRangeOverlay.vue'
   import GameTokens from './GameTokens.vue'
   import GameWallPainter from './GameWallPainter.vue'
   import GameMenu from './GameMenu.vue'
@@ -135,6 +137,10 @@
   )
   const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
   const { close: closeContextMenu } = useTokenContextMenu()
+
+  // GameRangeOverlay и useTokenDrop инжектируют offsetX/offsetY через provide/inject
+  provide('offsetX', offsetX)
+  provide('offsetY', offsetY)
 
   // ─── Навигация ───────────────────────────────────────────────────────────────
   function exitGame() {

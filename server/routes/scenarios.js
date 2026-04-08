@@ -124,7 +124,7 @@ router.get('/:id', async (req, res) => {
   try {
     const scenario = await Scenario.findById(req.params.id).populate(
       'placedTokens.tokenId',
-      'name imagePath stats'
+      'name imagePath stats attitude tokenType'
     )
 
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })

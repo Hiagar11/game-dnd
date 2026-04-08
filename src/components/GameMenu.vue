@@ -1,16 +1,21 @@
 <script setup>
   import { ref } from 'vue'
-  import { PhUsers, PhGearSix, PhShieldStar } from '@phosphor-icons/vue'
+  import {
+    PhSkull,
+    PhHandshake,
+    PhCircleDashed,
+    PhGearSix,
+    PhShieldStar,
+  } from '@phosphor-icons/vue'
   import GameMenuIcon from './GameMenuIcon.vue'
   import GameMenuTokenList from './GameMenuTokenList.vue'
   import GameMenuSystem from './GameMenuSystem.vue'
   import { useSound } from '../composables/useSound'
 
-  // Активная вкладка центральной панели: 'tokens' | 'system' | 'heroes'
-  const activeTab = ref('tokens')
+  // Активная вкладка: 'hostile' | 'neutral' | 'friendly' | 'system' | 'heroes'
+  const activeTab = ref('neutral')
   const { playHover, playClick } = useSound()
 
-  // editorMode: true — включены функции только для редактора (например, рисование стен)
   defineProps({
     editorMode: { type: Boolean, default: false },
   })
@@ -25,18 +30,34 @@
   <aside class="game-menu">
     <GameMenuIcon />
 
-    <!-- Центральная часть: вкладки + контент -->
     <div class="game-menu__center">
-      <!-- Вкладки переключения -->
       <nav class="game-menu__tabs">
         <button
-          class="game-menu__tab"
-          :class="{ 'game-menu__tab--active': activeTab === 'tokens' }"
+          class="game-menu__tab game-menu__tab--hostile"
+          :class="{ 'game-menu__tab--active': activeTab === 'hostile' }"
           @mouseenter="playHover"
-          @click="setTab('tokens')"
+          @click="setTab('hostile')"
         >
-          <PhUsers :size="13" />
-          Токены
+          <PhSkull :size="13" />
+          Враги
+        </button>
+        <button
+          class="game-menu__tab game-menu__tab--neutral"
+          :class="{ 'game-menu__tab--active': activeTab === 'neutral' }"
+          @mouseenter="playHover"
+          @click="setTab('neutral')"
+        >
+          <PhCircleDashed :size="13" />
+          Нейтралы
+        </button>
+        <button
+          class="game-menu__tab game-menu__tab--friendly"
+          :class="{ 'game-menu__tab--active': activeTab === 'friendly' }"
+          @mouseenter="playHover"
+          @click="setTab('friendly')"
+        >
+          <PhHandshake :size="13" />
+          Союзники
         </button>
         <button
           class="game-menu__tab"
@@ -58,13 +79,17 @@
         </button>
       </nav>
 
-      <!-- Контент вкладки -->
-      <GameMenuTokenList v-if="activeTab === 'tokens'" token-type="npc" />
+      <GameMenuTokenList v-if="activeTab === 'hostile'" token-type="npc" attitude="hostile" />
+      <GameMenuTokenList v-else-if="activeTab === 'neutral'" token-type="npc" attitude="neutral" />
+      <GameMenuTokenList
+        v-else-if="activeTab === 'friendly'"
+        token-type="npc"
+        attitude="friendly"
+      />
       <GameMenuSystem v-else-if="activeTab === 'system'" :editor-mode="editorMode" />
       <GameMenuTokenList v-else token-type="hero" />
     </div>
 
-    <!-- Правая панель — зарезервирована под будущий функционал -->
     <div class="game-menu__empty">
       <slot name="right-panel" />
     </div>
@@ -134,6 +159,25 @@
         background-position: center;
         color: var(--color-text);
         border-color: rgb(255 255 255 / 35%);
+      }
+
+      /* Цветовые акценты вкладок по отношению */
+      &--hostile:hover,
+      &--hostile#{&}--active {
+        color: rgb(248 113 113);
+        border-color: rgb(248 113 113 / 50%);
+      }
+
+      &--neutral:hover,
+      &--neutral#{&}--active {
+        color: rgb(96 165 250);
+        border-color: rgb(96 165 250 / 50%);
+      }
+
+      &--friendly:hover,
+      &--friendly#{&}--active {
+        color: rgb(74 222 128);
+        border-color: rgb(74 222 128 / 50%);
       }
     }
 
