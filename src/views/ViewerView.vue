@@ -185,11 +185,10 @@
           hidden: false,
           name: def?.name ?? pt.systemToken,
           src: def?.src ?? '',
-          meleeDmg: 0,
-          rangedDmg: 0,
-          visionRange: 0,
-          defense: 0,
-          evasion: 0,
+          strength: 0,
+          agility: 0,
+          intellect: 0,
+          charisma: 0,
         }
       }
 
@@ -203,11 +202,10 @@
         hidden: false,
         name: tid?.name ?? 'Неизвестный',
         src: tid?.imagePath ? `${API}/${tid.imagePath}` : '',
-        meleeDmg: tid?.stats?.meleeDmg ?? 0,
-        rangedDmg: tid?.stats?.rangedDmg ?? 0,
-        visionRange: tid?.stats?.visionRange ?? 0,
-        defense: tid?.stats?.defense ?? 0,
-        evasion: tid?.stats?.evasion ?? 0,
+        strength: tid?.stats?.strength ?? 0,
+        agility: tid?.stats?.agility ?? 0,
+        intellect: tid?.stats?.intellect ?? 0,
+        charisma: tid?.stats?.charisma ?? 0,
       }
     })
   }

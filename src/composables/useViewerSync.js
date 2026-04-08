@@ -78,11 +78,10 @@ export function useViewerSync(socket) {
             hidden: false,
             name: def.name,
             src: def.src,
-            meleeDmg: 0,
-            rangedDmg: 0,
-            visionRange: 0,
-            defense: 0,
-            evasion: 0,
+            strength: 0,
+            agility: 0,
+            intellect: 0,
+            charisma: 0,
           })
           return
         }
@@ -96,11 +95,10 @@ export function useViewerSync(socket) {
           hidden: false,
           name: tokenName ?? 'Неизвестный',
           src,
-          meleeDmg: 0,
-          rangedDmg: 0,
-          visionRange: 0,
-          defense: 0,
-          evasion: 0,
+          strength: 0,
+          agility: 0,
+          intellect: 0,
+          charisma: 0,
         })
       }
     )

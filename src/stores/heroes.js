@@ -7,7 +7,7 @@ import { defineStore } from 'pinia'
 
 export const useHeroesStore = defineStore('heroes', () => {
   // Полные данные героев — те же поля, что у элементов tokensStore.tokens.
-  // { id, name, tokenType, src, meleeDmg, rangedDmg, visionRange, defense, evasion }
+  // { id, name, tokenType, src, strength, agility, intellect, charisma }
   const heroes = ref([])
 
   // Заменяем весь список — используется при получении состояния от сервера.

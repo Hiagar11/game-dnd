@@ -53,7 +53,7 @@ router.post('/', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: 'Изображение обязательно' })
   }
 
-  const { name, meleeDmg, rangedDmg, visionRange, defense, evasion, tokenType } = req.body
+  const { name, strength, agility, intellect, charisma, tokenType } = req.body
 
   if (!name?.trim()) {
     // Удаляем загруженный файл, если имя не передано
@@ -71,11 +71,10 @@ router.post('/', upload.single('image'), async (req, res) => {
       imagePath,
       tokenType: tokenType === 'hero' ? 'hero' : 'npc',
       stats: {
-        meleeDmg: Number(meleeDmg) || 0,
-        rangedDmg: Number(rangedDmg) || 0,
-        visionRange: Number(visionRange) || 0,
-        defense: Number(defense) || 0,
-        evasion: Number(evasion) || 0,
+        strength: Number(strength) || 0,
+        agility: Number(agility) || 0,
+        intellect: Number(intellect) || 0,
+        charisma: Number(charisma) || 0,
       },
     })
 
@@ -106,7 +105,7 @@ router.put('/:id', async (req, res) => {
     const token = await Token.findOne({ _id: req.params.id, owner: req.user.id })
     if (!token) return res.status(404).json({ error: 'Токен не найден' })
 
-    const { name, meleeDmg, rangedDmg, visionRange, defense, evasion } = req.body
+    const { name, strength, agility, intellect, charisma } = req.body
 
     // Number(val) может вернуть NaN или Infinity — проверяем перед записью
     const parseStat = (val) => {
@@ -115,30 +114,25 @@ router.put('/:id', async (req, res) => {
     }
 
     if (name !== undefined) token.name = name.trim()
-    if (meleeDmg !== undefined) {
-      const v = parseStat(meleeDmg)
-      if (v === null) return res.status(400).json({ error: 'meleeDmg: некорректное значение' })
-      token.stats.meleeDmg = v
+    if (strength !== undefined) {
+      const v = parseStat(strength)
+      if (v === null) return res.status(400).json({ error: 'strength: некорректное значение' })
+      token.stats.strength = v
     }
-    if (rangedDmg !== undefined) {
-      const v = parseStat(rangedDmg)
-      if (v === null) return res.status(400).json({ error: 'rangedDmg: некорректное значение' })
-      token.stats.rangedDmg = v
+    if (agility !== undefined) {
+      const v = parseStat(agility)
+      if (v === null) return res.status(400).json({ error: 'agility: некорректное значение' })
+      token.stats.agility = v
     }
-    if (visionRange !== undefined) {
-      const v = parseStat(visionRange)
-      if (v === null) return res.status(400).json({ error: 'visionRange: некорректное значение' })
-      token.stats.visionRange = v
+    if (intellect !== undefined) {
+      const v = parseStat(intellect)
+      if (v === null) return res.status(400).json({ error: 'intellect: некорректное значение' })
+      token.stats.intellect = v
     }
-    if (defense !== undefined) {
-      const v = parseStat(defense)
-      if (v === null) return res.status(400).json({ error: 'defense: некорректное значение' })
-      token.stats.defense = v
-    }
-    if (evasion !== undefined) {
-      const v = parseStat(evasion)
-      if (v === null) return res.status(400).json({ error: 'evasion: некорректное значение' })
-      token.stats.evasion = v
+    if (charisma !== undefined) {
+      const v = parseStat(charisma)
+      if (v === null) return res.status(400).json({ error: 'charisma: некорректное значение' })
+      token.stats.charisma = v
     }
 
     await token.save()

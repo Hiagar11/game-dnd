@@ -3,6 +3,9 @@
     <Transition name="popup-fade">
       <div v-if="visible" class="popup-shell" @click.self="$emit('close')">
         <div class="popup-shell__box" role="dialog" aria-modal="true" :aria-label="ariaLabel">
+          <button class="popup-shell__close" aria-label="Закрыть" @click="$emit('close')">
+            <PhX :size="18" weight="bold" />
+          </button>
           <slot />
         </div>
       </div>
@@ -11,6 +14,8 @@
 </template>
 
 <script setup>
+  import { PhX } from '@phosphor-icons/vue'
+
   defineProps({
     visible: { type: Boolean, required: true },
     ariaLabel: { type: String, default: '' },
@@ -32,7 +37,10 @@
   }
 
   .popup-shell__box {
-    width: min(480px, 90vw);
+    position: relative;
+    width: 80vw;
+    max-height: 90dvh;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: var(--space-6);
@@ -60,6 +68,32 @@
 
     .popup-shell__box {
       transform: scale(0.95) translateY(8px);
+    }
+  }
+
+  .popup-shell__close {
+    position: absolute;
+    top: var(--space-4);
+    right: var(--space-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition:
+      color var(--transition-fast),
+      border-color var(--transition-fast),
+      background var(--transition-fast);
+
+    &:hover {
+      color: var(--color-text);
+      border-color: var(--color-border);
+      background: rgb(255 255 255 / 6%);
     }
   }
 </style>

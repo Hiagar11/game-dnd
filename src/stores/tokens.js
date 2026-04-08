@@ -9,7 +9,7 @@ export const useTokensStore = defineStore('tokens', () => {
   const api = useApi()
 
   // Список шаблонов токенов, загруженных с сервера.
-  // Элемент: { id, name, src, meleeDmg, rangedDmg, visionRange, defense, evasion }
+  // Элемент: { id, name, src, strength, agility, intellect, charisma }
   const tokens = ref([])
 
   // Выбранный шаблон — подсвечивается в меню и используется для размещения кликом по карте
@@ -21,8 +21,8 @@ export const useTokensStore = defineStore('tokens', () => {
       selectedToken.value?.id === id ? null : (tokens.value.find((t) => t.id === id) ?? null)
   }
 
-  // Сервер возвращает { id, name, tokenType, imageUrl, stats: { meleeDmg, ... } }
-  // Компоненты ожидают плоский объект { id, name, tokenType, src, meleeDmg, ... }
+  // Сервер возвращает { id, name, tokenType, imageUrl, stats: { strength, agility, intellect, charisma } }
+  // Компоненты ожидают плоский объект { id, name, tokenType, src, strength, ... }
   function normalizeToken({ id, name, tokenType, imageUrl, stats }) {
     return { id, name, tokenType: tokenType ?? 'npc', src: imageUrl, ...stats }
   }
@@ -32,7 +32,7 @@ export const useTokensStore = defineStore('tokens', () => {
     tokens.value = data.map(normalizeToken)
   }
 
-  // formData — FormData с полями image, name, meleeDmg и т.д.
+  // formData — FormData с полями image, name, strength, agility, intellect, charisma
   async function addToken(formData) {
     const data = await api.post('/api/tokens', formData)
     const token = normalizeToken(data)

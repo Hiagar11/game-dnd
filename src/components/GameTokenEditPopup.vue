@@ -17,10 +17,10 @@
             @keydown.esc="onCancel"
           />
         </label>
+
+        <TokenStatsGrid v-model="form" />
       </div>
     </div>
-
-    <TokenStatsGrid v-model="form" />
 
     <div class="token-edit-popup__footer">
       <button
@@ -30,6 +30,7 @@
         @mouseenter="playHover"
         @click="onDelete"
       >
+        <PhTrash :size="15" />
         {{ isPlacedMode ? 'Убрать с карты' : 'Удалить' }}
       </button>
       <button
@@ -38,6 +39,7 @@
         @mouseenter="playHover"
         @click="onCancel"
       >
+        <PhX :size="15" />
         Отмена
       </button>
       <button
@@ -47,9 +49,10 @@
         @click="onSave"
       >
         <span v-if="saving" class="token-edit-popup__spinner" />
-        <span v-else>{{
-          isPlacedMode ? 'Сохранить' : isEditMode ? 'Сохранить шаблон' : 'Добавить'
-        }}</span>
+        <template v-else>
+          <PhFloppyDisk :size="15" />
+          {{ isPlacedMode ? 'Сохранить' : isEditMode ? 'Сохранить шаблон' : 'Добавить' }}
+        </template>
       </button>
     </div>
     <p v-if="saveError" class="token-edit-popup__save-error">{{ saveError }}</p>
@@ -63,6 +66,7 @@
   import PopupShell from './PopupShell.vue'
   import TokenPreviewPicker from './TokenPreviewPicker.vue'
   import TokenStatsGrid from './TokenStatsGrid.vue'
+  import { PhTrash, PhX, PhFloppyDisk } from '@phosphor-icons/vue'
   import { useSocket } from '../composables/useSocket'
   import { useSound } from '../composables/useSound'
 
@@ -109,7 +113,7 @@
         : 'Добавить шаблон'
   )
 
-  const DEFAULT_STATS = { meleeDmg: 0, rangedDmg: 0, visionRange: 6, defense: 0, evasion: 0 }
+  const DEFAULT_STATS = { strength: 0, agility: 0, intellect: 0, charisma: 0 }
   const form = ref({ name: '', ...DEFAULT_STATS })
   const previewSrc = ref(null)
   const fileRef = ref(null)
@@ -134,15 +138,15 @@
     if (isPlacedMode.value) {
       const token = store.placedTokens.find((t) => t.uid === props.placedUid)
       if (token) {
-        const { name, src, meleeDmg, rangedDmg, visionRange, defense, evasion } = token
-        form.value = { name, meleeDmg, rangedDmg, visionRange, defense, evasion }
+        const { name, src, strength, agility, intellect, charisma } = token
+        form.value = { name, strength, agility, intellect, charisma }
         previewSrc.value = src
       }
     } else if (isEditMode.value) {
       const token = tokensStore.tokens.find((t) => t.id === props.tokenId)
       if (token) {
-        const { name, src, meleeDmg, rangedDmg, visionRange, defense, evasion } = token
-        form.value = { name, meleeDmg, rangedDmg, visionRange, defense, evasion }
+        const { name, src, strength, agility, intellect, charisma } = token
+        form.value = { name, strength, agility, intellect, charisma }
         previewSrc.value = src
       }
     } else {
@@ -164,35 +168,20 @@
     saving.value = true
     saveError.value = ''
     try {
-      const { name, meleeDmg, rangedDmg, visionRange, defense, evasion } = form.value
+      const { name, strength, agility, intellect, charisma } = form.value
       if (isPlacedMode.value) {
-        store.editPlacedToken(props.placedUid, {
-          name,
-          meleeDmg,
-          rangedDmg,
-          visionRange,
-          defense,
-          evasion,
-        })
+        store.editPlacedToken(props.placedUid, { name, strength, agility, intellect, charisma })
       } else if (isEditMode.value) {
-        await tokensStore.editToken(props.tokenId, {
-          name,
-          meleeDmg,
-          rangedDmg,
-          visionRange,
-          defense,
-          evasion,
-        })
+        await tokensStore.editToken(props.tokenId, { name, strength, agility, intellect, charisma })
       } else {
         const fd = new FormData()
         fd.append('image', fileRef.value)
         fd.append('name', name)
         fd.append('tokenType', props.tokenType)
-        fd.append('meleeDmg', meleeDmg)
-        fd.append('rangedDmg', rangedDmg)
-        fd.append('visionRange', visionRange)
-        fd.append('defense', defense)
-        fd.append('evasion', evasion)
+        fd.append('strength', strength)
+        fd.append('agility', agility)
+        fd.append('intellect', intellect)
+        fd.append('charisma', charisma)
         await tokensStore.addToken(fd)
       }
       emit('close')
@@ -276,6 +265,9 @@
   }
 
   .token-edit-popup__btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
     padding: var(--space-2) var(--space-6);
     font-size: 14px;
 
@@ -327,5 +319,11 @@
     to {
       transform: rotate(360deg);
     }
+  }
+
+  // Ширина попапа подстраивается под содержимое
+  :deep(.popup-shell__box) {
+    width: fit-content;
+    max-width: 94vw;
   }
 </style>

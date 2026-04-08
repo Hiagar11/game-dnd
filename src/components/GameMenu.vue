@@ -1,5 +1,6 @@
 <script setup>
   import { ref } from 'vue'
+  import { PhUsers, PhGearSix, PhShieldStar } from '@phosphor-icons/vue'
   import GameMenuIcon from './GameMenuIcon.vue'
   import GameMenuTokenList from './GameMenuTokenList.vue'
   import GameMenuSystem from './GameMenuSystem.vue'
@@ -29,6 +30,7 @@
           @mouseenter="playHover"
           @click="setTab('tokens')"
         >
+          <PhUsers :size="13" />
           Токены
         </button>
         <button
@@ -37,6 +39,7 @@
           @mouseenter="playHover"
           @click="setTab('system')"
         >
+          <PhGearSix :size="13" />
           Системные
         </button>
         <button
@@ -45,6 +48,7 @@
           @mouseenter="playHover"
           @click="setTab('heroes')"
         >
+          <PhShieldStar :size="13" />
           Герои
         </button>
       </nav>
@@ -96,6 +100,9 @@
     }
 
     &__tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
       padding: 2px 14px;
       border: 1px solid rgb(255 255 255 / 20%);
       border-bottom: none;

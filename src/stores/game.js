@@ -61,11 +61,10 @@ export const useGameStore = defineStore('game', () => {
       row,
       name: def?.name ?? '',
       src: def?.src ?? '',
-      meleeDmg: def?.meleeDmg ?? 0,
-      rangedDmg: def?.rangedDmg ?? 0,
-      visionRange: def?.visionRange ?? 0,
-      defense: def?.defense ?? 0,
-      evasion: def?.evasion ?? 0,
+      strength: def?.strength ?? 0,
+      agility: def?.agility ?? 0,
+      intellect: def?.intellect ?? 0,
+      charisma: def?.charisma ?? 0,
     })
     return uid
   }
@@ -84,11 +83,10 @@ export const useGameStore = defineStore('game', () => {
       hidden: false,
       name: def.name,
       src: def.src,
-      meleeDmg: 0,
-      rangedDmg: 0,
-      visionRange: 0,
-      defense: 0,
-      evasion: 0,
+      strength: 0,
+      agility: 0,
+      intellect: 0,
+      charisma: 0,
     })
     return uid
   }
@@ -139,11 +137,10 @@ export const useGameStore = defineStore('game', () => {
           hidden: hidden ?? false,
           name: def?.name ?? systemToken,
           src: def?.src ?? '',
-          meleeDmg: 0,
-          rangedDmg: 0,
-          visionRange: 0,
-          defense: 0,
-          evasion: 0,
+          strength: 0,
+          agility: 0,
+          intellect: 0,
+          charisma: 0,
         }
       }
       const id = tokenId && typeof tokenId === 'object' ? String(tokenId._id) : String(tokenId)
@@ -156,11 +153,10 @@ export const useGameStore = defineStore('game', () => {
         hidden: hidden ?? false,
         name: def?.name ?? 'Неизвестный',
         src: def?.src ?? '',
-        meleeDmg: def?.meleeDmg ?? 0,
-        rangedDmg: def?.rangedDmg ?? 0,
-        visionRange: def?.visionRange ?? 6,
-        defense: def?.defense ?? 0,
-        evasion: def?.evasion ?? 0,
+        strength: def?.strength ?? 0,
+        agility: def?.agility ?? 0,
+        intellect: def?.intellect ?? 0,
+        charisma: def?.charisma ?? 0,
       }
     })
     selectedPlacedUid.value = null
