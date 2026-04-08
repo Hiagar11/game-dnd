@@ -234,6 +234,7 @@
       const full = await scenariosStore.fetchScenario(s.id)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.initPlacedTokens(full.placedTokens ?? [])
+      gameStore.initWalls(full.walls ?? [])
       sessionChanged.value = false
       gameStore.currentScenario = full
       selectedScenario.value = full

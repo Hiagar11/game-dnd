@@ -39,10 +39,12 @@
   // true — курсор сейчас над клеткой в зоне хода → показываем сапог
   const cursorInRange = ref(false)
 
-  // Токен, который сейчас выбран (null если ни один)
-  const selectedToken = computed(() =>
-    store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
-  )
+  // Токен, который сейчас выбран (null если ни один, и null для системных токенов —
+  // дверей, факелов и пр., которые не перемещаются)
+  const selectedToken = computed(() => {
+    const t = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+    return t && !t.systemToken ? t : null
+  })
 
   // Множество достижимых клеток (обновляется при смене токена или стен).
   // BFS знает про стены — зона не пространяется за них.

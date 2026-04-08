@@ -33,7 +33,8 @@ export function useGridDraw(props) {
     // Логика проверки вынесена в useTokenMove.js (isInRange), здесь только рендер.
     const selected = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
 
-    if (selected) {
+    // Системные токены (двери, факелы и пр.) не перемещаются — зону хода не рисуем.
+    if (selected && !selected.systemToken) {
       // BFS учитывает стены: buildReachableCells вернёт только те клетки,
       // до которых можно дойти без прохождения сквозь стены.
       const reachable = buildReachableCells(selected, store.walls)

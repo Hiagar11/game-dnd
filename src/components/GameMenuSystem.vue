@@ -22,8 +22,12 @@
 
     <!-- ── 5 кол.: правая панель ────────────────────────────────────────────── -->
     <div class="game-menu-system__controls">
-      <!-- Выбор иконки курсора мастера -->
-      <div class="game-menu-system__cursor-section">
+      <!--
+        Игровой режим: выбор иконки курсора мастера.
+        Режим редактора: переключатель стены.
+        Оба блока не превышают высоту меню.
+      -->
+      <div v-if="!props.editorMode" class="game-menu-system__cursor-section">
         <span class="game-menu-system__cursor-label">Курсор мастера</span>
 
         <div
@@ -62,7 +66,7 @@
 
       <!--
         Диагональный квадрат: режим рисования стен.
-        Показывается только в editorMode.
+        Показывается только в editorMode вместо секции курсора.
       -->
       <div v-if="props.editorMode" class="game-menu-system__wall">
         <button
@@ -201,24 +205,32 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-3);
+    justify-content: center;
     padding: var(--space-2);
     border-left: 1px solid rgb(255 255 255 / 10%);
     background: rgb(0 0 0 / 20%);
-    overflow-y: auto;
+    min-height: 0;
+    overflow: hidden;
   }
 
   /* ── Секция курсора ─────────────────────────────────────────────────────── */
   .game-menu-system__cursor-section {
     width: 100%;
+
+    /* flex: 1 — секция растягивается на всю доступную высоту панели,
+       но не выходит за её пределы */
+    flex: 1;
+    min-height: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: var(--space-2);
     padding: var(--space-2);
     background: rgb(0 0 0 / 30%);
     border-radius: var(--radius-sm);
     border: 1px solid rgb(255 255 255 / 15%);
+    overflow: hidden;
   }
 
   .game-menu-system__cursor-label {
