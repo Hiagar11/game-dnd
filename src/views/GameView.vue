@@ -198,10 +198,6 @@
     }
   })
 
-  function backToCampaigns() {
-    gameStore.setActiveCampaign(null)
-  }
-
   // Выбор сценария: сразу открываем стартовую локацию
   async function selectCampaign(campaign) {
     playClick()

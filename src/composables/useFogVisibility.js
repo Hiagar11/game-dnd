@@ -10,6 +10,7 @@
 import { ref, computed } from 'vue'
 import { useGameStore } from '../stores/game'
 import { useTokensStore } from '../stores/tokens'
+import { useHeroesStore } from '../stores/heroes'
 import { RANGE_RADIUS } from './useTokenMove'
 
 const REVEAL_RADIUS = RANGE_RADIUS + 2
@@ -126,14 +127,17 @@ function buildFogCells(hero, wallSet) {
 export function useFogVisibility() {
   const gameStore = useGameStore()
   const tokensStore = useTokensStore()
+  const heroesStore = useHeroesStore()
 
   // ─── Текущая зона видимости ─────────────────────────────────────────────
   // Множество ключей «col:row», освещённых героями прямо сейчас.
-  // BFS с учётом стен — зона не «просачивается» сквозь стену.
+  // Источник hero ID: tokensStore (мастер) + heroesStore (зритель).
+  // На стороне зрителя tokensStore пуст — heroesStore заполняется через сокет.
   const currentCells = computed(() => {
-    const heroIds = new Set(
-      tokensStore.tokens.filter((t) => t.tokenType === 'hero').map((t) => t.id)
-    )
+    const heroIds = new Set([
+      ...tokensStore.tokens.filter((t) => t.tokenType === 'hero').map((t) => t.id),
+      ...heroesStore.heroes.map((t) => t.id),
+    ])
 
     // Строим Set стен заранее — O(1) для каждой проверки внутри BFS
     const wallSet = new Set(gameStore.walls.map((w) => `${w.col},${w.row}`))

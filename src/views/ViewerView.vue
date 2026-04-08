@@ -161,6 +161,7 @@
     try {
       const full = await scenariosStore.fetchScenario(scenarioId)
       gameStore.setCellSize(full.cellSize ?? 60)
+      gameStore.initWalls(full.walls ?? [])
       gameStore.placedTokens = buildPlacedTokens(full.placedTokens ?? [])
       gameStore.currentScenario = full
       mapSrc.value = full.mapImageUrl ?? ''

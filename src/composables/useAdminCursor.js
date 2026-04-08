@@ -6,13 +6,35 @@
 // Зритель пересчитывает в экранные координаты: screenX = mapX + viewer.offsetX
 // Это гарантирует одинаковую точку карты на любых разрешениях экрана.
 
-import { onMounted, onUnmounted } from 'vue'
+import { watch, computed, onMounted, onUnmounted } from 'vue'
+import { useGameStore } from '../stores/game'
+import { useTokensStore } from '../stores/tokens'
 
 const THROTTLE_MS = 33 // ~30 fps
 const MAX_ICON_SIZE = 256_000 // 256 KB в base64-символах
 
 // offsetX/offsetY — реактивные рефы из useMapPan, передаются снаружи
 export function useAdminCursor(getSocket, sessionActiveRef, offsetX, offsetY) {
+  const gameStore = useGameStore()
+  const tokensStore = useTokensStore()
+
+  // Курсор виден зрителям только пока выбран токен-герой.
+  // Проверяем: selectedPlacedUid → placedToken → tokenType === 'hero'
+  const isHeroSelected = computed(() => {
+    if (!gameStore.selectedPlacedUid) return false
+    const placed = gameStore.placedTokens.find((t) => t.uid === gameStore.selectedPlacedUid)
+    if (!placed) return false
+    const token = tokensStore.tokens.find((t) => t.id === placed.tokenId)
+    return token?.tokenType === 'hero'
+  })
+
+  // Когда герой снят с выбора — сразу прячем курсор у зрителей (не ждём движения мыши)
+  watch(isHeroSelected, (val) => {
+    if (!val && sessionActiveRef.value) {
+      getSocket()?.emit('game:cursor', { mapX: null, mapY: null })
+    }
+  })
+
   let lastEmit = 0
   // Когда мастер находится над своим меню или открыт попап — позицию курсора не шлём
   let menuActive = false
@@ -20,6 +42,8 @@ export function useAdminCursor(getSocket, sessionActiveRef, offsetX, offsetY) {
 
   function onMouseMove(e) {
     if (!sessionActiveRef.value) return
+    // Курсор шлём только когда выбран токен-герой
+    if (!isHeroSelected.value) return
     if (menuActive || popupBlocked) return
     const now = Date.now()
     if (now - lastEmit < THROTTLE_MS) return
