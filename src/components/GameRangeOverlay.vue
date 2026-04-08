@@ -25,7 +25,7 @@
   import { ref, computed } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useSocket } from '../composables/useSocket'
-  import { buildReachableCells } from '../composables/useTokenMove'
+  import { buildReachableCells, findPath } from '../composables/useTokenMove'
 
   defineProps({
     // Размеры карты — оверлей должен покрывать её полностью
@@ -36,8 +36,11 @@
   const store = useGameStore()
   const { getSocket } = useSocket()
 
-  // true — курсор сейчас над клеткой в зоне хода → показываем сапог
+  // true — курсор сейчас над клеткой в зоне хода → показываем следы
   const cursorInRange = ref(false)
+
+  // true — идёт анимация ходьбы. Блокируем повторные клики в этот период.
+  const isWalking = ref(false)
 
   // Токен, который сейчас выбран (null если ни один, и null для системных токенов —
   // дверей, факелов и пр., которые не перемещаются)
@@ -74,26 +77,39 @@
   }
 
   function onClick(e) {
-    if (!selectedToken.value) return
+    if (!selectedToken.value || isWalking.value) return
 
     const { col, row } = getCellAt(e)
 
     if (reachableCells.value.has(`${col},${row}`)) {
-      // Обновляем позицию локально (CSS transition анимирует движение)
-      store.moveToken(selectedToken.value.uid, col, row)
-
-      // Синхронизируем с сервером и зрителями через сокет.
-      // Сервер обновит scenario.placedTokens — это важно для корректного
-      // сохранения игровой сессии (снапшот берётся с сервера).
-      const scenarioId = String(store.currentScenario?.id ?? '')
-      if (scenarioId) {
-        getSocket()?.emit('token:move', {
-          scenarioId,
-          uid: selectedToken.value.uid,
-          col,
-          row,
-        })
+      // Ищем маршрут через BFS с учётом стен — цепочка клеток от текущей до цели.
+      // BFS гарантирует, что токен огибает стены, не «срезает» углы.
+      const path = findPath(selectedToken.value, { col, row }, store.walls)
+      if (!path || path.length === 0) {
+        store.selectPlacedToken(null)
+        return
       }
+
+      // Захватываем uid до снятия выделения — после deselect computed вернёт null
+      const uid = selectedToken.value.uid
+      const scenarioId = String(store.currentScenario?.id ?? '')
+
+      // Снимаем выделение сразу: overlay исчезнет, но async-анимация продолжит работу
+      isWalking.value = true
+      store.selectPlacedToken(null)
+
+      // Шаги задержаны на 380ms — чуть больше CSS transition (350ms) на токене,
+      // чтобы каждый следующий шаг начинался только когда предыдущий визуально завершился.
+      ;(async () => {
+        for (const step of path) {
+          store.moveToken(uid, step.col, step.row)
+          if (scenarioId) {
+            getSocket()?.emit('token:move', { scenarioId, uid, col: step.col, row: step.row })
+          }
+          await new Promise((resolve) => setTimeout(resolve, 380))
+        }
+        isWalking.value = false
+      })()
     } else {
       // Клик вне зоны — снимаем выделение
       store.selectPlacedToken(null)
@@ -117,15 +133,19 @@
   }
 
   /*
-    Курсор-сапог — показывается над клетками в зоне хода.
-    SVG встроен прямо в CSS через data URI (не нужен отдельный файл).
-    Формат: url("data:image/svg+xml,...") <hotspot-x> <hotspot-y>, <fallback>.
-    Горячая точка (27, 25) — носок сапога.
+    Курсор-следы — два следа ступни, показываются над клетками в зоне хода.
+    SVG встроен в CSS через data URI (не нужен отдельный файл).
+    Горячая точка (20 20) — центр курсора, где происходит клик.
+
+    Структура SVG:
+      - Правая нога (сзади, 35% opacity): верх, справа
+      - Левая нога (спереди, 90% opacity): низ, слева
+    Каждая нога — эллипс (пад) + 4 круга (пальцы).
   */
   .game-range-overlay--boot {
     cursor:
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M9 1 L15 1 L15 18 L22 18 L27 22 L27 28 L3 28 L3 22 L9 22 Z' fill='%234ade80' stroke='white' stroke-width='1.5' stroke-linejoin='round'/%3E%3C/svg%3E")
-        27 25,
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cg opacity='0.35'%3E%3Cellipse cx='28' cy='16' rx='5' ry='8' fill='%234ade80'/%3E%3Ccircle cx='24' cy='7' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='28' cy='6' r='2.5' fill='%234ade80'/%3E%3Ccircle cx='32' cy='7' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='35' cy='10' r='1.8' fill='%234ade80'/%3E%3C/g%3E%3Cg opacity='0.9'%3E%3Cellipse cx='12' cy='28' rx='5' ry='8' fill='%234ade80'/%3E%3Ccircle cx='8' cy='19' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='12' cy='18' r='2.5' fill='%234ade80'/%3E%3Ccircle cx='16' cy='19' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='19' cy='22' r='1.8' fill='%234ade80'/%3E%3C/g%3E%3C/svg%3E")
+        20 20,
       pointer;
   }
 </style>

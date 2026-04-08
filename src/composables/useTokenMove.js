@@ -90,3 +90,73 @@ export function buildReachableCells(token, walls) {
 
   return reachable
 }
+
+/**
+ * BFS с отслеживанием родителей — находит кратчайший маршрут от позиции токена
+ * до целевой клетки с учётом стен и ограничения RANGE_RADIUS.
+ *
+ * Отличие от buildReachableCells: здесь мы запоминаем, «откуда пришли» в каждую
+ * клетку (parent map), чтобы потом восстановить цепочку клеток — реальный путь.
+ *
+ * @param {{ col: number, row: number }} token — текущая позиция токена
+ * @param {{ col: number, row: number }} target — целевая клетка
+ * @param {Array<{ col: number, row: number }>} walls — стены из store
+ * @returns {{ col: number, row: number }[]|null} — шаги пути (без стартовой клетки) или null
+ */
+export function findPath(token, target, walls) {
+  const wallSet = new Set(walls.map((w) => `${w.col},${w.row}`))
+  const startKey = `${token.col},${token.row}`
+  const goalKey = `${target.col},${target.row}`
+
+  if (startKey === goalKey) return []
+
+  // parent[key] = ключ клетки, из которой пришли (null у стартовой)
+  const parent = new Map([[startKey, null]])
+  // stepCount[key] = количество шагов от старта до этой клетки
+  const stepCount = new Map([[startKey, 0]])
+  const queue = [[token.col, token.row]]
+
+  const DIRS = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ]
+
+  outer: while (queue.length) {
+    const [col, row] = queue.shift()
+    const key = `${col},${row}`
+    const nextSteps = (stepCount.get(key) ?? 0) + 1
+
+    // Дальше радиуса хода не идём
+    if (nextSteps > RANGE_RADIUS) continue
+
+    for (const [dc, dr] of DIRS) {
+      const nc = col + dc
+      const nr = row + dr
+      const nkey = `${nc},${nr}`
+
+      if (parent.has(nkey) || wallSet.has(nkey) || nc < 0 || nr < 0) continue
+
+      parent.set(nkey, key)
+      stepCount.set(nkey, nextSteps)
+
+      if (nkey === goalKey) break outer
+
+      queue.push([nc, nr])
+    }
+  }
+
+  // Цель недостижима (нет в parent) — возвращаем null
+  if (!parent.has(goalKey)) return null
+
+  // Восстанавливаем путь: идём от цели назад к старту, затем разворачиваем
+  const path = []
+  let cur = goalKey
+  while (cur !== startKey) {
+    const [c, r] = cur.split(',').map(Number)
+    path.unshift({ col: c, row: r })
+    cur = parent.get(cur)
+  }
+  return path
+}
