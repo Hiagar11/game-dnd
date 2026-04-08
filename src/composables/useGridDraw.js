@@ -5,23 +5,23 @@
 // Компонент GameGrid не знает деталей — он просто вешает canvasRef на элемент.
 import { onMounted, ref, watch } from 'vue'
 import { useGameStore } from '../stores/game'
+import { useTokensStore } from '../stores/tokens'
+import { useHeroesStore } from '../stores/heroes'
 import { buildReachableCells } from './useTokenMove'
 
 // props — объект пропсов компонента (ширина и высота карты)
 export function useGridDraw(props) {
   const store = useGameStore()
+  const tokensStore = useTokensStore()
+  const heroesStore = useHeroesStore()
 
-  // ref(null) — ссылка на DOM-элемент <canvas>.
-  // Компонент привяжет к ней реальный элемент через `ref="canvasRef"`.
   const canvasRef = ref(null)
 
   function drawGrid() {
     const canvas = canvasRef.value
 
-    // Пока карта не готова — рисовать нечего
     if (!canvas || !props.width || !props.height) return
 
-    // Обновляем размер canvas под размер карты
     canvas.width = props.width
     canvas.height = props.height
 
@@ -29,20 +29,35 @@ export function useGridDraw(props) {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
     // ─── Зона радиуса выбранного токена ──────────────────────────────────────
-    // Закрашиваем клетки, которые ЦЕЛИКОМ попадают в круг радиуса RANGE_RADIUS.
-    // Логика проверки вынесена в useTokenMove.js (isInRange), здесь только рендер.
-    const selected = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+    if (props.viewerMode) {
+      // Режим зрителя: рисуем зону хода для выбранного героя.
+      // Приоритет: adminSelectedUid (мастер выбрал) → selectedUid (игрок кликнул).
+      // Если ни одного нет — зона не отображается.
+      const selectedUid = heroesStore.adminSelectedUid ?? heroesStore.selectedUid
+      if (!selectedUid) return // без выделения — пропускаем
 
-    // Системные токены (двери, факелы и пр.) не перемещаются — зону хода не рисуем.
-    if (selected && !selected.systemToken) {
-      // BFS учитывает стены: buildReachableCells вернёт только те клетки,
-      // до которых можно дойти без прохождения сквозь стены.
-      const reachable = buildReachableCells(selected, store.walls)
+      const heroIds = new Set(heroesStore.heroes.map((h) => h.id))
+      const placed = store.placedTokens.find((t) => t.uid === selectedUid && heroIds.has(t.tokenId))
+      if (!placed) return
 
+      const reachable = buildReachableCells(placed, store.walls)
       ctx.fillStyle = 'rgba(74, 222, 128, 0.25)'
       for (const key of reachable) {
         const [c, r] = key.split(',').map(Number)
         ctx.fillRect(c * store.cellSize, r * store.cellSize, store.cellSize, store.cellSize)
+      }
+    } else {
+      // Режим админа: зона только для выбранного токена.
+      const selected = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+
+      if (selected && !selected.systemToken) {
+        const reachable = buildReachableCells(selected, store.walls)
+
+        ctx.fillStyle = 'rgba(74, 222, 128, 0.25)'
+        for (const key of reachable) {
+          const [c, r] = key.split(',').map(Number)
+          ctx.fillRect(c * store.cellSize, r * store.cellSize, store.cellSize, store.cellSize)
+        }
       }
     }
 
@@ -87,6 +102,10 @@ export function useGridDraw(props) {
       () => store.selectedPlacedUid,
       () => store.placedTokens.map((t) => `${t.uid}:${t.col}:${t.row}`).join(','),
       () => store.walls.map((w) => `${w.col}:${w.row}`).join(','),
+      // Зона героев на viewer-стороне обновляется при изменении списка героев или выбора
+      () => heroesStore.heroes.map((h) => h.id).join(','),
+      () => heroesStore.selectedUid,
+      () => heroesStore.adminSelectedUid,
     ],
     drawGrid
   )

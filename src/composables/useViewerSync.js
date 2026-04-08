@@ -126,6 +126,11 @@ export function useViewerSync(socket) {
     socket.on('game:heroes:updated', ({ heroes }) => {
       heroesStore.setHeroes(heroes)
     })
+
+    // Мастер выбрал токен — показываем выделение зрителям
+    socket.on('game:token:selected', ({ uid }) => {
+      heroesStore.adminSelectedUid = uid ?? null
+    })
   }
 
   // ── Отписка (при размонтировании ViewerView) ──────────────────────────────
@@ -139,6 +144,7 @@ export function useViewerSync(socket) {
     socket.off('game:cursor')
     socket.off('game:cursor:icon')
     socket.off('game:heroes:updated')
+    socket.off('game:token:selected')
   }
 
   return {

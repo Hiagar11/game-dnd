@@ -16,7 +16,7 @@
         :style="{ transform: `translate(${offsetX}px, ${offsetY}px)` }"
       >
         <GameMap :map-src="mapSrc" @ready="onMapReady" />
-        <GameGrid :width="mapSize.width" :height="mapSize.height" />
+        <GameGrid :width="mapSize.width" :height="mapSize.height" :viewer-mode="true" />
         <GameTokens :width="mapSize.width" :height="mapSize.height" :viewer-mode="true" />
         <GameFog :width="mapSize.width" :height="mapSize.height" />
       </div>
@@ -29,8 +29,8 @@
 
     <!-- Курсор мастера — виден только зрителям (Teleport внутри компонента монтирует в body) -->
     <AdminCursorOverlay
-      :map-x="cursorMapX"
-      :map-y="cursorMapY"
+      :map-x="filteredCursorPos.x"
+      :map-y="filteredCursorPos.y"
       :offset-x="offsetX"
       :offset-y="offsetY"
       :icon-url="cursorIconUrl"
@@ -39,7 +39,7 @@
 </template>
 
 <script setup>
-  import { ref, onMounted, onUnmounted } from 'vue'
+  import { ref, computed, onMounted, onUnmounted } from 'vue'
   import { useRoute } from 'vue-router'
   import { useAuthStore } from '../stores/auth'
   import { useSocket } from '../composables/useSocket'
@@ -48,6 +48,7 @@
   import { useHeroesStore } from '../stores/heroes'
   import { useScenariosStore } from '../stores/scenarios'
   import { SYSTEM_TOKENS } from '../constants/systemTokens'
+  import { buildReachableCells } from '../composables/useTokenMove'
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
@@ -84,10 +85,34 @@
     onScenarioChange,
   } = useViewerSync(socket)
 
+  // Курсор мастера виден только в зелёной зоне хода выбранного героя.
+  // Пересчитывается реактивно при любом изменении выбора, позиции курсора или стен.
+  const filteredCursorPos = computed(() => {
+    if (cursorMapX.value === null || cursorMapY.value === null) return { x: null, y: null }
+    if (!gameStore.cellSize) return { x: null, y: null }
+
+    // Определяем активный uid: приоритет у мастера, потом у локального выбора игрока
+    const activeUid = heroesStore.adminSelectedUid ?? heroesStore.selectedUid
+    if (!activeUid) return { x: null, y: null }
+
+    const heroIds = new Set(heroesStore.heroes.map((h) => h.id))
+    const placed = gameStore.placedTokens.find((t) => t.uid === activeUid && heroIds.has(t.tokenId))
+    if (!placed) return { x: null, y: null }
+
+    const col = Math.floor(cursorMapX.value / gameStore.cellSize)
+    const row = Math.floor(cursorMapY.value / gameStore.cellSize)
+    const reachable = buildReachableCells(placed, gameStore.walls)
+
+    if (!reachable.has(`${col},${row}`)) return { x: null, y: null }
+    return { x: cursorMapX.value, y: cursorMapY.value }
+  })
+
   // Мастер перешёл в другую локацию через дверь
   onScenarioChange(async (scenarioId) => {
     ready.value = false
     mapSize.value = { width: 0, height: 0 }
+    heroesStore.selectedUid = null
+    heroesStore.adminSelectedUid = null
     await loadScenario(scenarioId)
   })
 
@@ -125,6 +150,9 @@
 
         // Инициализируем список героев из текущего состояния сессии
         heroesStore.setHeroes(res.session.heroes ?? [])
+
+        // Инициализируем выбранный токен мастера
+        heroesStore.adminSelectedUid = res.session.selectedTokenUid ?? null
 
         // Резервный путь: если scenarioId не было в URL (прямой переход по ссылке)
         if (!scenarioIdFromRoute && !ready.value) {

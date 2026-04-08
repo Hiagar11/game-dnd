@@ -8,6 +8,8 @@
     height: { type: Number, default: 0 },
     // editorMode: true — рисовать стены красным (только в редакторе)
     editorMode: { type: Boolean, default: false },
+    // viewerMode: true — рисовать зону хода для всех героев без выделения
+    viewerMode: { type: Boolean, default: false },
   })
 
   // Вся логика рисования — в composable.

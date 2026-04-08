@@ -10,10 +10,15 @@ export const useHeroesStore = defineStore('heroes', () => {
   // { id, name, tokenType, src, strength, agility, intellect, charisma }
   const heroes = ref([])
 
-  // Заменяем весь список — используется при получении состояния от сервера.
+  // uid размещённого токена-героя, выбранного зрителем.
+  const selectedUid = ref(null)
+
+  // uid размещённого токена-героя, выбранного мастером (транслируется через сокет).
+  const adminSelectedUid = ref(null)
+
   function setHeroes(list) {
     heroes.value = list ?? []
   }
 
-  return { heroes, setHeroes }
+  return { heroes, selectedUid, adminSelectedUid, setHeroes }
 })

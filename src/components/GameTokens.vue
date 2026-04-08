@@ -12,6 +12,10 @@
       class="game-tokens__token"
       :class="{
         'game-tokens__token--selected': store.selectedPlacedUid === placed.uid,
+        'game-tokens__token--viewer-selected':
+          props.viewerMode && heroesStore.selectedUid === placed.uid,
+        'game-tokens__token--admin-selected':
+          props.viewerMode && heroesStore.adminSelectedUid === placed.uid,
         'game-tokens__token--shaking': store.shakingTokenUid === placed.uid,
         'game-tokens__token--fog-hidden': fogHiddenKeys.has(`${placed.col}:${placed.row}`),
       }"
@@ -21,7 +25,11 @@
         width: `${store.cellSize}px`,
         height: `${store.cellSize}px`,
       }"
-      @click.stop="!props.viewerMode && (store.selectPlacedToken(placed.uid), closeContextMenu())"
+      @click.stop="
+        props.viewerMode
+          ? onViewerClick(placed)
+          : (store.selectPlacedToken(placed.uid), closeContextMenu())
+      "
       @dblclick.stop="!props.viewerMode && onDblClick(placed)"
       @contextmenu.stop.prevent="!props.viewerMode && onContextMenu(placed)"
     >
@@ -62,6 +70,7 @@
 <script setup>
   import { ref, computed } from 'vue'
   import { useGameStore } from '../stores/game'
+  import { useHeroesStore } from '../stores/heroes'
   import { useFogVisibility } from '../composables/useFogVisibility'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
   import { wasDragged } from '../composables/useMapPan'
@@ -80,6 +89,7 @@
   const emit = defineEmits(['door-transition'])
 
   const store = useGameStore()
+  const heroesStore = useHeroesStore()
   const { visitedNotCurrentSet } = useFogVisibility()
   const { state: ctxState, open: openContextMenu, close: closeContextMenu } = useTokenContextMenu()
 
@@ -88,6 +98,19 @@
   // visitedNotCurrentSet реактивен: обновляется при движении героев.
   const fogHiddenKeys = computed(() => (store.fogEnabled ? visitedNotCurrentSet.value : new Set()))
   const { getSocket } = useSocket()
+
+  // ── Выделение в режиме зрителя ────────────────────────────────────────────
+  // Зритель может выбрать героя кликом — уходит в heroesStore.selectedUid,
+  // читается там же в useGridDraw для отрисовки зелёной зоны.
+  // Set ID героев — для проверки по tokenId разместённого токена
+  const heroIds = computed(() => new Set(heroesStore.heroes.map((h) => h.id)))
+
+  function onViewerClick(placed) {
+    // Клик на героя — выбираем / снимаем выделение
+    if (heroIds.value.has(placed.tokenId)) {
+      heroesStore.selectedUid = heroesStore.selectedUid === placed.uid ? null : placed.uid
+    }
+  }
   // Правый клик: выбираем токен, открываем меню.
   // Повторный правый клик по тому же токену закрывает меню (тоггл).
   // Если перед этим было перетаскивание карты — игнорируем: contextmenu
@@ -145,6 +168,58 @@
 
     /* Пустое пространство слоя не перехватывает клики — проходят к карте */
     pointer-events: none;
+  }
+
+  /*
+    Выделение на стороне зрителя — пульсирующее зелёное кольцо.
+    Отличается от admin-выделения (вращающийся градиент) чтобы визуально
+    разграничить «выбрал мастер» и «выбрал игрок».
+  */
+
+  /*
+    Выделение токена мастером — золотое/янтарное кольцо.
+    Отличается от зелёного кольца игрока.
+  */
+  .game-tokens__token--admin-selected::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-full);
+    padding: 3px;
+    background: conic-gradient(
+      rgb(250 204 21) 0deg,
+      rgb(234 179 8) 90deg,
+      transparent 160deg,
+      transparent 200deg,
+      rgb(234 179 8) 270deg,
+      rgb(250 204 21) 360deg
+    );
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: token-spin 2s linear infinite;
+  }
+
+  .game-tokens__token--viewer-selected::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-full);
+    padding: 3px;
+    background: conic-gradient(
+      rgb(74 222 128) 0deg,
+      rgb(34 197 94) 90deg,
+      transparent 160deg,
+      transparent 200deg,
+      rgb(34 197 94) 270deg,
+      rgb(74 222 128) 360deg
+    );
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: token-spin 3s linear infinite;
   }
 
   .game-tokens__token {

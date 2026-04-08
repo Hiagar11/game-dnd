@@ -35,6 +35,16 @@ export function useAdminCursor(getSocket, sessionActiveRef, offsetX, offsetY) {
     }
   })
 
+  // При любом изменении выбранного токена — сообщаем зрителям uid.
+  // Зрители показывают выделение на нужном токене.
+  watch(
+    () => gameStore.selectedPlacedUid,
+    (uid) => {
+      if (!sessionActiveRef.value) return
+      getSocket()?.emit('game:token:select', { uid: uid ?? null })
+    }
+  )
+
   let lastEmit = 0
   // Когда мастер находится над своим меню или открыт попап — позицию курсора не шлём
   let menuActive = false

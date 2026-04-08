@@ -258,6 +258,7 @@ export function setupSocket(io) {
         cursorMapY: null,
         cursorIconDataUrl: null,
         heroes: [],
+        selectedTokenUid: null,
       })
 
       socket.join(`viewer:${sessionId}`)
@@ -334,7 +335,19 @@ export function setupSocket(io) {
       session.heroes = Array.isArray(heroes) ? heroes : []
       socket.to(`viewer:${sessionId}`).emit('game:heroes:updated', { heroes: session.heroes })
     })
-
+    // ─── Выбор токена мастером (admin) ─────────────────────────────────────────
+    // Событие: game:token:select { uid }  (uid = null — снял выделение)
+    // Транслируем зрителям чтобы они видели какой токен выбран у мастера.
+    socket.on('game:token:select', ({ uid }) => {
+      if (role !== 'admin') return
+      const sessionId = socket.user.id
+      const session = sessions.get(sessionId)
+      if (!session) return
+      session.selectedTokenUid = uid ?? null
+      socket
+        .to(`viewer:${sessionId}`)
+        .emit('game:token:selected', { uid: session.selectedTokenUid })
+    })
     // ─── Синхронизация панорамы (admin) ──────────────────────────────────────
     // Событие: game:pan { mapCenterX, mapCenterY }
     // mapCenter — пиксель карты, видимый в центре экрана мастера.
@@ -400,6 +413,7 @@ export function setupSocket(io) {
             cursorMapY: session.cursorMapY ?? null,
             cursorIconDataUrl: session.cursorIconDataUrl ?? null,
             heroes: session.heroes ?? [],
+            selectedTokenUid: session.selectedTokenUid ?? null,
           },
           scenario: {
             id: String(scenario._id),
