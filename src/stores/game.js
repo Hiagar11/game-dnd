@@ -9,6 +9,10 @@ import { useTokensStore } from './tokens'
 // Re-export для обратной совместимости (GameMenuSystem.vue)
 export { SYSTEM_TOKENS }
 
+// Базовый URL API — используется как запасной источник для src, если токен
+// не найден в tokensStore (например, при первом рендере или удалённом токене).
+const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
+
 export const useGameStore = defineStore('game', () => {
   // ─── Сетка ───────────────────────────────────────────────────────────────────
   const cellSize = ref(60)
@@ -26,6 +30,28 @@ export const useGameStore = defineStore('game', () => {
   const placedTokens = ref([])
   const selectedPlacedUid = ref(null)
   const shakingTokenUid = ref(null)
+
+  // ─── Стены ────────────────────────────────────────────────────────────────────
+  // Массив { col, row } — клетки, отмеченные как стена.
+  // wallMode: true — включён режим рисования стен (задаётся редактором).
+  const walls = ref([])
+  const wallMode = ref(false)
+
+  // Проверяет, есть ли стена в клетке (col, row). Используется в useGridDraw.
+  function hasWall(col, row) {
+    return walls.value.some((w) => w.col === col && w.row === row)
+  }
+
+  // Ставит стену в клетку, если её ещё нет
+  function addWall(col, row) {
+    if (!hasWall(col, row)) walls.value.push({ col, row })
+  }
+
+  // Убирает стену из клетки
+  function removeWall(col, row) {
+    const idx = walls.value.findIndex((w) => w.col === col && w.row === row)
+    if (idx !== -1) walls.value.splice(idx, 1)
+  }
 
   // ─── Сессия ───────────────────────────────────────────────────────────────────
   const currentScenario = ref(null)
@@ -145,21 +171,33 @@ export const useGameStore = defineStore('game', () => {
       }
       const id = tokenId && typeof tokenId === 'object' ? String(tokenId._id) : String(tokenId)
       const def = tokensStore.tokens.find((t) => t.id === id)
+
+      // Запасной источник src: populated tokenId содержит imagePath, если сервер
+      // вернул полные данные через populate() (GET /api/scenarios/:id).
+      // Это защищает от ситуации, когда tokensStore ещё не загружен или токен удалён.
+      const tokenObj = tokenId && typeof tokenId === 'object' ? tokenId : null
+      const fallbackSrc = tokenObj?.imagePath ? `${API}/${tokenObj.imagePath}` : ''
+
       return {
         uid,
         tokenId: id,
         col,
         row,
         hidden: hidden ?? false,
-        name: def?.name ?? 'Неизвестный',
-        src: def?.src ?? '',
-        strength: def?.strength ?? 0,
-        agility: def?.agility ?? 0,
-        intellect: def?.intellect ?? 0,
-        charisma: def?.charisma ?? 0,
+        name: def?.name ?? tokenObj?.name ?? 'Неизвестный',
+        src: def?.src ?? fallbackSrc,
+        strength: def?.strength ?? tokenObj?.stats?.strength ?? 0,
+        agility: def?.agility ?? tokenObj?.stats?.agility ?? 0,
+        intellect: def?.intellect ?? tokenObj?.stats?.intellect ?? 0,
+        charisma: def?.charisma ?? tokenObj?.stats?.charisma ?? 0,
       }
     })
     selectedPlacedUid.value = null
+  }
+
+  // ─── Инициализация стен из сервера ───────────────────────────────────────────
+  function initWalls(serverWalls) {
+    walls.value = (serverWalls ?? []).map(({ col, row }) => ({ col, row }))
   }
 
   return {
@@ -169,6 +207,8 @@ export const useGameStore = defineStore('game', () => {
     placedTokens,
     selectedPlacedUid,
     shakingTokenUid,
+    walls,
+    wallMode,
     currentScenario,
     activeCampaign,
     setCellSize,
@@ -183,5 +223,9 @@ export const useGameStore = defineStore('game', () => {
     editPlacedToken,
     setDoorTarget,
     initPlacedTokens,
+    initWalls,
+    hasWall,
+    addWall,
+    removeWall,
   }
 })

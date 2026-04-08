@@ -5,6 +5,7 @@
 // Компонент GameGrid не знает деталей — он просто вешает canvasRef на элемент.
 import { onMounted, ref, watch } from 'vue'
 import { useGameStore } from '../stores/game'
+import { buildReachableCells } from './useTokenMove'
 
 // props — объект пропсов компонента (ширина и высота карты)
 export function useGridDraw(props) {
@@ -27,7 +28,32 @@ export function useGridDraw(props) {
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-    // Настройки линий сетки
+    // ─── Зона радиуса выбранного токена ──────────────────────────────────────
+    // Закрашиваем клетки, которые ЦЕЛИКОМ попадают в круг радиуса RANGE_RADIUS.
+    // Логика проверки вынесена в useTokenMove.js (isInRange), здесь только рендер.
+    const selected = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+
+    if (selected) {
+      // BFS учитывает стены: buildReachableCells вернёт только те клетки,
+      // до которых можно дойти без прохождения сквозь стены.
+      const reachable = buildReachableCells(selected, store.walls)
+
+      ctx.fillStyle = 'rgba(74, 222, 128, 0.25)'
+      for (const key of reachable) {
+        const [c, r] = key.split(',').map(Number)
+        ctx.fillRect(c * store.cellSize, r * store.cellSize, store.cellSize, store.cellSize)
+      }
+    }
+
+    // ─── Стены (поверх зоны токена, под линиями сетки) ───────────────────────
+    if (store.walls.length) {
+      ctx.fillStyle = 'rgba(220, 38, 38, 0.55)' // красный, полупрозрачный
+      for (const w of store.walls) {
+        ctx.fillRect(w.col * store.cellSize, w.row * store.cellSize, store.cellSize, store.cellSize)
+      }
+    }
+
+    // ─── Линии сетки (поверх заливки) ────────────────────────────────────────
     ctx.beginPath()
     ctx.strokeStyle = store.colorGrid
     ctx.lineWidth = 1
@@ -47,9 +73,18 @@ export function useGridDraw(props) {
     ctx.stroke()
   }
 
-  // Перерисовываем сетку при изменении размеров карты, размера ячейки или цвета.
+  // Перерисовываем сетку при изменении размеров карты, размера ячейки, цвета,
+  // а также при смене выбранного токена, позиций токенов или стен.
   watch(
-    [() => props.width, () => props.height, () => store.cellSize, () => store.colorGrid],
+    [
+      () => props.width,
+      () => props.height,
+      () => store.cellSize,
+      () => store.colorGrid,
+      () => store.selectedPlacedUid,
+      () => store.placedTokens.map((t) => `${t.uid}:${t.col}:${t.row}`).join(','),
+      () => store.walls.map((w) => `${w.col}:${w.row}`).join(','),
+    ],
     drawGrid
   )
 

@@ -10,6 +10,11 @@
   const activeTab = ref('tokens')
   const { playHover, playClick } = useSound()
 
+  // editorMode: true — включены функции только для редактора (например, рисование стен)
+  defineProps({
+    editorMode: { type: Boolean, default: false },
+  })
+
   function setTab(tab) {
     activeTab.value = tab
     playClick()
@@ -55,7 +60,7 @@
 
       <!-- Контент вкладки -->
       <GameMenuTokenList v-if="activeTab === 'tokens'" token-type="npc" />
-      <GameMenuSystem v-else-if="activeTab === 'system'" />
+      <GameMenuSystem v-else-if="activeTab === 'system'" :editor-mode="editorMode" />
       <GameMenuTokenList v-else token-type="hero" />
     </div>
 

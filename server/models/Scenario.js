@@ -69,6 +69,11 @@ const scenarioSchema = new mongoose.Schema(
       type: [{ col: Number, row: Number, _id: false }],
       default: [],
     },
+    // Стены — клетки, помеченные как непроходимые (рисуются красным в редакторе).
+    walls: {
+      type: [{ col: Number, row: Number, _id: false }],
+      default: [],
+    },
   },
   { timestamps: true }
 )

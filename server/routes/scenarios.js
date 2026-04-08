@@ -50,7 +50,7 @@ router.post('/upload-map', requireAdmin, mapUpload.single('map'), (req, res) => 
 // ─── POST /api/scenarios ──────────────────────────────────────────────────────
 // Создание нового сценария. Только для admin.
 router.post('/', requireAdmin, async (req, res) => {
-  const { name, mapImagePath, cellSize, placedTokens } = req.body
+  const { name, mapImagePath, cellSize, placedTokens, walls } = req.body
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Название обязательно' })
@@ -89,6 +89,9 @@ router.post('/', requireAdmin, async (req, res) => {
       cellSize: Number(cellSize) || 60,
       placedTokens: normalizedTokens,
       defaultPlacedTokens: normalizedTokens,
+      walls: Array.isArray(walls)
+        ? walls.map(({ col, row }) => ({ col: Number(col), row: Number(row) }))
+        : [],
     })
     res.status(201).json(formatScenario(scenario, req))
   } catch (err) {
@@ -171,7 +174,7 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
     if (String(scenario.owner) !== String(req.user.id))
       return res.status(403).json({ error: 'Нет доступа' })
 
-    const { placedTokens, name } = req.body
+    const { placedTokens, name, walls } = req.body
     if (!Array.isArray(placedTokens)) {
       return res.status(400).json({ error: 'placedTokens должен быть массивом' })
     }
@@ -197,6 +200,11 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
     )
     // Редактор устанавливает эталон — синхронно обновляем defaultPlacedTokens
     scenario.defaultPlacedTokens = scenario.placedTokens
+
+    // Стены эталона тоже обновляем если переданы
+    if (Array.isArray(walls)) {
+      scenario.walls = walls.map(({ col, row }) => ({ col: Number(col), row: Number(row) }))
+    }
 
     await scenario.save()
     res.json({ ok: true, count: scenario.placedTokens.length, name: scenario.name })
@@ -278,6 +286,7 @@ function formatScenario(scenario, req, { full = false, showHidden = false } = {}
   return {
     ...base,
     placedTokens,
+    walls: scenario.walls ?? [],
     revealedCells: scenario.revealedCells,
   }
 }

@@ -71,9 +71,10 @@
           <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
           <GameGrid :width="mapSize.width" :height="mapSize.height" />
           <GameTokens :width="mapSize.width" :height="mapSize.height" />
+          <GameWallPainter :width="mapSize.width" :height="mapSize.height" />
         </div>
 
-        <GameMenu>
+        <GameMenu editor-mode>
           <template #right-panel>
             <div class="level-save">
               <button
@@ -126,6 +127,7 @@
   import GameMap from './GameMap.vue'
   import GameGrid from './GameGrid.vue'
   import GameTokens from './GameTokens.vue'
+  import GameWallPainter from './GameWallPainter.vue'
   import GameMenu from './GameMenu.vue'
   import LevelCard from './LevelCard.vue'
   import LevelSavePopup from './LevelSavePopup.vue'
@@ -176,6 +178,7 @@
   function exitGame() {
     selectedScenario.value = null
     isEditingLevel.value = false
+    gameStore.wallMode = false
   }
 
   function goBack() {
@@ -208,6 +211,7 @@
       const full = await store.fetchScenario(s.id)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.initPlacedTokens(full.placedTokens ?? [])
+      gameStore.initWalls(full.walls ?? [])
       gameStore.currentScenario = full
       selectedScenario.value = full
       isEditingLevel.value = editMode

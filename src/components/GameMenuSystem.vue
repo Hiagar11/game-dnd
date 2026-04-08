@@ -41,6 +41,29 @@
       </button>
     </div>
 
+    <!-- ── Режим строительства стен (виден только в редакторе) ─────────────── -->
+    <div v-if="props.editorMode" class="game-menu-system__wall-section">
+      <span class="game-menu-system__wall-label">Стены</span>
+      <label class="game-menu-system__wall-toggle">
+        <input
+          type="checkbox"
+          class="game-menu-system__wall-input"
+          :checked="gameStore.wallMode"
+          @change="gameStore.wallMode = true"
+        />
+        <span class="game-menu-system__wall-chip game-menu-system__wall-chip--on">Рисовать</span>
+      </label>
+      <label class="game-menu-system__wall-toggle">
+        <input
+          type="checkbox"
+          class="game-menu-system__wall-input"
+          :checked="!gameStore.wallMode"
+          @change="gameStore.wallMode = false"
+        />
+        <span class="game-menu-system__wall-chip game-menu-system__wall-chip--off">Выключить</span>
+      </label>
+    </div>
+
     <!-- ── Системные токены (двери, ловушки и т.д.) ────────────────────────── -->
     <button
       v-for="token in SYSTEM_TOKENS"
@@ -59,7 +82,16 @@
 <script setup>
   import { ref, inject } from 'vue'
   import { SYSTEM_TOKENS } from '../stores/game'
+  import { useGameStore } from '../stores/game'
   import { useSound } from '../composables/useSound'
+
+  // editorMode: true — компонент используется во вкладке редактора;
+  // чекбоксы стен видны только там (в игровом режиме они не нужны).
+  const props = defineProps({
+    editorMode: { type: Boolean, default: false },
+  })
+
+  const gameStore = useGameStore()
 
   // inject получает функцию setCursorIcon из GameView через provide.
   // Если компонент используется вне GameView — fallback на пустую функцию.
@@ -210,5 +242,67 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  /* ── Режим стен ───────────────────────────────────────────── */
+  .game-menu-system__wall-section {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+    background: rgb(0 0 0 / 30%);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgb(255 255 255 / 15%);
+  }
+
+  .game-menu-system__wall-label {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-inline-end: var(--space-1);
+  }
+
+  .game-menu-system__wall-toggle {
+    display: flex;
+    cursor: pointer;
+  }
+
+  /* Скрываем стандартный checkbox - визуальная часть это chip-кнопка */
+  .game-menu-system__wall-input {
+    display: none;
+  }
+
+  .game-menu-system__wall-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-family: var(--font-ui);
+    border: 1px solid transparent;
+    transition:
+      background var(--transition-fast),
+      color var(--transition-fast),
+      border-color var(--transition-fast);
+
+    /* Неактивный вид */
+    background: var(--color-overlay);
+    color: var(--color-text-muted);
+    border-color: rgb(255 255 255 / 15%);
+  }
+
+  /* Активный чекбокс даёт chip яркий вид */
+  .game-menu-system__wall-input:checked + .game-menu-system__wall-chip--on {
+    background: rgb(220 38 38 / 70%);
+    color: #fff;
+    border-color: rgb(220 38 38 / 90%);
+  }
+
+  .game-menu-system__wall-input:checked + .game-menu-system__wall-chip--off {
+    background: rgb(74 222 128 / 30%);
+    color: #fff;
+    border-color: rgb(74 222 128 / 60%);
   }
 </style>

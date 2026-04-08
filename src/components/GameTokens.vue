@@ -146,6 +146,15 @@
     /* Включаем клики обратно только на самом токене */
     pointer-events: auto;
     cursor: pointer;
+
+    /*
+      Плавное перемещение при смене col/row через moveToken().
+      left и top меняются мгновенно в JS, а transition анимирует их.
+      0.35s — пауза достаточная, чтобы движение выглядело плавным, но не затяжным.
+    */
+    transition:
+      left 0.35s ease,
+      top 0.35s ease;
   }
 
   .game-tokens__img {
@@ -177,6 +186,7 @@
            → остаётся только кольцо шириной padding.
     5. animation вращает ::before — вместе с ним вращается и градиент.
   */
+
   .game-tokens__token--selected::before {
     content: '';
     position: absolute;

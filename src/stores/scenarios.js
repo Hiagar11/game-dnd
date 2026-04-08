@@ -64,10 +64,12 @@ export const useScenariosStore = defineStore('scenarios', () => {
 
   // ─── Сохранение расстановки токенов уровня ──────────────────────────────
   // placedTokens — массив { uid, tokenId, col, row } из game store.
+  // walls — массив { col, row } стен. Опциональный — null/undefined = не обновлять.
   // name — опциональное новое имя сценария.
-  async function saveLevelTokens(id, placedTokens, name) {
+  async function saveLevelTokens(id, placedTokens, name, walls) {
     const body = { placedTokens }
     if (name) body.name = name
+    if (walls != null) body.walls = walls
     const result = await api.patch(`/api/scenarios/${id}/placed-tokens`, body)
     // Синхронизируем локальный список: имя + актуальный tokensCount
     const idx = scenarios.value.findIndex((s) => String(s.id) === String(id))

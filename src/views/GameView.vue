@@ -89,6 +89,7 @@
       >
         <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
         <GameGrid :width="mapSize.width" :height="mapSize.height" />
+        <GameRangeOverlay :width="mapSize.width" :height="mapSize.height" />
         <GameTokens
           :width="mapSize.width"
           :height="mapSize.height"
@@ -129,6 +130,7 @@
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
   import GameGrid from '../components/GameGrid.vue'
+  import GameRangeOverlay from '../components/GameRangeOverlay.vue'
   import GameFog from '../components/GameFog.vue'
   import GameTokens from '../components/GameTokens.vue'
   import GameMenu from '../components/GameMenu.vue'

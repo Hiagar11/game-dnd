@@ -16,6 +16,11 @@ function buildTokensPayload(placedTokens, includeHidden = false) {
   }))
 }
 
+// Собирает массив стен — только { col, row }
+function buildWallsPayload(walls) {
+  return walls.map(({ col, row }) => ({ col, row }))
+}
+
 export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario, exitGame, goBack) {
   const gameStore = useGameStore()
   const store = useScenariosStore()
@@ -54,7 +59,8 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
     saveError.value = ''
     try {
       const tokens = buildTokensPayload(gameStore.placedTokens, true)
-      await store.saveLevelTokens(selectedScenario.value.id, tokens)
+      const walls = buildWallsPayload(gameStore.walls)
+      await store.saveLevelTokens(selectedScenario.value.id, tokens, undefined, walls)
       if (autoLoadScenario.value) {
         goBack()
       } else {
@@ -85,11 +91,13 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
     saveError.value = ''
     try {
       const tokens = buildTokensPayload(gameStore.placedTokens)
+      const walls = buildWallsPayload(gameStore.walls)
       await store.createScenario({
         name: levelName.value,
         mapImagePath: selectedScenario.value.mapImagePath,
         cellSize: selectedScenario.value.cellSize,
         placedTokens: tokens,
+        walls,
       })
       closeSavePopup()
       saveToastMsg.value = 'Уровень сохранён'
