@@ -45,9 +45,11 @@ export function useGridDraw(props) {
       }
     }
 
-    // ─── Стены (поверх зоны токена, под линиями сетки) ───────────────────────
-    if (store.walls.length) {
-      ctx.fillStyle = 'rgba(220, 38, 38, 0.55)' // красный, полупрозрачный
+    // ─── Стены (поверх зоны токена, под линиями сетки) ────────────────
+    // В режиме игры — стены невидимы (блокируют движение, но не отображаются).
+    // В режиме редактора — красные клетки для визуального 'painting'.
+    if (props.editorMode && store.walls.length) {
+      ctx.fillStyle = 'rgba(220, 38, 38, 0.55)'
       for (const w of store.walls) {
         ctx.fillRect(w.col * store.cellSize, w.row * store.cellSize, store.cellSize, store.cellSize)
       }

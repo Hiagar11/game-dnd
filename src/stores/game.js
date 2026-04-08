@@ -5,13 +5,10 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
 import { useTokensStore } from './tokens'
+import { mapServerToken } from '../utils/mapServerToken'
 
 // Re-export для обратной совместимости (GameMenuSystem.vue)
 export { SYSTEM_TOKENS }
-
-// Базовый URL API — используется как запасной источник для src, если токен
-// не найден в tokensStore (например, при первом рендере или удалённом токене).
-const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
 export const useGameStore = defineStore('game', () => {
   // ─── Сетка ───────────────────────────────────────────────────────────────────
@@ -144,54 +141,9 @@ export const useGameStore = defineStore('game', () => {
   }
 
   // ─── Инициализация из сервера ─────────────────────────────────────────────────
-  // После populate() на сервере tokenId приходит объектом { _id, ... }, а не строкой.
   function initPlacedTokens(serverTokens) {
     const tokensStore = useTokensStore()
-    placedTokens.value = serverTokens.map((serverToken) => {
-      const { uid, tokenId, systemToken, col, row, hidden } = serverToken
-      if (systemToken) {
-        const def = SYSTEM_TOKENS.find((t) => t.id === systemToken)
-        return {
-          uid,
-          tokenId: null,
-          systemToken,
-          targetScenarioId: serverToken.targetScenarioId
-            ? String(serverToken.targetScenarioId)
-            : null,
-          col,
-          row,
-          hidden: hidden ?? false,
-          name: def?.name ?? systemToken,
-          src: def?.src ?? '',
-          strength: 0,
-          agility: 0,
-          intellect: 0,
-          charisma: 0,
-        }
-      }
-      const id = tokenId && typeof tokenId === 'object' ? String(tokenId._id) : String(tokenId)
-      const def = tokensStore.tokens.find((t) => t.id === id)
-
-      // Запасной источник src: populated tokenId содержит imagePath, если сервер
-      // вернул полные данные через populate() (GET /api/scenarios/:id).
-      // Это защищает от ситуации, когда tokensStore ещё не загружен или токен удалён.
-      const tokenObj = tokenId && typeof tokenId === 'object' ? tokenId : null
-      const fallbackSrc = tokenObj?.imagePath ? `${API}/${tokenObj.imagePath}` : ''
-
-      return {
-        uid,
-        tokenId: id,
-        col,
-        row,
-        hidden: hidden ?? false,
-        name: def?.name ?? tokenObj?.name ?? 'Неизвестный',
-        src: def?.src ?? fallbackSrc,
-        strength: def?.strength ?? tokenObj?.stats?.strength ?? 0,
-        agility: def?.agility ?? tokenObj?.stats?.agility ?? 0,
-        intellect: def?.intellect ?? tokenObj?.stats?.intellect ?? 0,
-        charisma: def?.charisma ?? tokenObj?.stats?.charisma ?? 0,
-      }
-    })
+    placedTokens.value = serverTokens.map((t) => mapServerToken(t, tokensStore.tokens))
     selectedPlacedUid.value = null
   }
 

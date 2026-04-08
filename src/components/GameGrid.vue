@@ -6,6 +6,8 @@
   const props = defineProps({
     width: { type: Number, default: 0 },
     height: { type: Number, default: 0 },
+    // editorMode: true — рисовать стены красным (только в редакторе)
+    editorMode: { type: Boolean, default: false },
   })
 
   // Вся логика рисования — в composable.

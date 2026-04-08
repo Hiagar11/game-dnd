@@ -1,54 +1,19 @@
 <template>
   <div class="level-section">
     <!-- ── Состояние 1: выбор карты ──────────────────────────────────────────── -->
-    <template v-if="!selectedScenario">
-      <div class="level-picker">
-        <h2 class="level-picker__title">Выберите карту для расстановки</h2>
-
-        <p v-if="store.loading" class="level-picker__hint">Загрузка…</p>
-        <p v-else-if="!maps.length" class="level-picker__hint">
-          Нет карт. Сначала загрузите их в разделе «Загрузить карты».
-        </p>
-
-        <div v-else class="level-picker__grid">
-          <LevelCard
-            v-for="s in maps"
-            :key="s.id"
-            :scenario="s"
-            :is-loading="loadingId === s.id"
-            @click="selectScenario(s)"
-          />
-        </div>
-
-        <p v-if="loadError" class="level-section__error">{{ loadError }}</p>
-
-        <!-- ── Сохранённые уровни ─────────────────────────────────────────── -->
-        <!-- Тот же список, что видит игрок в GameView. Удаление здесь скрывает -->
-        <!-- уровень из «Играть», т.к. оба читают из одного сенарийного стора.  -->
-        <h2 class="level-picker__title level-picker__title--levels">Сохранённые уровни</h2>
-
-        <p v-if="!levels.length && !store.loading" class="level-picker__hint">
-          Нет сохранённых уровней.
-        </p>
-
-        <div v-else class="level-picker__grid">
-          <div v-for="s in levels" :key="s.id" class="level-card-wrap">
-            <LevelCard :scenario="s" :is-loading="loadingId === s.id" @click="editLevel(s)" />
-            <button
-              class="level-card__del"
-              title="Удалить уровень"
-              :disabled="deletingId === s.id"
-              @mouseenter="playHover"
-              @click="onDeleteLevel(s)"
-            >
-              {{ deletingId === s.id ? '…' : '×' }}
-            </button>
-          </div>
-        </div>
-
-        <p v-if="deleteError" class="level-section__error">{{ deleteError }}</p>
-      </div>
-    </template>
+    <LevelPickerList
+      v-if="!selectedScenario"
+      :maps="maps"
+      :levels="levels"
+      :loading="store.loading"
+      :loading-id="loadingId"
+      :load-error="loadError"
+      :deleting-id="deletingId"
+      :delete-error="deleteError"
+      @select-map="selectScenario"
+      @edit-level="editLevel"
+      @delete-level="onDeleteLevel"
+    />
 
     <!-- ── Состояние 2: fullscreen игровой интерфейс ──────────────────────────── -->
     <template v-else>
@@ -69,7 +34,7 @@
           @click="onMapClick"
         >
           <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
-          <GameGrid :width="mapSize.width" :height="mapSize.height" />
+          <GameGrid :width="mapSize.width" :height="mapSize.height" editor-mode />
           <GameTokens :width="mapSize.width" :height="mapSize.height" />
           <GameWallPainter :width="mapSize.width" :height="mapSize.height" />
         </div>
@@ -89,11 +54,6 @@
           </template>
         </GameMenu>
 
-        <!-- Кнопка возврата к выбору карты / назад в сценарий -->
-        <button class="level-back" @mouseenter="playHover" @click="onLevelBack">
-          {{ props.autoLoadScenario ? '← К сценарию' : '← К выбору' }}
-        </button>
-
         <!-- Попап: имя сохранения ─────────────────────────────────────────── -->
         <LevelSavePopup
           :visible="showSavePopup"
@@ -104,9 +64,11 @@
           @save="onSaveLevel"
           @close="closeSavePopup"
         />
-
-        <!-- Тост: успешное сохранение ─────────────────────────────────────── -->
       </div>
+
+      <button class="level-back" @mouseenter="playHover" @click="onLevelBack">
+        {{ props.autoLoadScenario ? '← К сценарию' : '← К выбору' }}
+      </button>
     </template>
   </div>
 
@@ -129,8 +91,8 @@
   import GameTokens from './GameTokens.vue'
   import GameWallPainter from './GameWallPainter.vue'
   import GameMenu from './GameMenu.vue'
-  import LevelCard from './LevelCard.vue'
   import LevelSavePopup from './LevelSavePopup.vue'
+  import LevelPickerList from './LevelPickerList.vue'
 
   const props = defineProps({ autoLoadScenario: { type: Object, default: null } })
   const emit = defineEmits(['back-to-scenario'])
@@ -287,81 +249,6 @@
     color: var(--color-text);
   }
 
-  /* ─── Выбор карты ─────────────────────────────────────────────────────────── */
-  .level-picker {
-    padding: var(--space-6) var(--space-8);
-    overflow-y: auto;
-    height: 100%;
-  }
-
-  .level-picker__title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-block-end: var(--space-5);
-
-    /* Заголовок раздела «Сохранённые уровни» с отступом сверху */
-    &--levels {
-      margin-block-start: var(--space-8);
-    }
-  }
-
-  .level-picker__hint {
-    font-size: 13px;
-    color: var(--color-text-muted);
-  }
-
-  .level-picker__grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: var(--space-4);
-    margin-block-start: var(--space-4);
-  }
-
-  /* Обёртка: position:relative для абсолютной кнопки × */
-  .level-card-wrap {
-    position: relative;
-
-    /* Кнопка × появляется при наведении */
-    &:hover .level-card__del {
-      opacity: 1;
-    }
-  }
-
-  .level-card__del {
-    position: absolute;
-    top: var(--space-2);
-    right: var(--space-2);
-    width: 24px;
-    height: 24px;
-    border-radius: var(--radius-sm);
-    border: none;
-    background: rgb(0 0 0 / 70%);
-    backdrop-filter: blur(4px);
-    color: var(--color-text-muted);
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    opacity: 0;
-    transition:
-      opacity var(--transition-fast),
-      color var(--transition-fast);
-
-    &:hover {
-      color: var(--color-error);
-    }
-
-    &:disabled {
-      cursor: default;
-      opacity: 0.4;
-    }
-  }
-
-  .level-section__error {
-    margin-block-start: var(--space-4);
-    font-size: 13px;
-    color: var(--color-error);
-  }
-
   /* ─── Игровой интерфейс: перекрывает весь экран ───────────────────────────── */
   .level-game {
     position: fixed;
@@ -429,7 +316,7 @@
     position: fixed;
     top: var(--space-4);
     left: var(--space-4);
-    z-index: 20;
+    z-index: 60; /* выше .level-game (50) — иначе кнопка перекрывается слоем карты */
     padding: var(--space-2) var(--space-3);
     font-size: 13px;
   }

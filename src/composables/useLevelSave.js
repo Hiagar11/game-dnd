@@ -100,6 +100,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
         walls,
       })
       closeSavePopup()
+      exitGame()
       saveToastMsg.value = 'Уровень сохранён'
       saveSuccess.value = true
       clearTimeout(successTimer)
