@@ -50,6 +50,10 @@ export const useGameStore = defineStore('game', () => {
     if (idx !== -1) walls.value.splice(idx, 1)
   }
 
+  // ─── Туман войны ──────────────────────────────────────────────────────────
+  // true — туман виден, false — админ его скрыл (игроки всегда видят туман).
+  const fogEnabled = ref(true)
+
   // ─── Сессия ───────────────────────────────────────────────────────────────────
   const currentScenario = ref(null)
   const activeCampaign = ref(null)
@@ -161,6 +165,7 @@ export const useGameStore = defineStore('game', () => {
     shakingTokenUid,
     walls,
     wallMode,
+    fogEnabled,
     currentScenario,
     activeCampaign,
     setCellSize,

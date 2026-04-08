@@ -40,7 +40,11 @@
           :height="mapSize.height"
           @door-transition="onDoorTransition"
         />
-        <GameFog :width="mapSize.width" :height="mapSize.height" />
+        <GameFog
+          :width="mapSize.width"
+          :height="mapSize.height"
+          :hidden="auth.role === 'admin' && !gameStore.fogEnabled"
+        />
       </div>
 
       <GameMenu @mouseenter="onMenuEnter" @mouseleave="onMenuLeave" />

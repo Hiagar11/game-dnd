@@ -49,7 +49,7 @@
   // своего stacking context — z-index между ними работает относительно.
   --z-background: -1; // AppBackground (за всем)
   --z-map: 1; // .game-view__map контейнер
-  --z-tokens: 3; // GameTokens — поверх сетки, под туманом
+  --z-tokens: 3; // GameTokens — поверх сетки, под туманом (z-index: 4)
   --z-map-border: 100; // Рамка карты (::after)
   --z-menu: 10; // Игровое меню
   --z-context-menu: 200; // Контекстное меню токена (выше всего)

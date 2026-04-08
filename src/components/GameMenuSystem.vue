@@ -89,6 +89,23 @@
           <line x1="2" y1="54" x2="54" y2="2" stroke="rgb(0 0 0 / 55%)" stroke-width="2" />
         </svg>
       </div>
+      <!--
+        Переключатель тумана войны — только для админа, во всех режимах.
+        Отключает туман только для себя — игроки всегда видят туман независимо от этой настройки.
+      -->
+      <button
+        v-if="auth.role === 'admin'"
+        class="game-menu-system__fog-btn"
+        :class="{ 'game-menu-system__fog-btn--off': !gameStore.fogEnabled }"
+        :title="gameStore.fogEnabled ? 'Скрыть туман' : 'Показать туман'"
+        @mouseenter="playHover"
+        @click="gameStore.fogEnabled = !gameStore.fogEnabled"
+      >
+        <span class="game-menu-system__fog-icon">{{ gameStore.fogEnabled ? '🌫️' : '☀️' }}</span>
+        <span class="game-menu-system__fog-label">{{
+          gameStore.fogEnabled ? 'Туман' : 'Откл.'
+        }}</span>
+      </button>
     </div>
   </div>
 </template>
@@ -97,14 +114,15 @@
   import { ref, inject } from 'vue'
   import { SYSTEM_TOKENS } from '../stores/game'
   import { useGameStore } from '../stores/game'
+  import { useAuthStore } from '../stores/auth'
   import { useSound } from '../composables/useSound'
 
   const props = defineProps({
     editorMode: { type: Boolean, default: false },
   })
 
-  // gameStore используется в других местах компонента — оставляем импорт без изменений
   const gameStore = useGameStore()
+  const auth = useAuthStore()
 
   // inject получает функцию setCursorIcon из GameView через provide.
   // Если компонент используется вне GameView — fallback на пустую функцию.
@@ -203,9 +221,10 @@
   /* ── 5 кол.: правая панель ──────────────────────────────────────────────── */
   .game-menu-system__controls {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
+    gap: var(--space-2);
     padding: var(--space-2);
     border-left: 1px solid rgb(255 255 255 / 10%);
     background: rgb(0 0 0 / 20%);
@@ -216,11 +235,6 @@
   /* ── Секция курсора ─────────────────────────────────────────────────────── */
   .game-menu-system__cursor-section {
     width: 100%;
-
-    /* flex: 1 — секция растягивается на всю доступную высоту панели,
-       но не выходит за её пределы */
-    flex: 1;
-    min-height: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -230,7 +244,6 @@
     background: rgb(0 0 0 / 30%);
     border-radius: var(--radius-sm);
     border: 1px solid rgb(255 255 255 / 15%);
-    overflow: hidden;
   }
 
   .game-menu-system__cursor-label {
@@ -363,5 +376,47 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
+  }
+
+  /* ── Переключатель тумана ──────────────────────────────────────────── */
+  .game-menu-system__fog-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 48px;
+    height: 48px;
+    flex-shrink: 0;
+    border: 2px solid rgb(255 255 255 / 20%);
+    border-radius: var(--radius-sm);
+    background: rgb(0 0 0 / 50%);
+    cursor: pointer;
+    transition:
+      border-color var(--transition-fast),
+      background var(--transition-fast);
+
+    &:hover {
+      border-color: rgb(255 255 255 / 50%);
+      background: rgb(255 255 255 / 8%);
+    }
+
+    /* Туман отключён: подсвечиваем золотом — админ видит карту без тумана */
+    &--off {
+      border-color: var(--color-primary);
+      background: rgb(200 154 74 / 15%);
+    }
+  }
+
+  .game-menu-system__fog-icon {
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .game-menu-system__fog-label {
+    font-size: 9px;
+    color: var(--color-text-muted);
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
   }
 </style>

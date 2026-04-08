@@ -13,6 +13,7 @@
       :class="{
         'game-tokens__token--selected': store.selectedPlacedUid === placed.uid,
         'game-tokens__token--shaking': store.shakingTokenUid === placed.uid,
+        'game-tokens__token--fog-hidden': fogHiddenKeys.has(`${placed.col}:${placed.row}`),
       }"
       :style="{
         left: `${placed.col * store.cellSize}px`,
@@ -59,8 +60,9 @@
 </template>
 
 <script setup>
-  import { ref } from 'vue'
+  import { ref, computed } from 'vue'
   import { useGameStore } from '../stores/game'
+  import { useFogVisibility } from '../composables/useFogVisibility'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
   import { wasDragged } from '../composables/useMapPan'
   import { useSocket } from '../composables/useSocket'
@@ -78,7 +80,13 @@
   const emit = defineEmits(['door-transition'])
 
   const store = useGameStore()
+  const { visitedNotCurrentSet } = useFogVisibility()
   const { state: ctxState, open: openContextMenu, close: closeContextMenu } = useTokenContextMenu()
+
+  // Ключи «col:row» токенов, которые нужно скрыть туманом.
+  // Когда туман выключен (админ), возвращаем пустой Set — все токены видны.
+  // visitedNotCurrentSet реактивен: обновляется при движении героев.
+  const fogHiddenKeys = computed(() => (store.fogEnabled ? visitedNotCurrentSet.value : new Set()))
   const { getSocket } = useSocket()
   // Правый клик: выбираем токен, открываем меню.
   // Повторный правый клик по тому же токену закрывает меню (тоггл).
@@ -155,6 +163,17 @@
     transition:
       left 0.35s ease,
       top 0.35s ease;
+  }
+
+  /*
+    Токен в посещённой (dim) зоне — скрыт, но сохраняет своё место в потоке.
+    pointer-events: none — не реагирует на клики пока невидим.
+    Туман (fog GIF) отображается поверх: unvisited-клетки уже скрыты им;
+    visited-клетки скрыты этим правилом.
+  */
+  .game-tokens__token--fog-hidden {
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .game-tokens__img {
