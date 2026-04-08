@@ -23,6 +23,7 @@
         draggable="false"
         @mouseenter="playHover"
         @click="onSelect(token)"
+        @contextmenu.prevent="onContextEdit(token)"
         @dragstart="onDragStart($event, token)"
       >
         <img
@@ -45,6 +46,7 @@
 
   <GameTokenEditPopup
     :visible="isPopupOpen"
+    :token-id="editTokenId"
     :token-type="tokenType"
     :default-attitude="attitude"
     @close="onPopupClose"
@@ -77,6 +79,8 @@
   const { playHover, playClick } = useSound()
 
   const isPopupOpen = ref(false)
+  // null = создание, id = редактирование шаблона
+  const editTokenId = ref(null)
 
   // inject из GameView — явно шлёт heroes зрителям после изменений.
   // null-fallback: компонент работает и вне GameView (например в редакторе).
@@ -90,6 +94,13 @@
   })
 
   function onAdd() {
+    editTokenId.value = null
+    isPopupOpen.value = true
+    playClick()
+  }
+
+  function onContextEdit(token) {
+    editTokenId.value = token.id
     isPopupOpen.value = true
     playClick()
   }
@@ -101,7 +112,8 @@
 
   function onPopupClose() {
     isPopupOpen.value = false
-    // После создания нового героя немедленно синхронизируем зрителей.
+    editTokenId.value = null
+    // После создания/редактирования героя немедленно синхронизируем зрителей.
     if (props.tokenType === 'hero') emitHeroes?.()
   }
 

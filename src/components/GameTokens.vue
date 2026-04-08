@@ -28,6 +28,17 @@
           placed.tokenType === 'npc' &&
           placed.attitude !== 'hostile' &&
           placed.attitude !== 'friendly',
+        // Курсор мечи/пузыря над НПС, когда выбран герой и НПС в зоне достижимости
+        'game-tokens__token--cursor-attack':
+          !props.viewerMode &&
+          placed.tokenType === 'npc' &&
+          placed.attitude === 'hostile' &&
+          isNpcReachable(placed),
+        'game-tokens__token--cursor-talk':
+          !props.viewerMode &&
+          placed.tokenType === 'npc' &&
+          (placed.attitude === 'neutral' || placed.attitude === 'friendly') &&
+          isNpcReachable(placed),
       }"
       :style="{
         left: `${placed.col * store.cellSize}px`,
@@ -66,6 +77,7 @@
     <GameTokenEditPopup
       :visible="editPlacedUid !== null"
       :placed-uid="editPlacedUid"
+      :token-type="store.placedTokens.find((t) => t.uid === editPlacedUid)?.tokenType ?? 'npc'"
       @close="editPlacedUid = null"
     />
 
@@ -85,6 +97,7 @@
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
   import { wasDragged } from '../composables/useMapPan'
   import { useSocket } from '../composables/useSocket'
+  import { buildReachableCells } from '../composables/useTokenMove'
   import GameTokenContextMenu from './GameTokenContextMenu.vue'
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
   import GameDoorPopup from './GameDoorPopup.vue'
@@ -108,6 +121,27 @@
   // visitedNotCurrentSet реактивен: обновляется при движении героев.
   const fogHiddenKeys = computed(() => (store.fogEnabled ? visitedNotCurrentSet.value : new Set()))
   const { getSocket } = useSocket()
+
+  // Клетки в зоне достижимости выбранного героя — нужны для определения курсора над НПС
+  const heroReachable = computed(() => {
+    const sel = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+    if (!sel || sel.systemToken || sel.tokenType !== 'hero') return new Set()
+    return buildReachableCells(sel, store.walls)
+  })
+
+  const DIRS = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ]
+
+  // Проверяет, есть ли хотя бы одна соседняя клетка НПС в зоне достижимости героя
+  function isNpcReachable(placed) {
+    const r = heroReachable.value
+    if (!r.size) return false
+    return DIRS.some(([dc, dr]) => r.has(`${placed.col + dc},${placed.row + dr}`))
+  }
 
   // ── Выделение в режиме зрителя ────────────────────────────────────────────
   // Зритель может выбрать героя кликом — уходит в heroesStore.selectedUid,
@@ -292,6 +326,22 @@
     outline: 2px solid rgb(74 222 128 / 90%);
     outline-offset: -2px;
     border-radius: var(--radius-full);
+  }
+
+  /* Курсор «мечи» — враждебный НПС в зоне атаки героя */
+  .game-tokens__token--cursor-attack {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cg transform='rotate(-45 20 20)' opacity='0.95'%3E%3Crect x='18.5' y='4' width='3' height='22' rx='1' fill='%23f87171'/%3E%3Crect x='14' y='10' width='12' height='2.5' rx='1' fill='%23fca5a5'/%3E%3Cpolygon points='20,2 18,6 22,6' fill='%23fca5a5'/%3E%3C/g%3E%3Cg transform='rotate(45 20 20)' opacity='0.70'%3E%3Crect x='18.5' y='4' width='3' height='22' rx='1' fill='%23f87171'/%3E%3Crect x='14' y='10' width='12' height='2.5' rx='1' fill='%23fca5a5'/%3E%3Cpolygon points='20,2 18,6 22,6' fill='%23fca5a5'/%3E%3C/g%3E%3C/svg%3E")
+        20 20,
+      crosshair;
+  }
+
+  /* Курсор «пузырь» — нейтральный/союзный НПС в зоне диалога героя */
+  .game-tokens__token--cursor-talk {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect x='6' y='6' width='22' height='16' rx='4' fill='%2360a5fa' opacity='0.9'/%3E%3Cpolygon points='10,22 8,28 16,22' fill='%2360a5fa' opacity='0.9'/%3E%3Ccircle cx='13' cy='14' r='2' fill='white'/%3E%3Ccircle cx='18' cy='14' r='2' fill='white'/%3E%3Ccircle cx='23' cy='14' r='2' fill='white'/%3E%3C/svg%3E")
+        20 20,
+      pointer;
   }
 
   .game-tokens__img {

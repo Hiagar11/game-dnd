@@ -146,8 +146,8 @@
     { value: 'hostile', label: 'Враждебное' },
   ]
 
-  // Показывать selector только для НПС-шаблонов — не для героев и не для placed-режима
-  const showAttitude = computed(() => !isPlacedMode.value && props.tokenType === 'npc')
+  // Показывать selector для всех НПС — и шаблонов, и placed (но не для героев)
+  const showAttitude = computed(() => props.tokenType === 'npc')
   const previewSrc = ref(null)
   const fileRef = ref(null)
 
@@ -171,8 +171,15 @@
     if (isPlacedMode.value) {
       const token = store.placedTokens.find((t) => t.uid === props.placedUid)
       if (token) {
-        const { name, src, strength, agility, intellect, charisma } = token
-        form.value = { name, attitude: 'neutral', strength, agility, intellect, charisma }
+        const { name, src, strength, agility, intellect, charisma, attitude } = token
+        form.value = {
+          name,
+          attitude: attitude ?? 'neutral',
+          strength,
+          agility,
+          intellect,
+          charisma,
+        }
         previewSrc.value = src
       }
     } else if (isEditMode.value) {
@@ -214,7 +221,14 @@
     try {
       const { name, strength, agility, intellect, charisma } = form.value
       if (isPlacedMode.value) {
-        store.editPlacedToken(props.placedUid, { name, strength, agility, intellect, charisma })
+        store.editPlacedToken(props.placedUid, {
+          name,
+          attitude: form.value.attitude,
+          strength,
+          agility,
+          intellect,
+          charisma,
+        })
       } else if (isEditMode.value) {
         await tokensStore.editToken(props.tokenId, {
           name,

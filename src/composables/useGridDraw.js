@@ -100,7 +100,7 @@ export function useGridDraw(props) {
       () => store.cellSize,
       () => store.colorGrid,
       () => store.selectedPlacedUid,
-      () => store.placedTokens.map((t) => `${t.uid}:${t.col}:${t.row}`).join(','),
+      () => store.placedTokens.map((t) => `${t.uid}:${t.col}:${t.row}:${t.attitude}`).join(','),
       () => store.walls.map((w) => `${w.col}:${w.row}`).join(','),
       // Зона героев на viewer-стороне обновляется при изменении списка героев или выбора
       () => heroesStore.heroes.map((h) => h.id).join(','),

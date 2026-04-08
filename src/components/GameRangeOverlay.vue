@@ -17,7 +17,7 @@
     :style="{ width: `${width}px`, height: `${height}px` }"
     @mousemove="onMouseMove"
     @click.stop="onClick"
-    @mouseleave="cursorInRange = false"
+    @mouseleave="onMouseLeave"
     @dragover="onDragOver"
     @drop="onDrop"
   />
@@ -44,7 +44,7 @@
   const offsetY = inject('offsetY')
   const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
 
-  // true — курсор сейчас над клеткой в зоне хода → показываем следы
+  // true — курсор над клеткой в зоне хода → показываем следы
   const cursorInRange = ref(false)
 
   // true — идёт анимация ходьбы. Блокируем повторные клики в этот период.
@@ -62,7 +62,6 @@
   const reachableCells = computed(() =>
     selectedToken.value ? buildReachableCells(selectedToken.value, store.walls) : new Set()
   )
-
   /**
    * Переводит позицию мыши (clientX/Y) в координату клетки (col, row).
    * Использует currentTarget.getBoundingClientRect() — работает корректно
@@ -78,10 +77,21 @@
     }
   }
 
+  function onMouseLeave() {
+    cursorInRange.value = false
+    cursorInAttack.value = false
+    cursorInTalk.value = false
+  }
+
   function onMouseMove(e) {
     if (!selectedToken.value) return
     const { col, row } = getCellAt(e)
-    cursorInRange.value = reachableCells.value.has(`${col},${row}`)
+    const key = `${col},${row}`
+    cursorInAttack.value = attackCells.value.has(key)
+    cursorInTalk.value = !cursorInAttack.value && talkCells.value.has(key)
+    // Следы показываем, только если клетка не является атаковой или диалоговой
+    cursorInRange.value =
+      !cursorInAttack.value && !cursorInTalk.value && reachableCells.value.has(key)
   }
 
   function onClick(e) {

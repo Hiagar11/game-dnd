@@ -160,3 +160,92 @@ export function findPath(token, target, walls) {
   }
   return path
 }
+
+/**
+ * Возвращает Set клеток "col,row", из которых герой может атаковать враждебного НПС.
+ *
+ * Условие атаки:
+ *   1. Клетка входит в reachableCells — герой может туда дойти за один ход.
+ *   2. Клетка непосредственно (4-связно) соседняя с враждебным НПС.
+ *
+ * Таким образом, герой подходит к врагу вплотную и занимает клетку рядом с ним.
+ *
+ * @param {{ col: number, row: number, tokenType: string }} token — выбранный токен
+ * @param {Array} placedTokens — все токены на карте из game store
+ * @param {Array} walls — стены из game store
+ * @returns {Set<string>}
+ */
+export function buildAttackCells(token, placedTokens, walls) {
+  // Атака доступна только для героев
+  if (token.tokenType !== 'hero') return new Set()
+
+  const reachable = buildReachableCells(token, walls)
+
+  // Позиции всех враждебных НПС на карте
+  const hostiles = placedTokens.filter(
+    (t) => t.tokenType === 'npc' && t.attitude === 'hostile' && t.uid !== token.uid
+  )
+  if (!hostiles.length) return new Set()
+
+  const DIRS = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ]
+  const attackCells = new Set()
+
+  for (const enemy of hostiles) {
+    for (const [dc, dr] of DIRS) {
+      const key = `${enemy.col + dc},${enemy.row + dr}`
+      // Клетка должна быть в зоне хода (и не совпадать с позицией самого НПС)
+      if (reachable.has(key)) attackCells.add(key)
+    }
+  }
+
+  return attackCells
+}
+
+/**
+ * Возвращает Set клеток "col,row", из которых герой может поговорить с нейтральным/союзным НПС.
+ *
+ * Условие разговора (зеркально атаке):
+ *   1. Клетка входит в reachableCells.
+ *   2. Клетка непосредственно (4-связно) соседняя с нейтральным или союзным НПС.
+ *   3. Клетка НЕ входит в attackCells — атака имеет приоритет.
+ *
+ * @param {{ col: number, row: number, tokenType: string }} token — выбранный токен
+ * @param {Array} placedTokens — все токены на карте из game store
+ * @param {Array} walls — стены из game store
+ * @returns {Set<string>}
+ */
+export function buildTalkCells(token, placedTokens, walls) {
+  if (token.tokenType !== 'hero') return new Set()
+
+  const reachable = buildReachableCells(token, walls)
+
+  const friendly = placedTokens.filter(
+    (t) =>
+      t.tokenType === 'npc' &&
+      (t.attitude === 'neutral' || t.attitude === 'friendly') &&
+      t.uid !== token.uid
+  )
+  if (!friendly.length) return new Set()
+
+  const DIRS = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ]
+  const talkCells = new Set()
+
+  for (const npc of friendly) {
+    for (const [dc, dr] of DIRS) {
+      const key = `${npc.col + dc},${npc.row + dr}`
+      if (reachable.has(key)) talkCells.add(key)
+    }
+  }
+
+  return talkCells
+}
