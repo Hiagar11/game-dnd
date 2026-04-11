@@ -3,7 +3,6 @@
     <AppBackground src="/video/mainBackground.mp4" :brightness="0.4" />
 
     <div class="editor-body">
-      <!-- Левая навигация: переключение разделов -->
       <nav class="editor-nav">
         <router-link class="editor-nav__back" :to="{ name: 'menu' }">← Меню</router-link>
 
@@ -21,9 +20,6 @@
         </div>
       </nav>
 
-      <!-- Правая область: текущий раздел -->
-      <!-- v-if для maps/levels: не нужно хранить состояние -->
-      <!-- v-show для scenarios: хранит граф (рёбра, позиции узлов) при переходе на редактирование уровня -->
       <main class="editor-content">
         <EditorMapsSection v-if="activeSection === 'maps'" />
         <EditorLevelSection

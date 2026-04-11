@@ -154,7 +154,7 @@
 </template>
 
 <script setup>
-  import { ref, computed } from 'vue'
+  import { ref } from 'vue'
   import IconPickerInput from './IconPickerInput.vue'
   import { useTraitsStore } from '../stores/traits'
 
@@ -197,8 +197,6 @@
 
   const form = ref({ name: '', category: 'passive', icon: '', mods: [{ stat: '', value: 0 }] })
   const filterCategory = ref(null)
-
-  const iconUrl = computed(() => (form.value.icon ? gameIconUrl(form.value.icon) : null))
 
   function addMod() {
     form.value.mods.push({ stat: '', value: 0 })

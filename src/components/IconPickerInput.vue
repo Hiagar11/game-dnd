@@ -2,7 +2,6 @@
   <div class="icon-picker" ref="rootEl">
     <div class="icon-picker__row">
       <input
-        ref="inputEl"
         v-model="query"
         type="text"
         class="icon-picker__input"
@@ -21,7 +20,6 @@
       </div>
     </div>
 
-    <!-- Выпадающий список подсказок -->
     <div v-if="showDropdown" class="icon-picker__dropdown">
       <div v-if="loading" class="icon-picker__status">Поиск…</div>
       <div v-else-if="!suggestions.length && query.length >= 2" class="icon-picker__status">
@@ -61,7 +59,6 @@
 
   let debounceTimer = null
 
-  // Синхронизируем query при внешнем изменении modelValue
   watch(
     () => props.modelValue,
     (val) => {
@@ -77,7 +74,6 @@
     activeIdx.value = -1
     const q = query.value.trim()
 
-    // Сразу сообщаем наверх — пользователь может вручную вписать точный слаг
     emit('update:modelValue', q)
 
     if (q.length < 2) {
@@ -105,7 +101,6 @@
       const res = await fetch(url)
       if (!res.ok) throw new Error('fetch failed')
       const data = await res.json()
-      // data.icons — массив вида ["game-icons:sword", ...]
       suggestions.value = (data.icons ?? []).map((s) => s.replace('game-icons:', ''))
     } catch {
       suggestions.value = []
@@ -141,7 +136,6 @@
     }
   }
 
-  // Клик вне — закрыть
   function onDocClick(e) {
     if (rootEl.value && !rootEl.value.contains(e.target)) {
       close()

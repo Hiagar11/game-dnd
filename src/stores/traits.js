@@ -1,6 +1,3 @@
-// Хранилище свойств персонажей — пассивные черты, особенности, статусные эффекты.
-// Мастер создаёт их в редакторе, потом применяет к токенам в инвентаре.
-// Хранится в localStorage — серверная персистентность добавляется позже.
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
@@ -20,9 +17,6 @@ function saveToStorage(traits) {
 }
 
 export const useTraitsStore = defineStore('traits', () => {
-  // Список свойств. Элемент: { id, name, category, icon, mods }
-  // category: 'passive' | 'active' | 'status' | 'racial' | 'class'
-  // mods: [{ stat, value }] — массив модификаторов характеристик
   const traits = ref(loadFromStorage())
 
   function addTrait({ name, category, icon, mods }) {

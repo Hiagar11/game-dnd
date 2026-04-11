@@ -1,10 +1,7 @@
-// Composable для сохранения/обновления/удаления уровня (EditorLevelSection).
-// Отделяет логику персистентности от UI-логики компонента.
 import { ref, nextTick, onUnmounted } from 'vue'
 import { useGameStore } from '../stores/game'
 import { useScenariosStore } from '../stores/scenarios'
 
-// Собирает массив токенов для отправки на сервер — без лишних полей UI
 function buildTokensPayload(placedTokens, includeHidden = false) {
   return placedTokens.map(({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden }) => ({
     uid,
@@ -16,7 +13,6 @@ function buildTokensPayload(placedTokens, includeHidden = false) {
   }))
 }
 
-// Собирает массив стен — только { col, row }
 function buildWallsPayload(walls) {
   return walls.map(({ col, row }) => ({ col, row }))
 }
@@ -25,7 +21,6 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
   const gameStore = useGameStore()
   const store = useScenariosStore()
 
-  // ─── Попап: ввод названия нового уровня ──────────────────────────────────────
   const showSavePopup = ref(false)
   const levelName = ref('')
   const levelNameInputRef = ref(null)
@@ -50,12 +45,10 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
     showSavePopup.value = false
   }
 
-  // ─── Диспетчер кнопки сохранения ─────────────────────────────────────────────
   function onSaveBtnClick() {
     isEditingLevel.value ? onUpdateLevel() : openSavePopup()
   }
 
-  // ─── Обновление существующего уровня через PATCH ──────────────────────────────
   async function onUpdateLevel() {
     saving.value = true
     saveError.value = ''
@@ -79,7 +72,6 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
     }
   }
 
-  // ─── Создание нового уровня ───────────────────────────────────────────────────
   async function onSaveLevel() {
     if (!levelName.value) return
     const duplicate = store.scenarios.find(

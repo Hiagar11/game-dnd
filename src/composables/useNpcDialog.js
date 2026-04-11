@@ -1,19 +1,12 @@
-// Управление диалоговыми облаками НПС и стрелками изменения отношения.
-// Вынесено из GameTokens.vue: всё состояние диалога сосредоточено здесь.
 import { ref, onUnmounted } from 'vue'
 
 export function useNpcDialog(store) {
-  // uid → { messages: [{who:'npc'|'player', text}], loading: bool, heroSrc, npcScore }
-  // Map позволяет нескольким НПС говорить одновременно.
   const dialogBubbles = ref(new Map())
 
-  // Map uid → функция очистки (снимает document-слушатель кликов снаружи)
   const bubbleCleanups = new Map()
 
-  // uid → 'up' | 'down' — стрелка изменения отношения (анимация 1.5с)
   const attitudeArrows = ref({})
 
-  // Закрыть облако конкретного токена и снять слушатель
   function closeBubble(uid) {
     const m = new Map(dialogBubbles.value)
     m.delete(uid)
@@ -22,7 +15,6 @@ export function useNpcDialog(store) {
     bubbleCleanups.delete(uid)
   }
 
-  // Открыть новый диалог (пустой, в состоянии загрузки). Регистрирует закрытие по клику снаружи.
   function openBubble(uid, heroSrc = null) {
     closeBubble(uid)
     const next = new Map(dialogBubbles.value)
@@ -42,7 +34,6 @@ export function useNpcDialog(store) {
     bubbleCleanups.set(uid, () => clearTimeout(timer))
   }
 
-  // Добавить реплику НПС и снять флаг загрузки
   function addNpcMessage(uid, text, npcScore) {
     const m = new Map(dialogBubbles.value)
     const b = m.get(uid)
@@ -53,7 +44,6 @@ export function useNpcDialog(store) {
     dialogBubbles.value = m
   }
 
-  // Добавить реплику игрока и поставить флаг загрузки (ждём ответа ИИ)
   function addPlayerMessage(uid, text) {
     const m = new Map(dialogBubbles.value)
     const b = m.get(uid)
@@ -62,8 +52,6 @@ export function useNpcDialog(store) {
     dialogBubbles.value = m
   }
 
-  // Тригернуть стрелку изменения отношения на токене (1.5с)
-  // Заменяем весь объект чтобы гарантированно триггернуть Vue-реактивность
   function triggerAttitudeArrow(uid, direction) {
     attitudeArrows.value = { ...attitudeArrows.value, [uid]: direction }
     setTimeout(() => {
@@ -73,7 +61,6 @@ export function useNpcDialog(store) {
     }, 1500)
   }
 
-  // Снимаем все слушатели при размонтировании компонента
   onUnmounted(() => {
     for (const cleanup of bubbleCleanups.values()) cleanup()
     bubbleCleanups.clear()

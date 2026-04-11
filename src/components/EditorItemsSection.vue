@@ -1,50 +1,53 @@
 <template>
   <div class="editor-items">
     <div class="editor-items__layout">
-      <!-- ─── Форма создания предмета ── -->
+      <!-- Форма создания предмета -->
       <div class="editor-items__form-col">
         <h2 class="editor-items__heading">Создать предмет</h2>
 
         <form class="editor-items__form" @submit.prevent="onSubmit">
-          <label class="editor-items__label">
-            Название
+          <!-- Иконка + название в одну строку -->
+          <div class="editor-items__name-row">
+            <IconPickerInput
+              v-model="form.icon"
+              class="editor-items__icon-picker"
+              placeholder="Иконка..."
+            />
             <input
               v-model.trim="form.name"
               type="text"
-              class="editor-items__input"
-              placeholder="Например: Длинный меч"
+              class="editor-items__input editor-items__name-input"
+              placeholder="Название предмета"
               maxlength="60"
               required
             />
-          </label>
+          </div>
 
-          <label class="editor-items__label">
-            Тип
-            <select v-model="form.type" class="editor-items__input">
-              <option v-for="t in ITEM_TYPES" :key="t.value" :value="t.value">
-                {{ t.label }}
-              </option>
-            </select>
-          </label>
-
-          <label class="editor-items__label">
-            Иконка
-            <IconPickerInput
-              v-model="form.icon"
-              placeholder="Начни печатать название: sword, poison…"
-            />
-          </label>
-
-          <label class="editor-items__label">
-            Описание
-            <textarea
-              v-model.trim="form.description"
-              class="editor-items__textarea"
-              placeholder="Краткое описание предмета и его эффектов"
-              rows="3"
-              maxlength="300"
-            />
-          </label>
+          <!-- Выбор свойств -->
+          <div class="editor-items__label">
+            Свойства предмета
+            <p v-if="!traitsStore.traits.length" class="editor-items__traits-empty">
+              Сначала создайте свойства во вкладке «Создание свойств».
+            </p>
+            <div v-else class="editor-items__traits-grid">
+              <button
+                v-for="trait in traitsStore.traits"
+                :key="trait.id"
+                type="button"
+                class="editor-items__trait-chip"
+                :class="{ 'editor-items__trait-chip--selected': form.traitIds.includes(trait.id) }"
+                @click="toggleTrait(trait.id)"
+              >
+                <img
+                  v-if="trait.icon"
+                  :src="gameIconUrl(trait.icon)"
+                  class="editor-items__trait-chip-icon"
+                  alt=""
+                />
+                <span>{{ trait.name }}</span>
+              </button>
+            </div>
+          </div>
 
           <button type="submit" class="editor-items__btn-add" :disabled="!form.name">
             + Добавить предмет
@@ -52,9 +55,9 @@
         </form>
       </div>
 
-      <!-- ─── Список созданных предметов ── -->
+      <!-- Список созданных предметов -->
       <div class="editor-items__list-col">
-        <h2 class="editor-items__heading">Предметы в игре ({{ store.items.length }})</h2>
+        <h2 class="editor-items__heading">Предметы ({{ store.items.length }})</h2>
 
         <p v-if="!store.items.length" class="editor-items__empty">
           Предметов пока нет. Создайте первый слева.
@@ -74,10 +77,24 @@
 
             <div class="editor-items__card-body">
               <span class="editor-items__card-name">{{ item.name }}</span>
-              <span class="editor-items__card-type">{{ labelForType(item.type) }}</span>
-              <span v-if="item.description" class="editor-items__card-desc">{{
-                item.description
-              }}</span>
+              <div class="editor-items__card-traits">
+                <span
+                  v-for="traitId in item.traitIds"
+                  :key="traitId"
+                  class="editor-items__card-trait"
+                >
+                  <img
+                    v-if="traitById(traitId)?.icon"
+                    :src="gameIconUrl(traitById(traitId).icon)"
+                    class="editor-items__card-trait-icon"
+                    alt=""
+                  />
+                  {{ traitById(traitId)?.name ?? '?' }}
+                </span>
+                <span v-if="!item.traitIds?.length" class="editor-items__card-no-traits">
+                  без свойств
+                </span>
+              </div>
             </div>
 
             <button
@@ -98,30 +115,33 @@
   import { ref } from 'vue'
   import IconPickerInput from './IconPickerInput.vue'
   import { useItemsStore } from '../stores/items'
+  import { useTraitsStore } from '../stores/traits'
 
   const store = useItemsStore()
+  const traitsStore = useTraitsStore()
 
-  const ITEM_TYPES = [
-    { value: 'weapon', label: '⚔️ Оружие' },
-    { value: 'armor', label: '🛡 Броня' },
-    { value: 'potion', label: '🧪 Зелье' },
-    { value: 'misc', label: '📦 Разное' },
-  ]
-
-  function labelForType(type) {
-    return ITEM_TYPES.find((t) => t.value === type)?.label ?? type
-  }
-
-  // Formирует ссылку через Iconify API — поддерживает все 4000+ иконок game-icons.net
   function gameIconUrl(slug) {
     return `https://api.iconify.design/game-icons:${slug}.svg`
   }
 
-  const form = ref({ name: '', type: 'weapon', icon: '', description: '' })
+  function traitById(id) {
+    return traitsStore.traits.find((t) => t.id === id)
+  }
+
+  const form = ref({ name: '', icon: '', traitIds: [] })
+
+  function toggleTrait(id) {
+    const idx = form.value.traitIds.indexOf(id)
+    if (idx === -1) {
+      form.value.traitIds.push(id)
+    } else {
+      form.value.traitIds.splice(idx, 1)
+    }
+  }
 
   function onSubmit() {
-    store.addItem({ ...form.value })
-    form.value = { name: '', type: 'weapon', icon: '', description: '' }
+    store.addItem({ ...form.value, traitIds: [...form.value.traitIds] })
+    form.value = { name: '', icon: '', traitIds: [] }
   }
 </script>
 
@@ -134,7 +154,7 @@
 
   .editor-items__layout {
     display: grid;
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 400px 1fr;
     gap: var(--space-8);
     align-items: flex-start;
   }
@@ -146,18 +166,32 @@
     color: var(--color-primary);
   }
 
-  /* ── Форма ── */
-
   .editor-items__form {
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
   }
 
+  .editor-items__name-row {
+    display: flex;
+    gap: var(--space-2);
+    align-items: flex-start;
+  }
+
+  .editor-items__icon-picker {
+    width: 180px;
+    flex-shrink: 0;
+  }
+
+  .editor-items__name-input {
+    flex: 1;
+    height: 40px;
+  }
+
   .editor-items__label {
     display: flex;
     flex-direction: column;
-    gap: var(--space-1);
+    gap: var(--space-2);
     font-size: 12px;
     font-family: var(--font-ui);
     color: var(--color-text-muted);
@@ -173,75 +207,59 @@
     padding: var(--space-2) var(--space-3);
     outline: none;
     transition: border-color var(--transition-fast);
-
-    &:focus {
-      border-color: var(--color-primary);
-    }
   }
 
-  .editor-items__textarea {
-    background: rgb(0 0 0 / 40%);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
+  .editor-items__input:focus {
+    border-color: var(--color-primary);
+  }
+
+  .editor-items__traits-empty {
+    margin: 0;
+    font-size: 12px;
+    color: var(--color-text-muted);
     font-family: var(--font-ui);
-    font-size: 14px;
-    padding: var(--space-2) var(--space-3);
-    outline: none;
-    resize: vertical;
-    transition: border-color var(--transition-fast);
-
-    &:focus {
-      border-color: var(--color-primary);
-    }
   }
 
-  .editor-items__icon-row {
+  .editor-items__traits-grid {
     display: flex;
-    gap: var(--space-2);
+    flex-wrap: wrap;
+    gap: var(--space-1);
+  }
+
+  .editor-items__trait-chip {
+    display: inline-flex;
     align-items: center;
-  }
-
-  .editor-items__icon-row .editor-items__input {
-    flex: 1;
-  }
-
-  .editor-items__icon-preview {
-    width: 40px;
-    height: 40px;
-    flex-shrink: 0;
-    background: rgb(0 0 0 / 40%);
+    gap: 5px;
+    background: rgb(0 0 0 / 35%);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    color: var(--color-text-muted);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition:
+      background var(--transition-fast),
+      border-color var(--transition-fast),
+      color var(--transition-fast);
   }
 
-  .editor-items__icon-img {
-    width: 28px;
-    height: 28px;
+  .editor-items__trait-chip:hover {
+    border-color: #557;
+    color: var(--color-text);
+  }
+
+  .editor-items__trait-chip--selected {
+    background: rgb(200 154 74 / 15%);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+
+  .editor-items__trait-chip-icon {
+    width: 16px;
+    height: 16px;
     object-fit: contain;
     filter: invert(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(0.9);
-  }
-
-  .editor-items__icon-placeholder {
-    font-size: 18px;
-    color: var(--color-text-muted);
-  }
-
-  .editor-items__hint {
-    font-size: 11px;
-    color: var(--color-text-muted);
-
-    a {
-      color: var(--color-primary);
-      text-decoration: none;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
   }
 
   .editor-items__btn-add {
@@ -256,18 +274,16 @@
     cursor: pointer;
     transition: background var(--transition-fast);
     align-self: flex-start;
-
-    &:hover:not(:disabled) {
-      background: var(--color-primary-hover);
-    }
-
-    &:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
   }
 
-  /* ── Список карточек ── */
+  .editor-items__btn-add:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+  }
+
+  .editor-items__btn-add:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 
   .editor-items__list-col {
     min-width: 0;
@@ -289,21 +305,22 @@
 
   .editor-items__card {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: var(--space-3);
     background: rgb(0 0 0 / 30%);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     padding: var(--space-2) var(--space-3);
+    transition: border-color var(--transition-fast);
+  }
 
-    &:hover {
-      border-color: rgb(200 154 74 / 40%);
-    }
+  .editor-items__card:hover {
+    border-color: rgb(200 154 74 / 40%);
   }
 
   .editor-items__card-icon {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
@@ -312,10 +329,22 @@
     border-radius: var(--radius-sm);
   }
 
+  .editor-items__icon-img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    filter: invert(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(0.9);
+  }
+
+  .editor-items__icon-placeholder {
+    font-size: 18px;
+    color: var(--color-text-muted);
+  }
+
   .editor-items__card-body {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--space-1);
     flex: 1;
     min-width: 0;
   }
@@ -324,24 +353,38 @@
     font-family: var(--font-ui);
     font-size: 14px;
     color: var(--color-text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
   }
 
-  .editor-items__card-type {
-    font-size: 11px;
-    color: var(--color-text-muted);
-    font-family: var(--font-ui);
+  .editor-items__card-traits {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
   }
 
-  .editor-items__card-desc {
+  .editor-items__card-trait {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgb(200 154 74 / 10%);
+    border: 1px solid rgb(200 154 74 / 30%);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--color-primary);
+    padding: 2px 6px;
+  }
+
+  .editor-items__card-trait-icon {
+    width: 13px;
+    height: 13px;
+    object-fit: contain;
+    filter: invert(1) sepia(1) saturate(3) hue-rotate(5deg) brightness(0.9);
+  }
+
+  .editor-items__card-no-traits {
+    font-family: var(--font-ui);
     font-size: 11px;
     color: var(--color-text-muted);
-    font-family: var(--font-ui);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .editor-items__card-del {
@@ -354,9 +397,9 @@
     line-height: 1;
     transition: color var(--transition-fast);
     flex-shrink: 0;
+  }
 
-    &:hover {
-      color: var(--color-error);
-    }
+  .editor-items__card-del:hover {
+    color: var(--color-error);
   }
 </style>

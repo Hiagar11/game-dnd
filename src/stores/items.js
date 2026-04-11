@@ -1,5 +1,3 @@
-// Хранилище предметов игры — создаются мастером в редакторе, используются в инвентаре.
-// Хранится локально (localStorage) — серверная персистентность добавляется позже.
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
@@ -19,13 +17,11 @@ function saveToStorage(items) {
 }
 
 export const useItemsStore = defineStore('items', () => {
-  // Список предметов. Элемент: { id, name, type, icon, description }
-  // type: 'weapon' | 'armor' | 'potion' | 'misc'
   const items = ref(loadFromStorage())
 
-  function addItem({ name, type, icon, description }) {
+  function addItem({ name, icon, traitIds }) {
     const id = `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-    items.value.push({ id, name: name.trim(), type, icon, description: description?.trim() ?? '' })
+    items.value.push({ id, name: name.trim(), icon, traitIds: traitIds ?? [] })
     saveToStorage(items.value)
     return id
   }
