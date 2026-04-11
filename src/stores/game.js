@@ -214,6 +214,8 @@ export const useGameStore = defineStore('game', () => {
       col,
       row,
       name: def?.name ?? '',
+      npcName: def?.npcName ?? '',
+      personality: def?.personality ?? '',
       src: def?.src ?? '',
       tokenType: def?.tokenType ?? 'npc',
       attitude: def?.attitude ?? 'neutral',

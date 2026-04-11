@@ -2,8 +2,8 @@
   <PopupShell :visible="visible" :aria-label="popupTitle" @close="onCancel">
     <h2 class="token-edit-popup__title">{{ popupTitle }}</h2>
 
-    <!-- Табы — только для placed-токена на карте -->
-    <div v-if="isPlacedMode" class="token-edit-popup__tabs">
+    <!-- Табы — для placed-токена на карте и для шаблонов -->
+    <div v-if="isEditMode || !isPlacedMode" class="token-edit-popup__tabs">
       <button
         v-for="tab in TABS"
         :key="tab.id"
@@ -21,7 +21,7 @@
 
       <div class="token-edit-popup__fields">
         <label class="token-edit-popup__label">
-          Название
+          Класс / Тип
           <input
             v-model.trim="form.name"
             type="text"
@@ -78,17 +78,85 @@
     </div>
 
     <!-- Панель: Инвентарь -->
-    <div v-if="isPlacedMode && activeTab === 'inventory'" class="token-edit-popup__panel-empty">
+    <div v-if="activeTab === 'inventory'" class="token-edit-popup__panel-empty">
       <PhBackpack :size="40" weight="duotone" class="token-edit-popup__panel-empty-icon" />
       <p class="token-edit-popup__panel-empty-text">Инвентарь пока не реализован</p>
       <p class="token-edit-popup__panel-empty-hint">Здесь будут предметы, зелья и снаряжение</p>
     </div>
 
     <!-- Панель: Способности -->
-    <div v-if="isPlacedMode && activeTab === 'abilities'" class="token-edit-popup__panel-empty">
+    <div v-if="activeTab === 'abilities'" class="token-edit-popup__panel-empty">
       <PhMagicWand :size="40" weight="duotone" class="token-edit-popup__panel-empty-icon" />
       <p class="token-edit-popup__panel-empty-text">Способности пока не реализованы</p>
       <p class="token-edit-popup__panel-empty-hint">Здесь будут активные и пассивные умения</p>
+    </div>
+
+    <!-- Панель: Личность ИИ — только для НПС -->
+    <div
+      v-if="activeTab === 'personality' && props.tokenType === 'npc'"
+      class="token-edit-popup__panel-personality"
+    >
+      <div class="token-edit-popup__personality-header">
+        <PhRobot :size="18" weight="duotone" class="token-edit-popup__personality-icon" />
+        <span class="token-edit-popup__personality-title">Личность для ИИ-диалога</span>
+        <div class="token-edit-popup__personality-name">
+          <input
+            v-model.trim="form.npcName"
+            type="text"
+            class="token-edit-popup__input token-edit-popup__input--name"
+            placeholder="Личное имя НПС..."
+            maxlength="40"
+          />
+          <button
+            type="button"
+            class="token-edit-popup__random-btn"
+            title="Случайное имя"
+            @click="randomizeName"
+          >
+            <PhArrowsClockwise :size="14" weight="bold" />
+          </button>
+        </div>
+      </div>
+
+      <div class="token-edit-popup__personality-body">
+        <!-- Левая колонка: textarea + счётчик -->
+        <div class="token-edit-popup__personality-left">
+          <textarea
+            ref="personalityTextarea"
+            v-model="form.personality"
+            class="token-edit-popup__textarea"
+            placeholder="Опиши характер, манеру речи, что знает персонаж..."
+            maxlength="500"
+          />
+          <p class="token-edit-popup__personality-counter">{{ form.personality.length }} / 500</p>
+        </div>
+
+        <!-- Правая колонка: группы тегов -->
+        <div class="token-edit-popup__personality-tags">
+          <div
+            v-for="group in PERSONALITY_TAGS"
+            :key="group.id"
+            class="token-edit-popup__tag-group"
+          >
+            <p class="token-edit-popup__tag-group-label" :style="{ color: group.color }">
+              {{ group.label }}
+            </p>
+            <div class="token-edit-popup__tag-row">
+              <button
+                v-for="tag in group.tags"
+                :key="tag.phrase"
+                type="button"
+                class="token-edit-popup__tag"
+                :class="{ 'token-edit-popup__tag--active': isTagActive(tag.phrase) }"
+                :style="{ '--tag-color': group.color }"
+                @click="toggleTag(tag.phrase)"
+              >
+                {{ tag.label }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="token-edit-popup__footer">
@@ -112,7 +180,7 @@
         Отмена
       </button>
       <button
-        v-if="activeTab === 'stats'"
+        v-if="activeTab === 'stats' || activeTab === 'personality'"
         class="token-edit-popup__btn token-edit-popup__btn--save"
         :disabled="!canSave"
         @mouseenter="playHover"
@@ -144,6 +212,8 @@
     PhBackpack,
     PhMagicWand,
     PhScroll,
+    PhRobot,
+    PhArrowsClockwise,
   } from '@phosphor-icons/vue'
   import { useSocket } from '../composables/useSocket'
   import { useSound } from '../composables/useSound'
@@ -170,11 +240,14 @@
   const saveError = ref('')
   const activeTab = ref('stats')
 
-  const TABS = [
+  const TABS = computed(() => [
     { id: 'stats', label: 'Характеристики', icon: PhScroll },
     { id: 'inventory', label: 'Инвентарь', icon: PhBackpack },
     { id: 'abilities', label: 'Способности', icon: PhMagicWand },
-  ]
+    ...(props.tokenType === 'npc'
+      ? [{ id: 'personality', label: 'Личность ИИ', icon: PhRobot }]
+      : []),
+  ])
 
   // Блокировка курсора мастера у зрителей пока попап открыт.
   // inject(..., null) — безопасный fallback: если нет GameView-провайдера (напр. в редакторе) — ничего не делаем.
@@ -201,9 +274,192 @@
   )
 
   const DEFAULT_STATS = { strength: 0, agility: 0, intellect: 0, charisma: 0 }
-  const form = ref({ name: '', attitude: 'neutral', ...DEFAULT_STATS })
+  const form = ref({
+    name: '',
+    npcName: '',
+    attitude: 'neutral',
+    personality: '',
+    ...DEFAULT_STATS,
+  })
 
-  // Варианты отношения — видны только для НПС-шаблонов
+  // ─── Теги личности ────────────────────────────────────────────────────────
+  // Каждая группа — характеристика; tag.phrase добавляется в textarea при клике.
+  const PERSONALITY_TAGS = [
+    {
+      id: 'aggression',
+      label: '⚔ Агрессивность',
+      color: '#f87171',
+      tags: [
+        { label: 'Миролюбивый', phrase: 'Избегает конфликтов, никогда не начинает драку первым.' },
+        { label: 'Осторожный', phrase: 'Насторожён, но не агрессивен.' },
+        { label: 'Вспыльчивый', phrase: 'Легко выходит из себя.' },
+        { label: 'Воинственный', phrase: 'Жаждет битвы, провоцирует соперников.' },
+      ],
+    },
+    {
+      id: 'honesty',
+      label: '🔍 Честность',
+      color: '#60a5fa',
+      tags: [
+        { label: 'Кристально честный', phrase: 'Никогда не лжёт, даже во вред себе.' },
+        { label: 'Дипломатичный', phrase: 'Говорит правду, но осторожно подбирает слова.' },
+        { label: 'Хитрый', phrase: 'Умело уводит разговор в сторону, избегая прямых ответов.' },
+        { label: 'Лжец', phrase: 'Врёт непринуждённо и с удовольствием.' },
+      ],
+    },
+    {
+      id: 'speech',
+      label: '💬 Речь',
+      color: '#a78bfa',
+      tags: [
+        { label: 'Немногословный', phrase: 'Говорит коротко, только по делу.' },
+        { label: 'Цветистый', phrase: 'Любит сложные обороты, украшает речь метафорами.' },
+        { label: 'Уличный', phrase: 'Говорит грубо, с жаргоном.' },
+        { label: 'Велеречивый', phrase: 'Не может остановиться — отвечает длинными монологами.' },
+        { label: 'Шёпот', phrase: 'Говорит тихо и осторожно, будто вокруг враги.' },
+      ],
+    },
+    {
+      id: 'humor',
+      label: '😄 Юмор',
+      color: '#fbbf24',
+      tags: [
+        { label: 'Серьёзный', phrase: 'Лишён чувства юмора, воспринимает всё буквально.' },
+        { label: 'Саркастичный', phrase: 'Часто говорит с иронией и сарказмом.' },
+        { label: 'Балагур', phrase: 'Любит шутки, прибаутки и каламбуры.' },
+        { label: 'Чёрный юмор', phrase: 'Шутит о смерти и трагедиях без смущения.' },
+      ],
+    },
+    {
+      id: 'flirt',
+      label: '💘 Флирт',
+      color: '#f472b6',
+      tags: [
+        { label: 'Холодный', phrase: 'Равнодушен к лести и заигрываниям.' },
+        { label: 'Застенчивый', phrase: 'Краснеет и теряется от комплиментов.' },
+        { label: 'Кокетливый', phrase: 'Любит намекать и флиртовать.' },
+        { label: 'Обольститель', phrase: 'Виртуозно флиртует, умеет очаровывать.' },
+      ],
+    },
+    {
+      id: 'trust',
+      label: '🤝 Доверие',
+      color: '#34d399',
+      tags: [
+        { label: 'Параноик', phrase: 'Не доверяет никому, видит опасность в каждом.' },
+        { label: 'Осмотрительный', phrase: 'Доверяет, но сначала проверяет.' },
+        { label: 'Открытый', phrase: 'Легко сходится с людьми, доверяет незнакомцам.' },
+        { label: 'Наивный', phrase: 'Верит всему на слово, легко обмануть.' },
+      ],
+    },
+    {
+      id: 'knowledge',
+      label: '📚 Знания',
+      color: '#fb923c',
+      tags: [
+        { label: 'Невежда', phrase: 'Знает лишь своё ремесло, в остальном тёмен.' },
+        { label: 'Местный', phrase: 'Хорошо знает этот город и его слухи.' },
+        { label: 'Эрудит', phrase: 'Образован, знает историю, магию и географию.' },
+        { label: 'Шпион', phrase: 'Располагает тайными сведениями, но не спешит делиться.' },
+      ],
+    },
+    {
+      id: 'motive',
+      label: '🎯 Мотив',
+      color: '#e2e8f0',
+      tags: [
+        { label: 'Корыстный', phrase: 'Думает только о выгоде и деньгах.' },
+        { label: 'Мститель', phrase: 'Одержим местью — помнит каждую обиду.' },
+        { label: 'Защитник', phrase: 'Готов умереть ради тех, кого любит.' },
+        { label: 'Нигилист', phrase: 'Потерял смысл жизни, ему всё равно.' },
+        { label: 'Авантюрист', phrase: 'Любит риск и приключения ради самого процесса.' },
+      ],
+    },
+  ]
+
+  const personalityTextarea = ref(null)
+
+  // Случайные фэнтезийные имена для НПС
+  const NPC_NAMES = [
+    'Арторик',
+    'Брандус',
+    'Вельгар',
+    'Гардимар',
+    'Дравен',
+    'Ерсика',
+    'Жанар',
+    'Зорин',
+    'Ирендир',
+    'Кастрон',
+    'Лунара',
+    'Малинда',
+    'Наера',
+    'Оринда',
+    'Палдрик',
+    'Равенна',
+    'Сальдур',
+    'Талана',
+    'Урван',
+    'Фалкрин',
+    'Хелена',
+    'Цветана',
+    'Шалира',
+    'Элдрик',
+    'Борин',
+    'Громмаш',
+    'Дургал',
+    'Жаргус',
+    'Крорн',
+    'Мурдак',
+    'Трогдар',
+    'Ульрик',
+    'Амара',
+    'Бенда',
+    'Галюна',
+    'Дария',
+    'Инара',
+    'Кира',
+    'Лилиа',
+    'Мира',
+    'Нари',
+    'Ольга',
+    'Рейна',
+    'Сильва',
+    'Таринья',
+    'Уна',
+    'Фарида',
+    'Халееда',
+    'Шара',
+    'Эвныя',
+  ]
+
+  function randomizeName() {
+    const pool = NPC_NAMES.filter((n) => n !== form.value.npcName)
+    form.value.npcName = pool[Math.floor(Math.random() * pool.length)]
+  }
+
+  // Тег считается активным если его фраза есть в тексте
+  function isTagActive(phrase) {
+    return form.value.personality.includes(phrase)
+  }
+
+  // Клик по тегу: добавляет фразу в конец или убирает её из текста
+  function toggleTag(phrase) {
+    if (isTagActive(phrase)) {
+      // Убираем фразу — и лишний пробел рядом
+      form.value.personality = form.value.personality
+        .replace(` ${phrase}`, '')
+        .replace(`${phrase} `, '')
+        .replace(phrase, '')
+        .trim()
+    } else {
+      const current = form.value.personality.trim()
+      const separator = current.length > 0 ? ' ' : ''
+      const next = `${current}${separator}${phrase}`
+      // Не превышаем лимит в 500 символов
+      if (next.length <= 500) form.value.personality = next
+    }
+  }
   const ATTITUDE_OPTIONS = [
     { value: 'neutral', label: 'Нейтральное' },
     { value: 'friendly', label: 'Дружественное' },
@@ -236,10 +492,22 @@
     if (isPlacedMode.value) {
       const token = store.placedTokens.find((t) => t.uid === props.placedUid)
       if (token) {
-        const { name, src, strength, agility, intellect, charisma, attitude } = token
+        const {
+          name,
+          npcName,
+          src,
+          strength,
+          agility,
+          intellect,
+          charisma,
+          attitude,
+          personality,
+        } = token
         form.value = {
           name,
+          npcName: npcName ?? '',
           attitude: attitude ?? 'neutral',
+          personality: personality ?? '',
           strength,
           agility,
           intellect,
@@ -250,10 +518,22 @@
     } else if (isEditMode.value) {
       const token = tokensStore.tokens.find((t) => t.id === props.tokenId)
       if (token) {
-        const { name, src, strength, agility, intellect, charisma, attitude } = token
+        const {
+          name,
+          npcName,
+          src,
+          strength,
+          agility,
+          intellect,
+          charisma,
+          attitude,
+          personality,
+        } = token
         form.value = {
           name,
+          npcName: npcName ?? '',
           attitude: attitude ?? 'neutral',
+          personality: personality ?? '',
           strength,
           agility,
           intellect,
@@ -264,7 +544,9 @@
     } else {
       form.value = {
         name: props.defaultName,
+        npcName: '',
         attitude: props.defaultAttitude ?? 'neutral',
+        personality: '',
         ...DEFAULT_STATS,
       }
       previewSrc.value = null
@@ -299,11 +581,13 @@
     saving.value = true
     saveError.value = ''
     try {
-      const { name, strength, agility, intellect, charisma } = form.value
+      const { name, npcName, strength, agility, intellect, charisma } = form.value
       if (isPlacedMode.value) {
         store.editPlacedToken(props.placedUid, {
           name,
+          npcName,
           attitude: form.value.attitude,
+          personality: form.value.personality,
           strength,
           agility,
           intellect,
@@ -312,7 +596,9 @@
       } else if (isEditMode.value) {
         await tokensStore.editToken(props.tokenId, {
           name,
+          npcName,
           attitude: form.value.attitude,
+          personality: form.value.personality,
           strength,
           agility,
           intellect,
@@ -322,8 +608,10 @@
         const fd = new FormData()
         fd.append('image', fileRef.value)
         fd.append('name', name)
+        fd.append('npcName', npcName ?? '')
         fd.append('tokenType', props.tokenType)
         fd.append('attitude', form.value.attitude)
+        fd.append('personality', form.value.personality)
         fd.append('strength', strength)
         fd.append('agility', agility)
         fd.append('intellect', intellect)
@@ -615,6 +903,165 @@
     &--active {
       color: var(--color-primary);
       border-bottom-color: var(--color-primary);
+    }
+  }
+
+  // ─── Панель личности ИИ ───────────────────────────────────────────
+  .token-edit-popup__panel-personality {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    padding: var(--space-2) 0;
+  }
+
+  .token-edit-popup__personality-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .token-edit-popup__personality-name {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    margin-left: auto;
+  }
+
+  .token-edit-popup__input--name {
+    width: 160px;
+    padding: var(--space-1) var(--space-3);
+    font-size: 13px;
+  }
+
+  .token-edit-popup__random-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    border: 1px solid rgb(255 255 255 / 12%);
+    background: rgb(255 255 255 / 5%);
+    color: var(--color-text-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+
+    &:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+      background: rgb(from var(--color-primary) r g b / 10%);
+    }
+
+    &:active {
+      transform: rotate(180deg);
+    }
+  }
+
+  .token-edit-popup__personality-icon {
+    color: var(--color-primary);
+    flex-shrink: 0;
+  }
+
+  .token-edit-popup__personality-title {
+    font-size: 15px;
+    font-family: var(--font-ui);
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  // Двухколоночная компоновка: textarea слева, теги справа
+  .token-edit-popup__personality-body {
+    display: grid;
+    grid-template-columns: 1fr 260px;
+    gap: var(--space-4);
+    align-items: start;
+  }
+
+  .token-edit-popup__personality-left {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .token-edit-popup__textarea {
+    @include form-input(rgb(255 255 255 / 6%), 13px);
+
+    resize: none;
+    height: 220px;
+    line-height: 1.6;
+    font-family: var(--font-ui);
+    white-space: pre-wrap;
+  }
+
+  .token-edit-popup__personality-counter {
+    margin: 0;
+    font-size: 11px;
+    font-family: var(--font-ui);
+    color: rgb(255 255 255 / 25%);
+    text-align: right;
+  }
+
+  // Правая колонка — прокручиваемый список групп тегов
+  .token-edit-popup__personality-tags {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    max-height: 240px;
+    overflow-y: auto;
+    padding-right: var(--space-1);
+
+    // Тонкий скроллбар
+    scrollbar-width: thin;
+    scrollbar-color: rgb(255 255 255 / 15%) transparent;
+  }
+
+  .token-edit-popup__tag-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .token-edit-popup__tag-group-label {
+    margin: 0;
+    font-size: 10px;
+    font-family: var(--font-ui);
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  .token-edit-popup__tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .token-edit-popup__tag {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid rgb(from var(--tag-color) r g b / 30%);
+    background: rgb(from var(--tag-color) r g b / 7%);
+    color: rgb(from var(--tag-color) r g b / 70%);
+    font-size: 11px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    line-height: 1;
+
+    &:hover {
+      border-color: rgb(from var(--tag-color) r g b / 60%);
+      color: var(--tag-color);
+      background: rgb(from var(--tag-color) r g b / 15%);
+    }
+
+    &--active {
+      border-color: var(--tag-color);
+      background: rgb(from var(--tag-color) r g b / 20%);
+      color: var(--tag-color);
     }
   }
 

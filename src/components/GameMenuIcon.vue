@@ -8,8 +8,8 @@
       :alt="activeToken.name"
       class="game-menu-icon__img"
     />
-    <span v-if="activeToken" class="game-menu-icon__name">
-      {{ activeToken.name }}
+    <span v-if="activeToken?.npcName" class="game-menu-icon__name">
+      {{ activeToken.npcName }}
     </span>
   </div>
 </template>
@@ -27,12 +27,12 @@
   // Если ничего не выбрано на карте — показываем выбранный в меню.
   const activeToken = computed(() => {
     if (gameStore.selectedPlacedUid) {
-      // Находим экземпляр на карте по uid
       const placed = gameStore.placedTokens.find((t) => t.uid === gameStore.selectedPlacedUid)
-      // По tokenId находим определение (src, name)
-      return placed ? tokensStore.tokens.find((t) => t.id === placed.tokenId) : null
+      if (!placed) return null
+      const def = tokensStore.tokens.find((t) => t.id === placed.tokenId)
+      // src берём из шаблона, npcName — из placed-токена (может быть отредактирован)
+      return def ? { ...def, npcName: placed.npcName || def.npcName } : null
     }
-
     return tokensStore.selectedToken
   })
 </script>

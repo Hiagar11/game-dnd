@@ -21,14 +21,25 @@ export const useTokensStore = defineStore('tokens', () => {
       selectedToken.value?.id === id ? null : (tokens.value.find((t) => t.id === id) ?? null)
   }
 
-  // Сервер возвращает { id, name, tokenType, imageUrl, stats: { strength, agility, intellect, charisma }, attitude }
-  // Компоненты ожидают плоский объект { id, name, tokenType, attitude, src, strength, ... }
-  function normalizeToken({ id, name, tokenType, imageUrl, stats, attitude }) {
+  // Сервер возвращает { id, name, npcName, tokenType, imageUrl, stats, attitude, personality }
+  // Компоненты ожидают плоский объект { id, name, npcName, tokenType, attitude, personality, src, strength, ... }
+  function normalizeToken({
+    id,
+    name,
+    npcName,
+    tokenType,
+    imageUrl,
+    stats,
+    attitude,
+    personality,
+  }) {
     return {
       id,
       name,
+      npcName: npcName ?? '',
       tokenType: tokenType ?? 'npc',
       attitude: attitude ?? 'neutral',
+      personality: personality ?? '',
       src: imageUrl,
       ...stats,
     }

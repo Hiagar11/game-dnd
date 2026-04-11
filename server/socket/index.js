@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken'
 import Scenario from '../models/Scenario.js'
 import Token from '../models/Token.js'
+import { askNpc } from '../ai/npcChat.js'
 
 // ─── Socket.io обработчики событий ───────────────────────────────────────────
 // Эта функция принимает io (сервер Socket.io) и навешивает все обработчики.
@@ -456,6 +457,44 @@ export function setupSocket(io) {
         })
       } catch {
         ackError(ack, 'Ошибка сервера')
+      }
+    })
+
+    // ─── Диалог с НПС через ИИ ────────────────────────────────────────────────
+    // Событие: npc:talk { npcUid, tokenId, scenarioId, playerMessage }
+    // Сервер запрашивает OpenAI и возвращает ответ обратно только инициатору.
+    // Если ИИ решил изменить отношение — бродкастим token:attitude всей комнате сценария.
+    socket.on('npc:talk', async ({ npcUid, tokenId, scenarioId, playerMessage }) => {
+      try {
+        // Получаем имя и личность НПС из базы
+        const tokenDoc = tokenId
+          ? await Token.findById(tokenId).select('name npcName personality').lean()
+          : null
+
+        const npcName = tokenDoc?.npcName?.trim() || tokenDoc?.name || 'Незнакомец'
+        const personality = tokenDoc?.personality ?? ''
+        const message = typeof playerMessage === 'string' ? playerMessage.slice(0, 200) : 'Привет!'
+
+        const { reply, attitudeChange } = await askNpc({
+          npcName,
+          personality,
+          playerMessage: message,
+        })
+
+        // Отвечаем только запросившему сокету (текст + возможное изменение отношения)
+        socket.emit('npc:reply', { npcUid, text: reply, attitudeChange })
+
+        // Если ИИ изменил отношение — бродкастим всей комнате сценария
+        if (attitudeChange && scenarioId) {
+          io.to(String(scenarioId)).emit('token:attitude', {
+            uid: npcUid,
+            attitude: attitudeChange,
+          })
+        }
+      } catch (err) {
+        console.error('[npc:talk] ошибка:', err.message)
+        // Фоллбэк — простая реплика без AI
+        socket.emit('npc:reply', { npcUid, text: 'Приветствую, путник.', attitudeChange: null })
       }
     })
 

@@ -144,6 +144,12 @@ export function useViewerSync(socket) {
     socket.on('game:token:selected', ({ uid }) => {
       heroesStore.adminSelectedUid = uid ?? null
     })
+
+    // ИИ изменил отношение НПС к героям во время диалога
+    socket.on('token:attitude', ({ uid, attitude }) => {
+      const t = useGameStore().placedTokens.find((p) => p.uid === uid)
+      if (t && ['hostile', 'friendly', 'neutral'].includes(attitude)) t.attitude = attitude
+    })
   }
 
   // ── Отписка (при размонтировании ViewerView) ──────────────────────────────
@@ -158,6 +164,7 @@ export function useViewerSync(socket) {
     socket.off('game:cursor:icon')
     socket.off('game:heroes:updated')
     socket.off('game:token:selected')
+    socket.off('token:attitude')
   }
 
   return {

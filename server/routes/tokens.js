@@ -54,7 +54,17 @@ router.post('/', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: 'Изображение обязательно' })
   }
 
-  const { name, strength, agility, intellect, charisma, tokenType, attitude } = req.body
+  const {
+    name,
+    npcName,
+    strength,
+    agility,
+    intellect,
+    charisma,
+    tokenType,
+    attitude,
+    personality,
+  } = req.body
 
   if (!name?.trim()) {
     // Удаляем загруженный файл, если имя не передано
@@ -72,6 +82,8 @@ router.post('/', upload.single('image'), async (req, res) => {
       imagePath,
       tokenType: tokenType === 'hero' ? 'hero' : 'npc',
       attitude: ['neutral', 'friendly', 'hostile'].includes(attitude) ? attitude : 'neutral',
+      personality: typeof personality === 'string' ? personality.slice(0, 500) : '',
+      npcName: typeof npcName === 'string' ? npcName.trim().slice(0, 40) : '',
       stats: {
         strength: Number(strength) || 0,
         agility: Number(agility) || 0,
@@ -138,6 +150,12 @@ router.put('/:id', async (req, res) => {
     }
     if (attitude !== undefined && ['neutral', 'friendly', 'hostile'].includes(attitude)) {
       token.attitude = attitude
+    }
+    if (req.body.personality !== undefined) {
+      token.personality = String(req.body.personality).slice(0, 500)
+    }
+    if (req.body.npcName !== undefined) {
+      token.npcName = String(req.body.npcName).trim().slice(0, 40)
     }
 
     // DM может вручную скорректировать уровень или обнулить XP (например, для быстрого теста)
@@ -229,8 +247,10 @@ function formatToken(token, req) {
   return {
     id: token._id,
     name: token.name,
+    npcName: token.npcName ?? '',
     tokenType: token.tokenType ?? 'npc',
     attitude: token.attitude ?? 'neutral',
+    personality: token.personality ?? '',
     imageUrl: `${req.protocol}://${req.get('host')}/${token.imagePath}`,
     stats: token.stats,
     xp: token.xp ?? 0,

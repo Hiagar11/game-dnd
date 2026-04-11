@@ -82,5 +82,7 @@ export function mapServerToken(serverToken, clientTokens) {
         (def?.strength ?? tokenObj?.stats?.strength ?? 0) * 2 +
         (def?.agility ?? tokenObj?.stats?.agility ?? 0),
     actionPoints: serverToken.actionPoints ?? 4,
+    npcName: def?.npcName ?? tokenObj?.npcName ?? '',
+    personality: def?.personality ?? tokenObj?.personality ?? '',
   }
 }

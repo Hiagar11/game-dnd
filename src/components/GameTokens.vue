@@ -723,8 +723,32 @@
       closeContextMenu()
     }
 
-    // НПС говорит привет
-    showDialogBubble(npc.uid, 'Привет!')
+    // Показываем индикатор "печатает..." пока ИИ думает
+    showDialogBubble(npc.uid, '...')
+
+    const socket = getSocket()
+    if (socket) {
+      const scenarioId = String(store.currentScenario?.id ?? '')
+      // Отправляем запрос к ИИ через сервер
+      socket.emit('npc:talk', {
+        npcUid: npc.uid,
+        tokenId: npc.tokenId ?? null,
+        scenarioId,
+        playerMessage: 'Привет!',
+      })
+
+      // Один раз ловим ответ для этого конкретного НПС
+      function onReply({ npcUid, text, attitudeChange }) {
+        if (npcUid !== npc.uid) return
+        socket.off('npc:reply', onReply)
+        showDialogBubble(npc.uid, text)
+        // Применяем смену отношения к placed-токену (цвет и поведение изменятся автоматически)
+        if (attitudeChange && ['hostile', 'friendly', 'neutral'].includes(attitudeChange)) {
+          store.editPlacedToken(npc.uid, { attitude: attitudeChange })
+        }
+      }
+      socket.on('npc:reply', onReply)
+    }
   }
 
   // Герой идёт в ближайшую ячейку рядом с НПС и после этого появляется значок сстычки мечей.
