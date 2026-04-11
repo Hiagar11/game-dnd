@@ -2,7 +2,21 @@
   <PopupShell :visible="visible" :aria-label="popupTitle" @close="onCancel">
     <h2 class="token-edit-popup__title">{{ popupTitle }}</h2>
 
-    <div class="token-edit-popup__body">
+    <!-- Табы — только для placed-токена на карте -->
+    <div v-if="isPlacedMode" class="token-edit-popup__tabs">
+      <button
+        v-for="tab in TABS"
+        :key="tab.id"
+        class="token-edit-popup__tab"
+        :class="{ 'token-edit-popup__tab--active': activeTab === tab.id }"
+        @click="activeTab = tab.id"
+      >
+        <component :is="tab.icon" :size="13" weight="fill" />
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <div v-show="activeTab === 'stats'" class="token-edit-popup__body">
       <TokenPreviewPicker :src="previewSrc" :readonly="isEditMode" @file="onFile" />
 
       <div class="token-edit-popup__fields">
@@ -40,12 +54,46 @@
         </label>
 
         <TokenStatsGrid v-model="form" />
+
+        <!-- Шкала здоровья -->
+        <div class="token-edit-popup__hp">
+          <div class="token-edit-popup__hp-header">
+            <PhHeart :size="14" weight="fill" class="token-edit-popup__hp-icon" />
+            <span class="token-edit-popup__hp-label">Здоровье</span>
+            <span class="token-edit-popup__hp-value">
+              <template v-if="isPlacedMode">
+                <b>{{ placedHp }}</b> / {{ placedMaxHp }}
+              </template>
+              <template v-else> {{ formulaMaxHp }} (макс.) </template>
+            </span>
+          </div>
+          <div class="token-edit-popup__hp-bar">
+            <div
+              class="token-edit-popup__hp-fill"
+              :style="{ width: isPlacedMode ? `${placedHpPercent}%` : '100%' }"
+            />
+          </div>
+        </div>
       </div>
+    </div>
+
+    <!-- Панель: Инвентарь -->
+    <div v-if="isPlacedMode && activeTab === 'inventory'" class="token-edit-popup__panel-empty">
+      <PhBackpack :size="40" weight="duotone" class="token-edit-popup__panel-empty-icon" />
+      <p class="token-edit-popup__panel-empty-text">Инвентарь пока не реализован</p>
+      <p class="token-edit-popup__panel-empty-hint">Здесь будут предметы, зелья и снаряжение</p>
+    </div>
+
+    <!-- Панель: Способности -->
+    <div v-if="isPlacedMode && activeTab === 'abilities'" class="token-edit-popup__panel-empty">
+      <PhMagicWand :size="40" weight="duotone" class="token-edit-popup__panel-empty-icon" />
+      <p class="token-edit-popup__panel-empty-text">Способности пока не реализованы</p>
+      <p class="token-edit-popup__panel-empty-hint">Здесь будут активные и пассивные умения</p>
     </div>
 
     <div class="token-edit-popup__footer">
       <button
-        v-if="isEditMode"
+        v-if="isEditMode && activeTab === 'stats'"
         class="token-edit-popup__btn token-edit-popup__btn--delete"
         :disabled="saving"
         @mouseenter="playHover"
@@ -64,6 +112,7 @@
         Отмена
       </button>
       <button
+        v-if="activeTab === 'stats'"
         class="token-edit-popup__btn token-edit-popup__btn--save"
         :disabled="!canSave"
         @mouseenter="playHover"
@@ -87,7 +136,15 @@
   import PopupShell from './PopupShell.vue'
   import TokenPreviewPicker from './TokenPreviewPicker.vue'
   import TokenStatsGrid from './TokenStatsGrid.vue'
-  import { PhTrash, PhX, PhFloppyDisk } from '@phosphor-icons/vue'
+  import {
+    PhTrash,
+    PhX,
+    PhFloppyDisk,
+    PhHeart,
+    PhBackpack,
+    PhMagicWand,
+    PhScroll,
+  } from '@phosphor-icons/vue'
   import { useSocket } from '../composables/useSocket'
   import { useSound } from '../composables/useSound'
 
@@ -111,6 +168,13 @@
   const { playHover, playClick } = useSound()
   const saving = ref(false)
   const saveError = ref('')
+  const activeTab = ref('stats')
+
+  const TABS = [
+    { id: 'stats', label: 'Характеристики', icon: PhScroll },
+    { id: 'inventory', label: 'Инвентарь', icon: PhBackpack },
+    { id: 'abilities', label: 'Способности', icon: PhMagicWand },
+  ]
 
   // Блокировка курсора мастера у зрителей пока попап открыт.
   // inject(..., null) — безопасный fallback: если нет GameView-провайдера (напр. в редакторе) — ничего не делаем.
@@ -168,6 +232,7 @@
 
   function resetForm() {
     saveError.value = ''
+    activeTab.value = 'stats'
     if (isPlacedMode.value) {
       const token = store.placedTokens.find((t) => t.uid === props.placedUid)
       if (token) {
@@ -206,6 +271,21 @@
       fileRef.value = null
     }
   }
+
+  // Шкала HP: для placed-режима читаем из стора, для шаблона — вычисляем по формуле
+  const formulaMaxHp = computed(
+    () => 10 + (form.value.strength ?? 0) * 2 + (form.value.agility ?? 0)
+  )
+  const placedToken = computed(() =>
+    isPlacedMode.value ? store.placedTokens.find((t) => t.uid === props.placedUid) : null
+  )
+  const placedHp = computed(() => placedToken.value?.hp ?? formulaMaxHp.value)
+  const placedMaxHp = computed(() => placedToken.value?.maxHp ?? formulaMaxHp.value)
+  const placedHpPercent = computed(() =>
+    placedMaxHp.value > 0
+      ? Math.max(0, Math.min(100, (placedHp.value / placedMaxHp.value) * 100))
+      : 100
+  )
 
   function onFile(file) {
     if (previewSrc.value?.startsWith('blob:')) URL.revokeObjectURL(previewSrc.value)
@@ -442,6 +522,129 @@
     color: var(--color-error);
     font-size: 13px;
     text-align: center;
+  }
+
+  // ─── Шкала здоровья ───────────────────────────────────────────────
+  .token-edit-popup__hp {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .token-edit-popup__hp-header {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+
+  .token-edit-popup__hp-icon {
+    color: #f87171;
+    flex-shrink: 0;
+  }
+
+  .token-edit-popup__hp-label {
+    font-size: 13px;
+    color: var(--color-text-muted);
+    font-family: var(--font-ui);
+  }
+
+  .token-edit-popup__hp-value {
+    margin-left: auto;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgb(255 255 255 / 80%);
+    font-family: var(--font-ui);
+
+    b {
+      color: #f87171;
+      font-size: 16px;
+    }
+  }
+
+  .token-edit-popup__hp-bar {
+    width: 100%;
+    height: 7px;
+    background: rgb(255 255 255 / 10%);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .token-edit-popup__hp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ef4444, #f87171);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+
+  .token-edit-popup__hp-hint {
+    margin: 0;
+    font-size: 11px;
+    color: rgb(255 255 255 / 25%);
+    font-family: var(--font-ui);
+  }
+
+  // ─── Табы ─────────────────────────────────────────────────────────
+  .token-edit-popup__tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid rgb(255 255 255 / 8%);
+    margin-bottom: var(--space-4);
+  }
+
+  .token-edit-popup__tab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-4);
+    border: none;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition:
+      color 150ms ease,
+      border-color 150ms ease;
+    margin-bottom: -1px;
+
+    &:hover {
+      color: var(--color-text);
+    }
+
+    &--active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+  }
+
+  // ─── Пустые панели (инвентарь / способности) ─────────────────────
+  .token-edit-popup__panel-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-3);
+    padding: var(--space-8) var(--space-4);
+    min-height: 180px;
+  }
+
+  .token-edit-popup__panel-empty-icon {
+    color: rgb(255 255 255 / 15%);
+  }
+
+  .token-edit-popup__panel-empty-text {
+    margin: 0;
+    font-size: 14px;
+    font-family: var(--font-ui);
+    color: rgb(255 255 255 / 40%);
+  }
+
+  .token-edit-popup__panel-empty-hint {
+    margin: 0;
+    font-size: 12px;
+    font-family: var(--font-ui);
+    color: rgb(255 255 255 / 20%);
   }
 
   @keyframes token-spin {

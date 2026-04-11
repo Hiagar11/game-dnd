@@ -40,7 +40,7 @@
           <GameWallPainter :width="mapSize.width" :height="mapSize.height" />
         </div>
 
-        <GameMenu editor-mode>
+        <GameMenu editor-mode :scenario-mode="props.scenarioMode">
           <template #right-panel>
             <div class="level-save">
               <button
@@ -96,7 +96,11 @@
   import LevelSavePopup from './LevelSavePopup.vue'
   import LevelPickerList from './LevelPickerList.vue'
 
-  const props = defineProps({ autoLoadScenario: { type: Object, default: null } })
+  const props = defineProps({
+    autoLoadScenario: { type: Object, default: null },
+    // scenarioMode: true — открыто из редактора сценариев (редактирование дверей, только системные токены)
+    scenarioMode: { type: Boolean, default: false },
+  })
   const emit = defineEmits(['back-to-scenario'])
 
   const store = useScenariosStore()

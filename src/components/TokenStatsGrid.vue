@@ -28,7 +28,14 @@
           <div class="stats-grid__derived" :title="stat.hint">
             <component :is="stat.icon" :size="15" />
             <span class="stats-grid__derived-name">{{ stat.label }}</span>
-            <span class="stats-grid__derived-value">{{ computeDerived(stat.key) }}</span>
+            <span
+              class="stats-grid__derived-value"
+              :class="{
+                'stats-grid__derived-value--up': flashingKeys.has(stat.key),
+                'stats-grid__derived-value--arrow': arrowKeys.has(stat.key),
+              }"
+              >{{ computeDerived(stat.key) }}</span
+            >
           </div>
         </template>
       </div>
@@ -37,6 +44,7 @@
 </template>
 
 <script setup>
+  import { ref, watch } from 'vue'
   import {
     PhSword,
     PhFeather,
@@ -140,6 +148,46 @@
         return 0
     }
   }
+
+  // Анимация повышения пассивных характеристик
+  const ALL_DERIVED_KEYS = [
+    'damage',
+    'critChance',
+    'defense',
+    'evasion',
+    'initiative',
+    'resistance',
+    'magicPower',
+    'persuasion',
+  ]
+  const flashingKeys = ref(new Set())
+  const arrowKeys = ref(new Set())
+
+  // Храним предыдущие значения пассивных характеристик до изменения
+  let prevDerived = Object.fromEntries(ALL_DERIVED_KEYS.map((k) => [k, computeDerived(k)]))
+
+  watch(
+    () => props.modelValue,
+    () => {
+      const newFlashing = new Set()
+      for (const key of ALL_DERIVED_KEYS) {
+        const next = computeDerived(key)
+        if (next > prevDerived[key]) newFlashing.add(key)
+        prevDerived[key] = next
+      }
+      if (newFlashing.size > 0) {
+        flashingKeys.value = newFlashing
+        arrowKeys.value = new Set(newFlashing)
+        setTimeout(() => {
+          flashingKeys.value = new Set()
+        }, 600)
+        setTimeout(() => {
+          arrowKeys.value = new Set()
+        }, 2600)
+      }
+    },
+    { deep: true }
+  )
 </script>
 
 <style scoped>
@@ -236,5 +284,53 @@
     font-weight: 600;
     color: var(--color-primary);
     margin-left: auto;
+    transition: color 0.2s;
+  }
+
+  .stats-grid__derived-value--up {
+    animation: stat-up 0.6s ease forwards;
+  }
+
+  .stats-grid__derived-value--arrow {
+    position: relative;
+
+    &::after {
+      content: '\25B2';
+      position: absolute;
+      top: -6px;
+      right: -12px;
+      font-size: 9px;
+      color: #4ade80;
+      animation: arrow-fade-in 0.2s ease forwards;
+    }
+  }
+
+  @keyframes arrow-fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes stat-up {
+    0% {
+      color: var(--color-primary);
+      text-shadow: none;
+    }
+
+    30% {
+      color: #4ade80;
+      text-shadow: 0 0 8px rgb(74 222 128 / 80%);
+    }
+
+    100% {
+      color: var(--color-primary);
+      text-shadow: none;
+    }
   }
 </style>

@@ -47,6 +47,7 @@
   import { useGameStore } from '../stores/game'
   import { useHeroesStore } from '../stores/heroes'
   import { useScenariosStore } from '../stores/scenarios'
+  import { playTravelMusic, stopTravelMusic } from '../composables/useSound'
   import { SYSTEM_TOKENS } from '../constants/systemTokens'
   import { buildReachableCells } from '../composables/useTokenMove'
   import AppBackground from '../components/AppBackground.vue'
@@ -177,6 +178,7 @@
     detach()
     socket.off('connect_error')
     socket.off('connect', undefined)
+    stopTravelMusic()
     gameStore.currentScenario = null
     // Очищаем токены чтобы не было «статики» при переходе на другой маршрут
     gameStore.placedTokens = []
@@ -194,6 +196,7 @@
       gameStore.currentScenario = full
       mapSrc.value = full.mapImageUrl ?? ''
       ready.value = true
+      playTravelMusic()
     } catch (err) {
       joinError.value = err.message || 'Не удалось загрузить карту'
     }

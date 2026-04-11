@@ -19,15 +19,18 @@
 </template>
 
 <script setup>
-  import { computed } from 'vue'
+  import { computed, onMounted, onUnmounted } from 'vue'
   import { useRouter } from 'vue-router'
-  import { useSound } from '../composables/useSound'
+  import { useSound, playMainMenuMusic, stopMainMenuMusic } from '../composables/useSound'
   import { useAuthStore } from '../stores/auth'
   import AppBackground from '../components/AppBackground.vue'
 
   const { playHover, playClick } = useSound()
   const auth = useAuthStore()
   const router = useRouter()
+
+  onMounted(() => playMainMenuMusic())
+  onUnmounted(() => stopMainMenuMusic())
 
   // Игрок видит только «Играть» → лобби. Мастер (admin) видит «Играть» → игра и «Редактор».
   const menuItems = computed(() => {

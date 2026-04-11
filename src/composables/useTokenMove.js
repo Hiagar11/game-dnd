@@ -43,7 +43,7 @@ export function isInRange(token, col, row) {
  * @param {Array<{ col: number, row: number }>} walls — массив стен из store
  * @returns {Set<string>}
  */
-export function buildReachableCells(token, walls) {
+export function buildReachableCells(token, walls, radius = RANGE_RADIUS, occupiedKeys = new Set()) {
   // Быстрый лукап стен: "col,row" → true
   const wallSet = new Set(walls.map((w) => `${w.col},${w.row}`))
 
@@ -52,7 +52,7 @@ export function buildReachableCells(token, walls) {
 
   // BFS-очередь: [col, row, stepsLeft]
   // Используем массив как очередь (shift медленнее Map, но карта не огромная)
-  const queue = [[token.col, token.row, RANGE_RADIUS]]
+  const queue = [[token.col, token.row, radius]]
   // Посещённые клетки — чтобы не обрабатывать одну клетку дважды
   const visited = new Set([`${token.col},${token.row}`])
 
@@ -80,8 +80,9 @@ export function buildReachableCells(token, walls) {
       const nr = row + dr
       const key = `${nc},${nr}`
 
-      // Пропускаем уже посещённые и клетки-стены
-      if (visited.has(key) || wallSet.has(key) || nc < 0 || nr < 0) continue
+      // Пропускаем уже посещённые, клетки-стены и занятые токенами
+      if (visited.has(key) || wallSet.has(key) || occupiedKeys.has(key) || nc < 0 || nr < 0)
+        continue
 
       visited.add(key)
       queue.push([nc, nr, steps - 1])
@@ -103,7 +104,7 @@ export function buildReachableCells(token, walls) {
  * @param {Array<{ col: number, row: number }>} walls — стены из store
  * @returns {{ col: number, row: number }[]|null} — шаги пути (без стартовой клетки) или null
  */
-export function findPath(token, target, walls) {
+export function findPath(token, target, walls, radius = RANGE_RADIUS, occupiedKeys = new Set()) {
   const wallSet = new Set(walls.map((w) => `${w.col},${w.row}`))
   const startKey = `${token.col},${token.row}`
   const goalKey = `${target.col},${target.row}`
@@ -129,14 +130,15 @@ export function findPath(token, target, walls) {
     const nextSteps = (stepCount.get(key) ?? 0) + 1
 
     // Дальше радиуса хода не идём
-    if (nextSteps > RANGE_RADIUS) continue
+    if (nextSteps > radius) continue
 
     for (const [dc, dr] of DIRS) {
       const nc = col + dc
       const nr = row + dr
       const nkey = `${nc},${nr}`
 
-      if (parent.has(nkey) || wallSet.has(nkey) || nc < 0 || nr < 0) continue
+      if (parent.has(nkey) || wallSet.has(nkey) || occupiedKeys.has(nkey) || nc < 0 || nr < 0)
+        continue
 
       parent.set(nkey, key)
       stepCount.set(nkey, nextSteps)

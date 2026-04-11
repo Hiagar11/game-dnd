@@ -2,6 +2,7 @@
   <div
     ref="viewRef"
     class="game-view"
+    :class="{ 'game-view--combat': gameStore.combatMode }"
     @mousemove="onMouseMove"
     @contextmenu="onContextMenu"
     @dragover="onDragOver"
@@ -49,6 +50,9 @@
 
       <GameMenu @mouseenter="onMenuEnter" @mouseleave="onMenuLeave" />
 
+      <!-- Трекер инициативы — появляется в боевом режиме над меню -->
+      <GameCombatTracker />
+
       <!-- Кнопка возврата к выбору карты -->
       <button class="game-back" @mouseenter="playHover" @click="onExitClick">← К выбору</button>
     </template>
@@ -60,6 +64,12 @@
       :existing-names="gameSessionsStore.sessions.map((s) => s.name)"
       @save="onSaveSession"
       @skip="doActualExit"
+    />
+
+    <!-- Боевой попап: появляется когда образована боевая пара -->
+    <GameCombatPopup
+      :visible="!!gameStore.combatPair"
+      @close="gameStore.setCombatPair(null, null)"
     />
   </div>
 </template>
@@ -74,7 +84,13 @@
   import { useGameSessionsStore } from '../stores/gameSessions'
   import { useAuthStore } from '../stores/auth'
   import { useSocket } from '../composables/useSocket'
-  import { useSound } from '../composables/useSound'
+  import {
+    useSound,
+    playBattleMusic,
+    stopBattleMusic,
+    playTravelMusic,
+    stopTravelMusic,
+  } from '../composables/useSound'
   import { useAdminCursor } from '../composables/useAdminCursor'
   import AppBackground from '../components/AppBackground.vue'
   import GamePicker from '../components/GamePicker.vue'
@@ -84,7 +100,9 @@
   import GameFog from '../components/GameFog.vue'
   import GameTokens from '../components/GameTokens.vue'
   import GameMenu from '../components/GameMenu.vue'
+  import GameCombatTracker from '../components/GameCombatTracker.vue'
   import GameSavePopup from '../components/GameSavePopup.vue'
+  import GameCombatPopup from '../components/GameCombatPopup.vue'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
 
@@ -99,7 +117,7 @@
 
   const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
   const { close: closeContextMenu } = useTokenContextMenu()
-  const { playHover, playClick } = useSound()
+  const { playHover, playClick, playNext } = useSound()
 
   const auth = useAuthStore()
   const { connect, getSocket } = useSocket()
@@ -151,7 +169,19 @@
     emitPan(x, y)
   })
 
+  function onSpaceKey(e) {
+    if (e.code !== 'Space') return
+    const tag = e.target.tagName
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+    e.preventDefault()
+    if (gameStore.combatPair) gameStore.setCombatPair(null, null)
+    playNext()
+    gameStore.endTurn()
+  }
+
   onUnmounted(() => {
+    window.removeEventListener('keydown', onSpaceKey)
+    window.removeEventListener('beforeunload', onBeforeUnload)
     if (sessionActive.value) {
       getSocket()?.emit('game:session:close')
       sessionActive.value = false
@@ -159,6 +189,20 @@
   })
 
   const gameStore = useGameStore()
+
+  watch(
+    () => gameStore.combatMode,
+    (active) => {
+      if (active) {
+        stopTravelMusic()
+        playBattleMusic()
+      } else {
+        stopBattleMusic()
+        playTravelMusic()
+      }
+    }
+  )
+
   const tokensStore = useTokensStore()
   const scenariosStore = useScenariosStore()
   const campaignsStore = useCampaignsStore()
@@ -194,6 +238,8 @@
     scenariosStore.fetchScenarios()
     campaignsStore.fetchCampaigns()
     gameSessionsStore.fetchSessions()
+    window.addEventListener('keydown', onSpaceKey)
+    window.addEventListener('beforeunload', onBeforeUnload)
     // Подключаем сокет для трансляции зрителям
     if (auth.role === 'admin') {
       connect(auth.token)
@@ -240,6 +286,7 @@
       sessionChanged.value = false
       gameStore.currentScenario = full
       selectedScenario.value = full
+      playTravelMusic()
 
       // Открываем/обновляем сессию для зрителей
       if (auth.role === 'admin') {
@@ -280,6 +327,14 @@
   const showSavePopup = ref(false)
   const activeSessionName = ref(null)
 
+  // Нативный диалог браузера при перезагрузке или закрытии вкладки.
+  // Показывается только если сессия активна и есть несохранённые изменения.
+  function onBeforeUnload(e) {
+    if (sessionActive.value && sessionChanged.value) {
+      e.preventDefault()
+    }
+  }
+
   // Кнопка «← К выбору»: если идёт сессия — показываем попап, иначе выходим сразу.
   function onExitClick() {
     playClick()
@@ -294,6 +349,8 @@
   function doActualExit() {
     showSavePopup.value = false
     activeSessionName.value = null
+    stopTravelMusic()
+    stopBattleMusic()
     if (sessionActive.value) {
       getSocket()?.emit('game:session:close')
       sessionActive.value = false
@@ -352,8 +409,9 @@
     await gameSessionsStore.deleteSession(id)
   }
 
-  // Переход через дверь: двойной клик по токену-двери с привязанным targetScenarioId
-  async function onDoorTransition({ targetScenarioId, sourceScenarioId }) {
+  // Переход через дверь: токен дошёл до двери, собраны все токены из буфера.
+  // Загружаем целевой сценарий, затем размещаем буферные токены вокруг входной двери.
+  async function onDoorTransition({ targetScenarioId, sourceScenarioId, buffer, initiatorUid }) {
     const target = scenariosStore.scenarios.find((s) => String(s.id) === String(targetScenarioId))
     if (!target) return
     mapSize.value = { width: 0, height: 0 }
@@ -365,7 +423,83 @@
     )
     if (backDoor) {
       centerOnToken(backDoor)
+      if (buffer?.length) {
+        // placeBufferAroundDoor возвращает новый uid токена-инициатора
+        const newInitiatorUid = placeBufferAroundDoor(backDoor, buffer, initiatorUid)
+        // Автовыбираем инициатора — в новой локации он сразу готов к действию
+        if (newInitiatorUid) gameStore.selectPlacedToken(newInitiatorUid)
+      }
     }
+  }
+
+  /**
+   * Размещает токены из буфера вокруг целевой двери.
+   * Использует BFS-расширение: сначала ближайшие клетки (радиус 1),
+   * если не хватает — ищем следующий радиус.
+   *
+   * Токены из буфера добавляются В ТЕКУЩИЙ gameStore.placedTokens.
+   * Существующие токены на новой карте не удаляются.
+   */
+  function placeBufferAroundDoor(door, buffer, initiatorUid = null) {
+    // Удаляем с новой карты токены с теми же tokenId, что в буфере:
+    // это дубли, появившиеся потому что selectScenario загружает исходные данные из БД.
+    // Например, герой перешёл в B → вернулся в A: A перезагружается из БД (герой там есть),
+    // а буфер несёт того же героя → без этой очистки будет два экземпляра.
+    const bufferTokenIds = new Set(buffer.map((bt) => bt.tokenId).filter(Boolean))
+    for (let i = gameStore.placedTokens.length - 1; i >= 0; i--) {
+      const t = gameStore.placedTokens[i]
+      if (!t.systemToken && t.tokenId && bufferTokenIds.has(t.tokenId)) {
+        gameStore.placedTokens.splice(i, 1)
+      }
+    }
+
+    // Занятые клетки: токены новой карты (буферные ещё не добавлены)
+    const occupiedKeys = new Set(gameStore.placedTokens.map((t) => `${t.col},${t.row}`))
+    const wallKeys = new Set(gameStore.walls.map((w) => `${w.col},${w.row}`))
+
+    // BFS-поиск свободных клеток, расходящийся от двери кольцами
+    const freeQueue = []
+    const visited = new Set([`${door.col},${door.row}`])
+    const pendingSearch = [{ col: door.col, row: door.row }]
+
+    // Ищем столько свободных клеток, сколько токенов в буфере
+    let searchIdx = 0
+    while (freeQueue.length < buffer.length && searchIdx < pendingSearch.length) {
+      const { col, row } = pendingSearch[searchIdx++]
+      for (let dc = -1; dc <= 1; dc++) {
+        for (let dr = -1; dr <= 1; dr++) {
+          if (dc === 0 && dr === 0) continue
+          const nc = col + dc
+          const nr = row + dr
+          const key = `${nc},${nr}`
+          if (visited.has(key)) continue
+          visited.add(key)
+          if (!wallKeys.has(key) && !occupiedKeys.has(key)) {
+            freeQueue.push({ col: nc, row: nr })
+            occupiedKeys.add(key) // резервируем клетку, чтобы не занять её дважды
+          } else {
+            pendingSearch.push({ col: nc, row: nr }) // расширяем поиск
+          }
+        }
+      }
+    }
+
+    // Добавляем токены из буфера в placedTokens новой карты
+    let initiatorNewUid = null
+    buffer.forEach((bt, i) => {
+      const cell = freeQueue[i]
+      if (!cell) return // места не нашлось — очень плотная карта
+      // Генерируем свежий uid, чтобы не конфликтовать с существующими токенами
+      const newUid = crypto.randomUUID()
+      if (bt.uid === initiatorUid) initiatorNewUid = newUid
+      gameStore.placedTokens.push({
+        ...bt,
+        uid: newUid,
+        col: cell.col,
+        row: cell.row,
+      })
+    })
+    return initiatorNewUid
   }
 
   // Центрирует вид на токене по его позиции в сетке
@@ -396,6 +530,33 @@
     overflow: hidden;
     color: var(--color-text);
     font-family: var(--font-ui);
+    user-select: none;
+
+    &::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      box-shadow: inset 0 0 0 0 transparent;
+      transition: box-shadow 0.6s ease;
+    }
+
+    &--combat::after {
+      box-shadow: inset 0 0 80px 20px rgb(200 30 30 / 35%);
+      animation: combat-pulse 2.5s ease-in-out infinite;
+    }
+  }
+
+  @keyframes combat-pulse {
+    0%,
+    100% {
+      box-shadow: inset 0 0 80px 20px rgb(200 30 30 / 35%);
+    }
+
+    50% {
+      box-shadow: inset 0 0 120px 40px rgb(200 30 30 / 18%);
+    }
   }
 
   /* ─── Игровое поле ────────────────────────────────────────────────────────── */

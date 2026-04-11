@@ -66,5 +66,21 @@ export function mapServerToken(serverToken, clientTokens) {
     agility: def?.agility ?? tokenObj?.stats?.agility ?? 0,
     intellect: def?.intellect ?? tokenObj?.stats?.intellect ?? 0,
     charisma: def?.charisma ?? tokenObj?.stats?.charisma ?? 0,
+    // Опыт и уровень — берём из шаблона (def из tokensStore) или из populated tokenId
+    xp: def?.xp ?? tokenObj?.xp ?? 0,
+    level: def?.level ?? tokenObj?.level ?? 1,
+    // HP: берём сохранённое значение или пересчитываем из характеристик по формуле
+    // maxHp = 10 + strength*2 + agility
+    maxHp:
+      serverToken.maxHp ??
+      10 +
+        (def?.strength ?? tokenObj?.stats?.strength ?? 0) * 2 +
+        (def?.agility ?? tokenObj?.stats?.agility ?? 0),
+    hp:
+      serverToken.hp ??
+      10 +
+        (def?.strength ?? tokenObj?.stats?.strength ?? 0) * 2 +
+        (def?.agility ?? tokenObj?.stats?.agility ?? 0),
+    actionPoints: serverToken.actionPoints ?? 4,
   }
 }

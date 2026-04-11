@@ -9,7 +9,19 @@ export function setupSocket(io) {
   // ─── Активные игровые сессии ──────────────────────────────────────────────
   // Map: userId (admin) → { adminSocketId, adminName, campaignId, campaignName, scenarioId, offsetX, offsetY }
   const sessions = new Map()
+  // ─── Текущие позиции токенов (только в памяти, без записи в БД) ────────
+  // Map: scenarioId → Map<uid, { col, row }>
+  // Сбрасывается при закрытии сессии — позиции возвращаются к сохранённым в БД
+  const livePositions = new Map()
 
+  function applyLivePositions(scenarioId, placedTokens) {
+    const live = livePositions.get(String(scenarioId))
+    if (!live) return placedTokens
+    return placedTokens.map((pt) => {
+      const pos = live.get(String(pt.uid))
+      return pos ? { ...pt, col: pos.col, row: pos.row } : pt
+    })
+  }
   function listSessions() {
     return Array.from(sessions.entries()).map(([sessionId, s]) => ({
       sessionId,
@@ -227,9 +239,10 @@ export function setupSocket(io) {
         if (!scenario) return ackError(ack, 'Сценарий не найден')
 
         const isAdmin = role === 'admin'
-        const placedTokens = isAdmin
+        const rawTokens = isAdmin
           ? scenario.placedTokens
           : scenario.placedTokens.filter((t) => !t.hidden)
+        const placedTokens = applyLivePositions(data.scenarioId, rawTokens)
 
         ack?.({
           ok: true,
@@ -252,6 +265,9 @@ export function setupSocket(io) {
     // Создаёт публичную сессию — зрители видят её в лобби.
     socket.on('game:session:open', ({ campaignId, campaignName, scenarioId }, ack) => {
       if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+
+      // Сбрасываем предыдущие позиции — новая сессия должна начинать с дефолтных из БД
+      livePositions.delete(scenarioId)
 
       const sessionId = socket.user.id
       sessions.set(sessionId, {
@@ -288,6 +304,9 @@ export function setupSocket(io) {
       session.scenarioId = scenarioId
       session.mapCenterX = null
       session.mapCenterY = null
+
+      // Сбрасываем позиции нового сценария
+      livePositions.delete(scenarioId)
 
       // Переводим зрителей в комнату нового сценария
       const viewerRoom = `viewer:${sessionId}`
@@ -377,6 +396,9 @@ export function setupSocket(io) {
     socket.on('game:session:close', (ack) => {
       if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
 
+      const session = sessions.get(socket.user.id)
+      if (session?.scenarioId) livePositions.delete(session.scenarioId)
+
       sessions.delete(socket.user.id)
       io.emit('sessions:updated', listSessions())
       ack?.({ ok: true })
@@ -405,8 +427,9 @@ export function setupSocket(io) {
         )
         if (!scenario) return ackError(ack, 'Сценарий не найден')
 
-        // Игроки видят только не скрытые токены
-        const placedTokens = scenario.placedTokens.filter((t) => !t.hidden)
+        // Игроки видят только не скрытые токены + применяем текущие позиции
+        const rawTokens = scenario.placedTokens.filter((t) => !t.hidden)
+        const placedTokens = applyLivePositions(session.scenarioId, rawTokens)
 
         ack?.({
           ok: true,
@@ -438,8 +461,10 @@ export function setupSocket(io) {
 
     socket.on('disconnect', () => {
       console.log(`[socket] ${username} отключился — ${socket.id}`)
-      // Если отключился admin с активной сессией — закрываем её
+      // Если отключился admin с активной сессией — закрываем её и сбрасываем позиции
       if (role === 'admin' && sessions.has(socket.user.id)) {
+        const session = sessions.get(socket.user.id)
+        if (session?.scenarioId) livePositions.delete(session.scenarioId)
         sessions.delete(socket.user.id)
         io.emit('sessions:updated', listSessions())
       }

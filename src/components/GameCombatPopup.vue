@@ -438,18 +438,19 @@
   /* ── Обёртка: позиционирует банер + попап как колонку по центру экрана ──── */
   .combat-popup-wrapper {
     position: fixed;
-    top: 50%;
+    top: 7vh;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
   }
 
   /* ── Баннер результата (над рамкой) ──────────────────────────────────────── */
   .combat-popup__banner {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
     font-family: var(--font-ui);
     font-size: 32px;
     font-weight: 900;
@@ -476,16 +477,16 @@
   @keyframes banner-pulse {
     0% {
       opacity: 0;
-      transform: scale(0.6) translateY(8px);
+      transform: translateX(-50%) scale(0.6) translateY(8px);
     }
 
     60% {
-      transform: scale(1.08) translateY(0);
+      transform: translateX(-50%) scale(1.08) translateY(0);
     }
 
     100% {
       opacity: 1;
-      transform: scale(1) translateY(0);
+      transform: translateX(-50%) scale(1) translateY(0);
     }
   }
 
@@ -886,22 +887,22 @@
 
   /* ── Анимация появления попапа ───────────────────────────────────────────── */
   .combat-popup-enter-active {
-    animation: popup-slide-up 0.25s ease;
+    animation: popup-slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .combat-popup-leave-active {
-    animation: popup-slide-up 0.2s ease reverse;
+    animation: popup-slide-up 0.2s ease-in reverse;
   }
 
   @keyframes popup-slide-up {
     from {
       opacity: 0;
-      transform: translate(-50%, calc(-50% + 20px));
+      transform: translateX(-50%) translateY(16px);
     }
 
     to {
       opacity: 1;
-      transform: translate(-50%, -50%);
+      transform: translateX(-50%) translateY(0);
     }
   }
 

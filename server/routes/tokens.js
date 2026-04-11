@@ -140,6 +140,48 @@ router.put('/:id', async (req, res) => {
       token.attitude = attitude
     }
 
+    // DM может вручную скорректировать уровень или обнулить XP (например, для быстрого теста)
+    if (req.body.level !== undefined) {
+      const v = Number(req.body.level)
+      if (Number.isFinite(v) && v >= 1) token.level = Math.floor(v)
+    }
+    if (req.body.xp !== undefined) {
+      const v = Number(req.body.xp)
+      if (Number.isFinite(v) && v >= 0) token.xp = Math.floor(v)
+    }
+
+    await token.save()
+    res.json(formatToken(token, req))
+  } catch {
+    res.status(500).json({ error: 'Ошибка сервера' })
+  }
+})
+
+// ─── PATCH /api/tokens/:id/xp ────────────────────────────────────────────────
+// Начисление очков опыта герою. Автоматически пересчитывает уровень.
+// Body: { amount: number } — количество XP для добавления (>0).
+// Возвращает обновлённый токен с новыми xp и level.
+//
+// Формула уровней:
+//   xpForLevel(N) = 50 * N * (N-1)   — суммарный XP для достижения уровня N
+//   Уровень N → N+1 требует: N * 100 XP
+router.patch('/:id/xp', async (req, res) => {
+  if (!mongoose.Types.ObjectId.isValid(req.params.id))
+    return res.status(400).json({ error: 'Некорректный id' })
+
+  const amount = Number(req.body.amount)
+  if (!Number.isFinite(amount) || amount <= 0)
+    return res.status(400).json({ error: 'amount: должно быть положительным числом' })
+
+  try {
+    const token = await Token.findOne({ _id: req.params.id, owner: req.user.id })
+    if (!token) return res.status(404).json({ error: 'Токен не найден' })
+
+    token.xp = (token.xp ?? 0) + Math.floor(amount)
+
+    // Пересчёт уровня: levelFromXp — обратная функция xpForLevel(N) = 50*N*(N-1)
+    token.level = Math.max(1, Math.floor((1 + Math.sqrt(1 + token.xp / 12.5)) / 2))
+
     await token.save()
     res.json(formatToken(token, req))
   } catch {
@@ -191,6 +233,8 @@ function formatToken(token, req) {
     attitude: token.attitude ?? 'neutral',
     imageUrl: `${req.protocol}://${req.get('host')}/${token.imagePath}`,
     stats: token.stats,
+    xp: token.xp ?? 0,
+    level: token.level ?? 1,
     createdAt: token.createdAt,
   }
 }

@@ -5,7 +5,7 @@
       <div class="token-info__row">
         <span class="token-info__name">{{ placed.name }}</span>
         <div class="token-info__hp">
-          <PhHeart :size="11" weight="fill" class="token-info__hp-icon" />
+          <PhHeart :size="15" weight="fill" class="token-info__hp-icon" />
           <span class="token-info__hp-text"
             >{{ placed.hp ?? placed.maxHp ?? 10 }}/{{ placed.maxHp ?? 10 }}</span
           >
@@ -123,30 +123,51 @@
   .token-info__hp-icon {
     color: #f87171;
     flex-shrink: 0;
+    filter: drop-shadow(0 0 4px #f87171aa);
   }
 
   .token-info__hp-text {
-    font-size: 11px;
-    font-weight: 600;
-    color: rgb(255 255 255 / 65%);
+    font-size: 14px;
+    font-weight: 700;
+    color: rgb(255 255 255 / 95%);
     font-family: var(--font-ui);
     white-space: nowrap;
+    text-shadow: 0 0 8px #f8717166;
   }
 
   .token-info__hp-bar {
-    width: 80px;
-    height: 5px;
+    width: 88px;
+    height: 8px;
     background: rgb(255 255 255 / 10%);
-    border-radius: 3px;
+    border-radius: 4px;
     overflow: hidden;
     flex-shrink: 0;
+    box-shadow: inset 0 1px 2px rgb(0 0 0 / 40%);
+  }
+
+  @keyframes hp-shimmer {
+    0% {
+      background-position: 200% center;
+    }
+    100% {
+      background-position: -200% center;
+    }
   }
 
   .token-info__hp-fill {
     height: 100%;
-    background: linear-gradient(90deg, #ef4444, #f87171);
-    border-radius: 3px;
+    background: linear-gradient(
+      90deg,
+      #ef4444 0%,
+      #f87171 30%,
+      #fca5a5 50%,
+      #f87171 70%,
+      #ef4444 100%
+    );
+    background-size: 200% 100%;
+    border-radius: 4px;
     transition: width 0.3s ease;
+    animation: hp-shimmer 2.5s linear infinite;
   }
 
   /* ── XP ── */

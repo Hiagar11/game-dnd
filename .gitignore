@@ -13,6 +13,8 @@ dist-ssr
 *.local
 .env
 
+# Аудиофайлы хранятся через Git LFS (см. .gitattributes)
+
 # Server
 server/.env
 server/node_modules

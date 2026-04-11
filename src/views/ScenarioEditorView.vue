@@ -29,6 +29,7 @@
         <EditorLevelSection
           v-if="activeSection === 'levels'"
           :auto-load-scenario="autoLoadScenario"
+          :scenario-mode="openedFromScenario"
           @back-to-scenario="onBackToScenario"
         />
         <EditorScenarioSection v-show="activeSection === 'scenarios'" @open-level="onOpenLevel" />
@@ -63,15 +64,19 @@
   // Сценарий, открытый двойным кликом из EditorScenarioSection.
   // Передаётся в EditorLevelSection как проп для авто-загрузки.
   const autoLoadScenario = ref(null)
+  // Флаг: показывает, что редактор открыт из вкладки сценариев — ограничивает меню до системных токенов
+  const openedFromScenario = ref(false)
 
   function onOpenLevel({ scenario }) {
     autoLoadScenario.value = scenario
+    openedFromScenario.value = true
     activeSection.value = 'levels'
   }
 
   function onBackToScenario() {
     activeSection.value = 'scenarios'
     autoLoadScenario.value = null
+    openedFromScenario.value = false
   }
 
   onMounted(() => window.addEventListener('keydown', onEscKey))

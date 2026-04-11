@@ -1,5 +1,5 @@
 <script setup>
-  import { ref } from 'vue'
+  import { ref, computed } from 'vue'
   import {
     PhSkull,
     PhHandshake,
@@ -10,14 +10,26 @@
   import GameMenuIcon from './GameMenuIcon.vue'
   import GameMenuTokenList from './GameMenuTokenList.vue'
   import GameMenuSystem from './GameMenuSystem.vue'
+  import GameMenuSelectedToken from './GameMenuSelectedToken.vue'
+  import GameEndTurnButton from './GameEndTurnButton.vue'
+  import { useGameStore } from '../stores/game'
   import { useSound } from '../composables/useSound'
 
   // Активная вкладка: 'hostile' | 'neutral' | 'friendly' | 'system' | 'heroes'
-  const activeTab = ref('neutral')
-  const { playHover, playClick } = useSound()
-
-  defineProps({
+  // В режиме сценария (редактирование дверей) — только 'system'
+  const props = defineProps({
     editorMode: { type: Boolean, default: false },
+    // scenarioMode: true — открыто из редактора сценариев (только системные токены)
+    scenarioMode: { type: Boolean, default: false },
+  })
+  const activeTab = ref(props.scenarioMode ? 'system' : 'neutral')
+  const { playHover, playClick } = useSound()
+  const gameStore = useGameStore()
+
+  // Токен выбран на карте (не системный) — в этом случае прячем вкладки и списки
+  const hasSelectedToken = computed(() => {
+    const t = gameStore.placedTokens.find((p) => p.uid === gameStore.selectedPlacedUid)
+    return !!(t && !t.systemToken)
   })
 
   function setTab(tab) {
@@ -30,67 +42,87 @@
   <aside class="game-menu">
     <GameMenuIcon />
 
-    <div class="game-menu__center">
-      <nav class="game-menu__tabs">
-        <button
-          class="game-menu__tab game-menu__tab--hostile"
-          :class="{ 'game-menu__tab--active': activeTab === 'hostile' }"
-          @mouseenter="playHover"
-          @click="setTab('hostile')"
-        >
-          <PhSkull :size="13" />
-          Враги
-        </button>
-        <button
-          class="game-menu__tab game-menu__tab--neutral"
-          :class="{ 'game-menu__tab--active': activeTab === 'neutral' }"
-          @mouseenter="playHover"
-          @click="setTab('neutral')"
-        >
-          <PhCircleDashed :size="13" />
-          Нейтралы
-        </button>
-        <button
-          class="game-menu__tab game-menu__tab--friendly"
-          :class="{ 'game-menu__tab--active': activeTab === 'friendly' }"
-          @mouseenter="playHover"
-          @click="setTab('friendly')"
-        >
-          <PhHandshake :size="13" />
-          Союзники
-        </button>
-        <button
-          class="game-menu__tab"
-          :class="{ 'game-menu__tab--active': activeTab === 'system' }"
-          @mouseenter="playHover"
-          @click="setTab('system')"
-        >
-          <PhGearSix :size="13" />
-          Системные
-        </button>
-        <button
-          class="game-menu__tab"
-          :class="{ 'game-menu__tab--active': activeTab === 'heroes' }"
-          @mouseenter="playHover"
-          @click="setTab('heroes')"
-        >
-          <PhShieldStar :size="13" />
-          Герои
-        </button>
-      </nav>
+    <div class="game-menu__center" :class="{ 'game-menu__center--token': hasSelectedToken }">
+      <template v-if="hasSelectedToken">
+        <GameMenuSelectedToken />
+        <div class="game-menu__perks" />
+      </template>
 
-      <GameMenuTokenList v-if="activeTab === 'hostile'" token-type="npc" attitude="hostile" />
-      <GameMenuTokenList v-else-if="activeTab === 'neutral'" token-type="npc" attitude="neutral" />
-      <GameMenuTokenList
-        v-else-if="activeTab === 'friendly'"
-        token-type="npc"
-        attitude="friendly"
-      />
-      <GameMenuSystem v-else-if="activeTab === 'system'" :editor-mode="editorMode" />
-      <GameMenuTokenList v-else token-type="hero" />
+      <div v-else class="game-menu__tab-area">
+        <nav class="game-menu__tabs">
+          <!-- В режиме сценария (двери) показываем только системную вкладку -->
+          <template v-if="!scenarioMode">
+            <button
+              class="game-menu__tab game-menu__tab--hostile"
+              :class="{ 'game-menu__tab--active': activeTab === 'hostile' }"
+              @mouseenter="playHover"
+              @click="setTab('hostile')"
+            >
+              <PhSkull :size="13" />
+              Враги
+            </button>
+            <button
+              class="game-menu__tab game-menu__tab--neutral"
+              :class="{ 'game-menu__tab--active': activeTab === 'neutral' }"
+              @mouseenter="playHover"
+              @click="setTab('neutral')"
+            >
+              <PhCircleDashed :size="13" />
+              Нейтралы
+            </button>
+            <button
+              class="game-menu__tab game-menu__tab--friendly"
+              :class="{ 'game-menu__tab--active': activeTab === 'friendly' }"
+              @mouseenter="playHover"
+              @click="setTab('friendly')"
+            >
+              <PhHandshake :size="13" />
+              Союзники
+            </button>
+          </template>
+          <button
+            class="game-menu__tab"
+            :class="{ 'game-menu__tab--active': activeTab === 'system' }"
+            @mouseenter="playHover"
+            @click="setTab('system')"
+          >
+            <PhGearSix :size="13" />
+            Системные
+          </button>
+          <button
+            v-if="!scenarioMode"
+            class="game-menu__tab"
+            :class="{ 'game-menu__tab--active': activeTab === 'heroes' }"
+            @mouseenter="playHover"
+            @click="setTab('heroes')"
+          >
+            <PhShieldStar :size="13" />
+            Герои
+          </button>
+        </nav>
+
+        <template v-if="!scenarioMode">
+          <GameMenuTokenList v-if="activeTab === 'hostile'" token-type="npc" attitude="hostile" />
+          <GameMenuTokenList
+            v-else-if="activeTab === 'neutral'"
+            token-type="npc"
+            attitude="neutral"
+          />
+          <GameMenuTokenList
+            v-else-if="activeTab === 'friendly'"
+            token-type="npc"
+            attitude="friendly"
+          />
+          <GameMenuSystem v-else-if="activeTab === 'system'" :editor-mode="editorMode" />
+          <GameMenuTokenList v-else token-type="hero" />
+        </template>
+        <!-- В режиме сценария всегда показываем системные токены -->
+        <GameMenuSystem v-else :editor-mode="editorMode" />
+      </div>
     </div>
 
-    <div class="game-menu__empty">
+    <div class="game-menu__actions">
+      <GameEndTurnButton v-if="!editorMode" />
       <slot name="right-panel" />
     </div>
   </aside>
@@ -116,6 +148,31 @@
       min-height: 0;
       block-size: calc(100% + var(--menu-overflow));
       margin-block-start: calc(-1 * var(--menu-overflow));
+
+      /* Когда выбран токен: 4/12 инфо + 8/12 пустой фон для перков, центр на 30px ниже боковых панелей */
+      &--token {
+        display: grid;
+        grid-template-columns: calc(100% / 12 * 4) 1fr;
+        grid-template-rows: 1fr;
+        margin-block-start: calc(-1 * var(--menu-overflow) + 30px);
+        block-size: calc(100% + var(--menu-overflow) - 30px);
+      }
+    }
+
+    /* Область табов и списков */
+    &__tab-area {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      min-width: 0;
+      flex: 1;
+    }
+
+    /* Пустая область для будущих перков */
+    &__perks {
+      background-image: url('/systemImage/panel-center.jpg');
+      background-size: cover;
+      background-position: center;
     }
 
     /* Полоса вкладок — ровно на высоту выступа, кнопки прижаты к низу */
@@ -181,7 +238,7 @@
       }
     }
 
-    &__empty {
+    &__actions {
       inline-size: var(--menu-side-width);
       block-size: calc(100% + var(--menu-overflow));
       margin-block-start: calc(-1 * var(--menu-overflow));
@@ -189,6 +246,10 @@
       background-size: cover;
       background-position: bottom;
       border-top-left-radius: var(--menu-side-radius);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 14px;
     }
   }
 </style>

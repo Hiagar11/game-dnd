@@ -95,6 +95,19 @@ const tokenSchema = new mongoose.Schema(
       enum: ['neutral', 'friendly', 'hostile'],
       default: 'neutral',
     },
+    // Опыт и уровень — только для героев (tokenType === 'hero').
+    // Хранятся на шаблоне токена: перс. прокачка сохраняется между сессиями.
+    // Уровень автоматически пересчитывается при начислении XP через PATCH /api/tokens/:id/xp.
+    xp: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    level: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
   },
   { timestamps: true }
 )

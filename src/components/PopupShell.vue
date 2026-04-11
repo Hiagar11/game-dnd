@@ -30,8 +30,9 @@
     inset: 0;
     z-index: var(--z-popup, 300);
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
+    padding-top: 5vh;
     background: var(--color-overlay-strong);
     backdrop-filter: blur(2px);
   }

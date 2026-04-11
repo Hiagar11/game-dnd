@@ -51,12 +51,65 @@ export function useGridDraw(props) {
       const selected = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
 
       if (selected && !selected.systemToken) {
-        const reachable = buildReachableCells(selected, store.walls)
+        const ap = selected.actionPoints ?? 0
+        const reachable = ap > 0 ? buildReachableCells(selected, store.walls, ap) : new Set()
 
         ctx.fillStyle = 'rgba(74, 222, 128, 0.25)'
         for (const key of reachable) {
           const [c, r] = key.split(',').map(Number)
           ctx.fillRect(c * store.cellSize, r * store.cellSize, store.cellSize, store.cellSize)
+        }
+
+        // ── Фантомный путь при ховере ─────────────────────────────────────────
+        const hcell = store.hoveredCell
+        if (hcell) {
+          ctx.fillStyle = 'rgba(250, 204, 21, 0.20)'
+          ctx.fillRect(
+            hcell.col * store.cellSize,
+            hcell.row * store.cellSize,
+            store.cellSize,
+            store.cellSize
+          )
+        }
+
+        const path = store.hoveredPath
+        if (path && path.length > 0) {
+          const cs = store.cellSize
+          const half = cs / 2
+
+          // Начальная точка — сам токен
+          const startX = selected.col * cs + half
+          const startY = selected.row * cs + half
+
+          // Линия пути
+          ctx.beginPath()
+          ctx.moveTo(startX, startY)
+          for (const step of path) {
+            ctx.lineTo(step.col * cs + half, step.row * cs + half)
+          }
+          ctx.strokeStyle = 'rgba(250, 204, 21, 0.75)'
+          ctx.lineWidth = 2
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          ctx.setLineDash([4, 4])
+          ctx.stroke()
+          ctx.setLineDash([])
+
+          // Точки по промежуточным клеткам
+          ctx.fillStyle = 'rgba(250, 204, 21, 0.85)'
+          for (let i = 0; i < path.length - 1; i++) {
+            const step = path[i]
+            ctx.beginPath()
+            ctx.arc(step.col * cs + half, step.row * cs + half, 3, 0, Math.PI * 2)
+            ctx.fill()
+          }
+
+          // Конечная точка — крупнее
+          const last = path[path.length - 1]
+          ctx.fillStyle = 'rgba(250, 204, 21, 1)'
+          ctx.beginPath()
+          ctx.arc(last.col * cs + half, last.row * cs + half, 5, 0, Math.PI * 2)
+          ctx.fill()
         }
       }
     }
@@ -101,6 +154,8 @@ export function useGridDraw(props) {
       () => store.colorGrid,
       () => store.selectedPlacedUid,
       () => store.placedTokens.map((t) => `${t.uid}:${t.col}:${t.row}:${t.attitude}`).join(','),
+      () => store.hoveredPath.map((s) => `${s.col},${s.row}`).join(','),
+      () => `${store.hoveredCell?.col},${store.hoveredCell?.row}`,
       () => store.walls.map((w) => `${w.col}:${w.row}`).join(','),
       // Зона героев на viewer-стороне обновляется при изменении списка героев или выбора
       () => heroesStore.heroes.map((h) => h.id).join(','),

@@ -11,7 +11,7 @@
     уходят к ним, а не к этому слою.
   -->
   <div
-    v-if="selectedToken"
+    v-if="selectedToken && !isWalking"
     class="game-range-overlay"
     :class="{ 'game-range-overlay--boot': cursorInRange }"
     :style="{ width: `${width}px`, height: `${height}px` }"
@@ -59,9 +59,14 @@
 
   // Множество достижимых клеток (обновляется при смене токена или стен).
   // BFS знает про стены — зона не пространяется за них.
-  const reachableCells = computed(() =>
-    selectedToken.value ? buildReachableCells(selectedToken.value, store.walls) : new Set()
-  )
+  // Радиус = текущие AP токена (если 0 — зона пустая)
+  const reachableCells = computed(() => {
+    const t = selectedToken.value
+    if (!t) return new Set()
+    const ap = t.actionPoints ?? 0
+    if (ap <= 0) return new Set()
+    return buildReachableCells(t, store.walls, ap)
+  })
   /**
    * Переводит позицию мыши (clientX/Y) в координату клетки (col, row).
    * Использует currentTarget.getBoundingClientRect() — работает корректно
@@ -79,19 +84,26 @@
 
   function onMouseLeave() {
     cursorInRange.value = false
-    cursorInAttack.value = false
-    cursorInTalk.value = false
+    store.setHoveredPath([])
+    store.setHoveredCell(null)
   }
 
   function onMouseMove(e) {
     if (!selectedToken.value) return
     const { col, row } = getCellAt(e)
     const key = `${col},${row}`
-    cursorInAttack.value = attackCells.value.has(key)
-    cursorInTalk.value = !cursorInAttack.value && talkCells.value.has(key)
-    // Следы показываем, только если клетка не является атаковой или диалоговой
-    cursorInRange.value =
-      !cursorInAttack.value && !cursorInTalk.value && reachableCells.value.has(key)
+    const inRange = reachableCells.value.has(key)
+    cursorInRange.value = inRange
+
+    if (inRange) {
+      store.setHoveredCell({ col, row })
+      const ap = selectedToken.value.actionPoints ?? 0
+      const path = findPath(selectedToken.value, { col, row }, store.walls, ap)
+      store.setHoveredPath(path ?? [])
+    } else {
+      store.setHoveredCell(null)
+      store.setHoveredPath([])
+    }
   }
 
   function onClick(e) {
@@ -100,31 +112,39 @@
     const { col, row } = getCellAt(e)
 
     if (reachableCells.value.has(`${col},${row}`)) {
-      // Ищем маршрут через BFS с учётом стен — цепочка клеток от текущей до цели.
-      // BFS гарантирует, что токен огибает стены, не «срезает» углы.
-      const path = findPath(selectedToken.value, { col, row }, store.walls)
+      // Захватываем uid и AP до снятия выделения — после deselect computed вернёт null
+      const uid = selectedToken.value.uid
+      const ap = selectedToken.value.actionPoints ?? 0
+      const scenarioId = String(store.currentScenario?.id ?? '')
+
+      // Путь строится с ограничением по AP
+      const path = findPath(selectedToken.value, { col, row }, store.walls, ap)
       if (!path || path.length === 0) {
         store.selectPlacedToken(null)
         return
       }
 
-      // Захватываем uid до снятия выделения — после deselect computed вернёт null
-      const uid = selectedToken.value.uid
-      const scenarioId = String(store.currentScenario?.id ?? '')
-
-      // Снимаем выделение сразу: overlay исчезнет, но async-анимация продолжит работу
+      // Ходьба началась — скрываем оверлей, но выделение остаётся — инфо-меню продолжает показывать AP реактивно
       isWalking.value = true
-      store.selectPlacedToken(null)
 
       // Шаги задержаны на 380ms — чуть больше CSS transition (350ms) на токене,
       // чтобы каждый следующий шаг начинался только когда предыдущий визуально завершился.
       ;(async () => {
         for (const step of path) {
+          // Тратим AP; если они кончились — останавливаем ход
+          if (!store.spendActionPoint(uid)) break
           store.moveToken(uid, step.col, step.row)
           if (scenarioId) {
             getSocket()?.emit('token:move', { scenarioId, uid, col: step.col, row: step.row })
           }
           await new Promise((resolve) => setTimeout(resolve, 380))
+        }
+        // Мирное время: если все AP потрачены — восстанавливаем всем без сброса выделения
+        if (!store.combatMode) {
+          const remainingAP = store.placedTokens.find((t) => t.uid === uid)?.actionPoints ?? 0
+          if (remainingAP === 0) {
+            for (const t of store.placedTokens) t.actionPoints = 4
+          }
         }
         isWalking.value = false
       })()
