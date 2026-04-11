@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken'
 import Scenario from '../models/Scenario.js'
 import Token from '../models/Token.js'
-import { askNpc } from '../ai/npcChat.js'
+import { askNpc, summarizeDialog } from '../ai/npcChat.js'
+import { getDispositionConfig } from '../ai/dispositionConfig.js'
 
 // ─── Socket.io обработчики событий ───────────────────────────────────────────
 // Эта функция принимает io (сервер Socket.io) и навешивает все обработчики.
@@ -79,10 +80,7 @@ export function setupSocket(io) {
         if (!scenario) return ackError(ack, 'Сценарий не найден')
 
         const placed = { uid, tokenId: tokenId ?? null, systemToken, col, row, hidden }
-        scenario.placedTokens.push(placed)
-        await scenario.save()
-
-        // Добавляем данные токена для зрителей (изображение + имя) чтобы не делать доп. запрос
+        // tokenType кешируется в схеме для надёжной загрузки без populate
         let tokenName = null
         let tokenImagePath = null
         let tokenAttitude = 'neutral'
@@ -95,7 +93,10 @@ export function setupSocket(io) {
           tokenImagePath = tokenDoc?.imagePath ?? null
           tokenAttitude = tokenDoc?.attitude ?? 'neutral'
           tokenType = tokenDoc?.tokenType ?? 'npc'
+          placed.tokenType = tokenType
         }
+        scenario.placedTokens.push(placed)
+        await scenario.save()
 
         io.to(scenarioId).emit('token:placed', {
           uid,
@@ -227,6 +228,45 @@ export function setupSocket(io) {
       }
     })
 
+    // ─── Редактирование полей размещённого токена ────────────────────────────
+    // Событие: token:edit { scenarioId, uid, fields: { name, attitude, hp, … } }
+    // Персистирует переименование / смену характеристик в БД чтобы они пережили сохранение.
+    socket.on('token:edit', async ({ scenarioId, uid, fields }, ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+      try {
+        const ALLOWED = [
+          'name',
+          'attitude',
+          'hp',
+          'maxHp',
+          'npcName',
+          'personality',
+          'contextNotes',
+          'strength',
+          'agility',
+          'intellect',
+          'charisma',
+        ]
+        const update = {}
+        for (const key of ALLOWED) {
+          if (Object.prototype.hasOwnProperty.call(fields, key)) {
+            update[`placedTokens.$.${key}`] = fields[key] ?? null
+          }
+        }
+        if (Object.keys(update).length === 0) {
+          ack?.({ ok: true })
+          return
+        }
+        await Scenario.findOneAndUpdate(
+          { _id: scenarioId, 'placedTokens.uid': uid },
+          { $set: update }
+        )
+        ack?.({ ok: true })
+      } catch {
+        ackError(ack, 'Ошибка сервера')
+      }
+    })
+
     // ─── Загрузка сценария (синхронизация) ───────────────────────────────
     // Событие: scenario:sync { scenarioId }
     // Отправляем всем в комнате актуальное состояние — используется при подключении нового игрока.
@@ -271,6 +311,12 @@ export function setupSocket(io) {
       livePositions.delete(scenarioId)
 
       const sessionId = socket.user.id
+      // Диалог и оценки отношения хранятся в памяти до закрытия сессии:
+      //   npcScores:       Map<npcUid, number>             — -100..+100
+      //   npcCooldowns:    Map<npcUid, number>             — остаток ходов запрета роста
+      //   npcHistory:      Map<npcUid, [{role, content}]>  — история GPT
+      //   npcMeta:         Map<npcUid, {tokenId, name, attitude}>
+      //   npcBehaviorNotes:Map<npcUid, string[]>           — накопленные впечатления (макс. 5 штук)
       sessions.set(sessionId, {
         adminSocketId: socket.id,
         adminName: username,
@@ -284,6 +330,11 @@ export function setupSocket(io) {
         cursorIconDataUrl: null,
         heroes: [],
         selectedTokenUid: null,
+        npcScores: new Map(),
+        npcCooldowns: new Map(),
+        npcHistory: new Map(),
+        npcMeta: new Map(),
+        npcBehaviorNotes: new Map(),
       })
 
       socket.join(`viewer:${sessionId}`)
@@ -461,40 +512,196 @@ export function setupSocket(io) {
     })
 
     // ─── Диалог с НПС через ИИ ────────────────────────────────────────────────
-    // Событие: npc:talk { npcUid, tokenId, scenarioId, playerMessage }
-    // Сервер запрашивает OpenAI и возвращает ответ обратно только инициатору.
-    // Если ИИ решил изменить отношение — бродкастим token:attitude всей комнате сценария.
-    socket.on('npc:talk', async ({ npcUid, tokenId, scenarioId, playerMessage }) => {
-      try {
-        // Получаем имя и личность НПС из базы
-        const tokenDoc = tokenId
-          ? await Token.findById(tokenId).select('name npcName personality').lean()
-          : null
+    // Событие: npc:talk { npcUid, tokenId, scenarioId, placedAttitude, placedName, playerMessage }
+    // Сервер запрашивает OpenAI, накапливает счёт отношения и бродкастит token:attitude при смене.
+    socket.on(
+      'npc:talk',
+      async ({ npcUid, tokenId, scenarioId, placedAttitude, placedName, playerMessage }) => {
+        try {
+          const tokenDoc = tokenId
+            ? await Token.findById(tokenId)
+                .select('name npcName personality contextNotes dispositionType')
+                .lean()
+            : null
 
-        const npcName = tokenDoc?.npcName?.trim() || tokenDoc?.name || 'Незнакомец'
-        const personality = tokenDoc?.personality ?? ''
-        const message = typeof playerMessage === 'string' ? playerMessage.slice(0, 200) : 'Привет!'
+          const npcName = tokenDoc?.npcName?.trim() || tokenDoc?.name || placedName || 'Незнакомец'
+          const personality = tokenDoc?.personality ?? ''
+          const contextNotes = tokenDoc?.contextNotes ?? ''
+          const dispositionType = tokenDoc?.dispositionType ?? 'neutral'
+          const disposition = getDispositionConfig(dispositionType)
+          const message =
+            typeof playerMessage === 'string' ? playerMessage.slice(0, 200) : 'Привет!'
 
-        const { reply, attitudeChange } = await askNpc({
-          npcName,
-          personality,
-          playerMessage: message,
-        })
+          // Описание локации из сценария
+          const scenarioDoc = scenarioId
+            ? await Scenario.findById(scenarioId).select('locationDescription').lean()
+            : null
+          const locationDescription = scenarioDoc?.locationDescription ?? ''
 
-        // Отвечаем только запросившему сокету (текст + возможное изменение отношения)
-        socket.emit('npc:reply', { npcUid, text: reply, attitudeChange })
+          // Состояние сессии для этого НПС
+          const adminId = socket.user.id
+          const session = sessions.get(adminId)
+          const scores = session?.npcScores
+          const cooldowns = session?.npcCooldowns
+          const histories = session?.npcHistory
+          const metaMap = session?.npcMeta
+          const behaviorNotesMap = session?.npcBehaviorNotes
 
-        // Если ИИ изменил отношение — бродкастим всей комнате сценария
-        if (attitudeChange && scenarioId) {
-          io.to(String(scenarioId)).emit('token:attitude', {
-            uid: npcUid,
-            attitude: attitudeChange,
+          if (!scores.has(npcUid)) {
+            const initScore =
+              placedAttitude === 'friendly' ? 50 : placedAttitude === 'hostile' ? -50 : 0
+            scores.set(npcUid, initScore)
+          }
+          if (!cooldowns.has(npcUid)) cooldowns.set(npcUid, 0)
+          if (!histories.has(npcUid)) histories.set(npcUid, [])
+          if (!behaviorNotesMap.has(npcUid)) behaviorNotesMap.set(npcUid, [])
+          if (!metaMap.has(npcUid)) {
+            metaMap.set(npcUid, {
+              tokenId: tokenId ?? null,
+              name: npcName,
+              attitude: placedAttitude ?? 'neutral',
+            })
+          }
+
+          const currentScore = scores.get(npcUid)
+          const history = histories.get(npcUid)
+          // Сохраняем флаг до обработки: приветствие не запускает кулдаун
+          const isFirstMessage = history.length === 0
+
+          const {
+            reply,
+            attitudeDelta: rawDelta,
+            traitNote,
+          } = await askNpc({
+            npcName,
+            personality,
+            contextNotes,
+            locationDescription,
+            currentScore,
+            history,
+            playerMessage: message,
+            behaviorNotes: behaviorNotesMap.get(npcUid) ?? [],
+          })
+
+          history.push({ role: 'user', content: message })
+          history.push({ role: 'assistant', content: reply })
+
+          // Кулдаун: если положительный рост запрещён, игнорируем delta
+          let cd = cooldowns.get(npcUid)
+          // Множитель нрава — только для положительных дельт. Дружелюбный завоевывает доверие быстрее,
+          // враждебный — медленнее. Отрицательные дельты (гнев, обиды) всегда ×1.
+          let attitudeDelta =
+            rawDelta > 0 ? Math.round(rawDelta * disposition.positiveMultiplier) : rawDelta
+          if (attitudeDelta > 0 && cd > 0) {
+            attitudeDelta = 0 // запрет роста в течение кулдауна
+          }
+          // Уменьшаем кулдаун на 1 за каждое сообщение (независимо от знака дельты)
+          if (cd > 0) cooldowns.set(npcUid, cd - 1)
+
+          const newScore = Math.max(-100, Math.min(100, currentScore + attitudeDelta))
+          scores.set(npcUid, newScore)
+
+          // Сохраняем traitNote — накапливаем впечатления (последние 5)
+          if (traitNote) {
+            const notes = behaviorNotesMap.get(npcUid)
+            notes.push(traitNote)
+            if (notes.length > 5) notes.shift()
+          }
+
+          // Запускаем кулдаун 6 ходов только на ручных сообщениях игрока (не на приветствии)
+          if (attitudeDelta > 0 && newScore > currentScore && !isFirstMessage) {
+            cooldowns.set(npcUid, 6)
+          }
+
+          // Пороги: определяются типом нрава НПС
+          const prevAttitude = metaMap.get(npcUid).attitude
+          const newAttitude =
+            newScore > disposition.ally
+              ? 'friendly'
+              : newScore < disposition.enemy
+                ? 'hostile'
+                : 'neutral'
+          metaMap.get(npcUid).attitude = newAttitude
+
+          if (newAttitude !== prevAttitude && scenarioId) {
+            io.to(String(scenarioId)).emit('token:attitude', { uid: npcUid, attitude: newAttitude })
+            // Персистим смену отношения в Сценарий, чтобы оно пережило сохранение сессии
+            Scenario.findOneAndUpdate(
+              { _id: scenarioId, 'placedTokens.uid': npcUid },
+              { $set: { 'placedTokens.$.attitude': newAttitude } }
+            ).catch(() => {})
+          }
+
+          socket.emit('npc:reply', {
+            npcUid,
+            text: reply,
+            attitudeDelta,
+            // rawDelta — реальное мнение ИИ (не зануляется кулдауном), нужно клиенту для стрелок
+            displayDelta: rawDelta,
+            newScore,
+            newAttitude,
+            cooldownLeft: cooldowns.get(npcUid),
+            // traitNote — наблюдение ИИ о поведении игрока (для отображения в UI)
+            traitNote: traitNote ?? null,
+          })
+        } catch (err) {
+          console.error('[npc:talk] ошибка:', err.message)
+          socket.emit('npc:reply', {
+            npcUid,
+            text: 'Приветствую, путник.',
+            attitudeDelta: 0,
+            newScore: 0,
+            newAttitude: null,
           })
         }
+      }
+    )
+
+    // ─── Итог сессии: суммаризация диалогов НПС ──────────────────────────────
+    // Событие: npc:session:summary → ack({ ok, npcs: [{npcUid, tokenId, name, attitude, summary}] })
+    socket.on('npc:session:summary', async (ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+      const session = sessions.get(socket.user.id)
+      if (!session?.npcMeta?.size) return ack?.({ ok: true, npcs: [] })
+
+      try {
+        const results = await Promise.all(
+          Array.from(session.npcMeta.entries()).map(async ([npcUid, meta]) => {
+            const history = session.npcHistory.get(npcUid) ?? []
+            if (!history.length) return null
+            const summary = await summarizeDialog({
+              npcName: meta.name,
+              history,
+              currentAttitude: meta.attitude,
+            })
+            return {
+              npcUid,
+              tokenId: meta.tokenId,
+              name: meta.name,
+              attitude: meta.attitude,
+              summary,
+            }
+          })
+        )
+        ack?.({ ok: true, npcs: results.filter(Boolean) })
       } catch (err) {
-        console.error('[npc:talk] ошибка:', err.message)
-        // Фоллбэк — простая реплика без AI
-        socket.emit('npc:reply', { npcUid, text: 'Приветствую, путник.', attitudeChange: null })
+        console.error('[npc:session:summary] ошибка:', err.message)
+        ack?.({ ok: false, error: err.message })
+      }
+    })
+
+    // ─── Сохранение заметок НПС (contextNotes) ───────────────────────────────
+    // Событие: npc:save:notes { tokenId, contextNotes }
+    socket.on('npc:save:notes', async ({ tokenId, contextNotes }, ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+      if (!tokenId) return ack?.({ ok: true })
+      try {
+        await Token.findByIdAndUpdate(tokenId, {
+          contextNotes: String(contextNotes ?? '').slice(0, 800),
+        })
+        ack?.({ ok: true })
+      } catch (err) {
+        ackError(ack, err.message)
       }
     })
 

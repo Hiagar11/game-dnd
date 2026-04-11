@@ -50,7 +50,7 @@ router.post('/upload-map', requireAdmin, mapUpload.single('map'), (req, res) => 
 // ─── POST /api/scenarios ──────────────────────────────────────────────────────
 // Создание нового сценария. Только для admin.
 router.post('/', requireAdmin, async (req, res) => {
-  const { name, mapImagePath, cellSize, placedTokens, walls } = req.body
+  const { name, mapImagePath, cellSize, placedTokens, walls, locationDescription } = req.body
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Название обязательно' })
@@ -87,6 +87,8 @@ router.post('/', requireAdmin, async (req, res) => {
       name: name.trim(),
       mapImagePath: mapImagePath || '',
       cellSize: Number(cellSize) || 60,
+      locationDescription:
+        typeof locationDescription === 'string' ? locationDescription.slice(0, 600) : '',
       placedTokens: normalizedTokens,
       defaultPlacedTokens: normalizedTokens,
       walls: Array.isArray(walls)
@@ -151,10 +153,12 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (String(scenario.owner) !== String(req.user.id))
       return res.status(403).json({ error: 'Нет доступа' })
 
-    const { name, mapImagePath, cellSize } = req.body
+    const { name, mapImagePath, cellSize, locationDescription } = req.body
     if (name !== undefined) scenario.name = name.trim()
     if (mapImagePath !== undefined) scenario.mapImagePath = mapImagePath
     if (cellSize !== undefined) scenario.cellSize = Number(cellSize)
+    if (locationDescription !== undefined)
+      scenario.locationDescription = String(locationDescription).slice(0, 600)
 
     await scenario.save()
     res.json(formatScenario(scenario, req))
@@ -271,7 +275,7 @@ function formatScenario(scenario, req, { full = false, showHidden = false } = {}
     mapImagePath: scenario.mapImagePath,
     mapImageUrl,
     cellSize: scenario.cellSize,
-    // Количество расставленных токенов — позволяет отличать «карту» (токенов = 0) от «уровня» (токены > 0)
+    locationDescription: scenario.locationDescription ?? '',
     tokensCount: scenario.placedTokens?.length ?? 0,
     createdAt: scenario.createdAt,
   }

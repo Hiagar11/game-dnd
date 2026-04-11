@@ -23,6 +23,22 @@ const placedTokenSchema = new mongoose.Schema(
     row: { type: Number, required: true },
     // hidden: true — токен виден только DM (используется для врагов в тумане войны)
     hidden: { type: Boolean, default: false },
+    // ─── Переопределяемые поля ─────────────────────────────────────────────
+    // Если null — при загрузке используется значение из шаблона (Token).
+    // Устанавливаются через сокет token:edit при редактировании размещённого токена.
+    tokenType: { type: String, default: null }, // 'hero' | 'npc', кешируется для надёжной загрузки
+    name: { type: String, default: null }, // переименование экземпляра
+    attitude: { type: String, default: null }, // изменилось в ходе сессии
+    hp: { type: Number, default: null },
+    maxHp: { type: Number, default: null },
+    npcName: { type: String, default: null },
+    personality: { type: String, default: null },
+    contextNotes: { type: String, default: null },
+    dispositionType: { type: String, default: null },
+    strength: { type: Number, default: null },
+    agility: { type: Number, default: null },
+    intellect: { type: Number, default: null },
+    charisma: { type: Number, default: null },
   },
   { _id: false }
 )
@@ -73,6 +89,14 @@ const scenarioSchema = new mongoose.Schema(
     walls: {
       type: [{ col: Number, row: Number, _id: false }],
       default: [],
+    },
+    // Описание местности — отправляется в системный промпт всем НПС сценария.
+    // ДМ описывает атмосферу, место, особенности локации.
+    // Пример: «Таверна 'Ржавый якорь'. Тёмное место, воры и контрабандисты. Все настороженные.»
+    locationDescription: {
+      type: String,
+      default: '',
+      maxlength: 600,
     },
   },
   { timestamps: true }

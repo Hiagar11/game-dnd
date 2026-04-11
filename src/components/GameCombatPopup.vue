@@ -227,6 +227,13 @@
   import { PhHeart, PhLightning, PhHandFist, PhX } from '@phosphor-icons/vue'
   import { useGameStore } from '../stores/game'
   import { playSuccess, playFist } from '../composables/useSound'
+  import {
+    HIT_DC,
+    calcCritChance,
+    calcDamageBonus,
+    calcEvasion,
+    calcDefense,
+  } from '../utils/combatFormulas'
 
   const props = defineProps({
     visible: { type: Boolean, default: false },
@@ -236,23 +243,6 @@
 
   const store = useGameStore()
   const DEFAULT_AP = 4
-
-  // Сложность броска на попадание (d20 + critChance >= HIT_DC → попал)
-  const HIT_DC = 10
-
-  // ── Вторичные характеристики (по формулам из модели) ─────────────────────────
-  function calcCritChance(t) {
-    return Math.floor(((t?.agility ?? 0) * 2 + (t?.strength ?? 0)) / 5)
-  }
-  function calcDamageBonus(t) {
-    return Math.floor(((t?.strength ?? 0) * 2 + (t?.agility ?? 0)) / 5)
-  }
-  function calcEvasion(t) {
-    return Math.floor(((t?.agility ?? 0) * 3 + (t?.strength ?? 0)) / 5)
-  }
-  function calcDefense(t) {
-    return Math.floor(((t?.strength ?? 0) + (t?.agility ?? 0)) / 4)
-  }
 
   const heroToken = computed(() => {
     if (!store.combatPair) return null

@@ -76,14 +76,21 @@ router.post('/', upload.single('image'), async (req, res) => {
     // Сохраняем относительный путь — чтобы сервер мог переехать
     const imagePath = `uploads/tokens/${req.file.filename}`
 
+    const { contextNotes } = req.body
+    const dispositionType = req.body.dispositionType
+
+    const DISPOSITION_TYPES = ['friendly', 'sociable', 'neutral', 'guarded', 'hostile']
+
     const token = await Token.create({
       owner: req.user.id,
       name: name.trim(),
       imagePath,
       tokenType: tokenType === 'hero' ? 'hero' : 'npc',
       attitude: ['neutral', 'friendly', 'hostile'].includes(attitude) ? attitude : 'neutral',
+      dispositionType: DISPOSITION_TYPES.includes(dispositionType) ? dispositionType : 'neutral',
       personality: typeof personality === 'string' ? personality.slice(0, 500) : '',
       npcName: typeof npcName === 'string' ? npcName.trim().slice(0, 40) : '',
+      contextNotes: typeof contextNotes === 'string' ? contextNotes.slice(0, 800) : '',
       stats: {
         strength: Number(strength) || 0,
         agility: Number(agility) || 0,
@@ -156,6 +163,15 @@ router.put('/:id', async (req, res) => {
     }
     if (req.body.npcName !== undefined) {
       token.npcName = String(req.body.npcName).trim().slice(0, 40)
+    }
+    if (req.body.contextNotes !== undefined) {
+      token.contextNotes = String(req.body.contextNotes).slice(0, 800)
+    }
+    if (req.body.dispositionType !== undefined) {
+      const DISPOSITION_TYPES = ['friendly', 'sociable', 'neutral', 'guarded', 'hostile']
+      if (DISPOSITION_TYPES.includes(req.body.dispositionType)) {
+        token.dispositionType = req.body.dispositionType
+      }
     }
 
     // DM может вручную скорректировать уровень или обнулить XP (например, для быстрого теста)
@@ -250,7 +266,9 @@ function formatToken(token, req) {
     npcName: token.npcName ?? '',
     tokenType: token.tokenType ?? 'npc',
     attitude: token.attitude ?? 'neutral',
+    dispositionType: token.dispositionType ?? 'neutral',
     personality: token.personality ?? '',
+    contextNotes: token.contextNotes ?? '',
     imageUrl: `${req.protocol}://${req.get('host')}/${token.imagePath}`,
     stats: token.stats,
     xp: token.xp ?? 0,

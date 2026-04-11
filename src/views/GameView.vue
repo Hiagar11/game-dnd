@@ -66,6 +66,14 @@
       @skip="doActualExit"
     />
 
+    <!-- Попап итогов диалогов НПС — появляется до попапа сохранения -->
+    <GameSessionSummaryPopup
+      :visible="showSummaryPopup"
+      :npcs="summaryNpcs"
+      @save="onSummaryConfirm"
+      @skip="onSummarySkip"
+    />
+
     <!-- Боевой попап: появляется когда образована боевая пара -->
     <GameCombatPopup
       :visible="!!gameStore.combatPair"
@@ -103,6 +111,7 @@
   import GameCombatTracker from '../components/GameCombatTracker.vue'
   import GameSavePopup from '../components/GameSavePopup.vue'
   import GameCombatPopup from '../components/GameCombatPopup.vue'
+  import GameSessionSummaryPopup from '../components/GameSessionSummaryPopup.vue'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
 
@@ -325,6 +334,8 @@
 
   // ─── Выход из игры с предложением сохранения ─────────────────────────────────
   const showSavePopup = ref(false)
+  const showSummaryPopup = ref(false)
+  const summaryNpcs = ref([])
   const activeSessionName = ref(null)
 
   // Нативный диалог браузера при перезагрузке или закрытии вкладки.
@@ -335,19 +346,59 @@
     }
   }
 
-  // Кнопка «← К выбору»: если идёт сессия — показываем попап, иначе выходим сразу.
-  function onExitClick() {
+  // Кнопка «← К выбору»:
+  // Если сессии нет и изменений нет — выход сразу.
+  // Если сессия активна — всегда запрашиваем итог диалогов у сервера:
+  //   • есть НПС с историей → показываем попап записей памяти
+  //   • нет НПС, но были изменения → показываем попап сохранения
+  //   • нет ничего → выход без попапов
+  async function onExitClick() {
     playClick()
-    if (sessionActive.value && sessionChanged.value) {
+    if (!sessionActive.value) {
+      return sessionChanged.value ? (showSavePopup.value = true) : doActualExit()
+    }
+
+    // Запрашиваем суммаризацию диалогов НПС у сервера (до 8 с)
+    const res = await new Promise((resolve) => {
+      getSocket()?.emit('npc:session:summary', resolve)
+      setTimeout(() => resolve({ ok: true, npcs: [] }), 8000)
+    })
+
+    if (res?.ok && res.npcs?.length > 0) {
+      summaryNpcs.value = res.npcs.map((npc) => {
+        const placed = gameStore.placedTokens.find((t) => t.uid === npc.npcUid)
+        return { ...npc, src: placed?.src ?? null }
+      })
+      showSummaryPopup.value = true
+    } else if (sessionChanged.value) {
       showSavePopup.value = true
     } else {
       doActualExit()
     }
   }
 
-  // Реальный выход — закрывает сокет-сессию и возвращает на экран выбора.
+  // Попап суммаризации: Сохраняем notes через сокет, затем показываем попап сохранения.
+  async function onSummaryConfirm(saves) {
+    const socket = getSocket()
+    await Promise.allSettled(
+      saves.map(
+        ({ tokenId, notes }) =>
+          new Promise((resolve) =>
+            socket?.emit('npc:save:notes', { tokenId, contextNotes: notes }, resolve)
+          )
+      )
+    )
+    showSummaryPopup.value = false
+    showSavePopup.value = true
+  }
+
+  function onSummarySkip() {
+    showSummaryPopup.value = false
+    showSavePopup.value = true
+  }
   function doActualExit() {
     showSavePopup.value = false
+    showSummaryPopup.value = false
     activeSessionName.value = null
     stopTravelMusic()
     stopBattleMusic()

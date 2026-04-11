@@ -17,6 +17,7 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@iconify-prerendered/vue-game-icons": "^0.28.1746419248",
     "@phosphor-icons/vue": "^2.2.1",
     "pinia": "^3.0.4",
     "socket.io-client": "^4.8.3",

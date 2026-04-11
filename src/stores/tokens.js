@@ -32,6 +32,7 @@ export const useTokensStore = defineStore('tokens', () => {
     stats,
     attitude,
     personality,
+    contextNotes,
   }) {
     return {
       id,
@@ -40,6 +41,7 @@ export const useTokensStore = defineStore('tokens', () => {
       tokenType: tokenType ?? 'npc',
       attitude: attitude ?? 'neutral',
       personality: personality ?? '',
+      contextNotes: contextNotes ?? '',
       src: imageUrl,
       ...stats,
     }

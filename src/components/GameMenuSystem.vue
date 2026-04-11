@@ -112,8 +112,7 @@
 
 <script setup>
   import { ref, inject } from 'vue'
-  import { SYSTEM_TOKENS } from '../stores/game'
-  import { useGameStore } from '../stores/game'
+  import { SYSTEM_TOKENS, useGameStore } from '../stores/game'
   import { useAuthStore } from '../stores/auth'
   import { useSound } from '../composables/useSound'
 

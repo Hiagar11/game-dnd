@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
 import { useTokensStore } from './tokens'
 import { mapServerToken } from '../utils/mapServerToken'
+import { calcMaxHp } from '../utils/combatFormulas'
 
 // Re-export для обратной совместимости (GameMenuSystem.vue)
 export { SYSTEM_TOKENS }
@@ -27,12 +28,6 @@ export const useGameStore = defineStore('game', () => {
   const placedTokens = ref([])
   const selectedPlacedUid = ref(null)
   const shakingTokenUid = ref(null)
-
-  // ─── Вычисление HP ───────────────────────────────────────────────────────────
-  // maxHp = 10 + Сила*2 + Ловкость
-  function calcMaxHp(strength = 0, agility = 0) {
-    return 10 + strength * 2 + agility
-  }
 
   // ─── Стены ────────────────────────────────────────────────────────────────────
   // Массив { col, row } — клетки, отмеченные как стена.

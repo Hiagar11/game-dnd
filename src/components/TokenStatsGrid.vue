@@ -59,6 +59,12 @@
     PhMagicWand,
     PhChatTeardropText,
   } from '@phosphor-icons/vue'
+  import {
+    calcCritChance,
+    calcDamageBonus,
+    calcEvasion,
+    calcDefense,
+  } from '../utils/combatFormulas'
 
   const props = defineProps({ modelValue: { type: Object, required: true } })
   defineEmits(['update:modelValue'])
@@ -129,13 +135,13 @@
     const { strength: s = 0, agility: a = 0, intellect: i = 0, charisma: c = 0 } = props.modelValue
     switch (key) {
       case 'damage':
-        return Math.floor((s * 2 + a) / 5)
+        return calcDamageBonus(props.modelValue)
       case 'critChance':
-        return Math.floor((a * 2 + s) / 5)
+        return calcCritChance(props.modelValue)
       case 'defense':
-        return Math.floor((s + a) / 4)
+        return calcDefense(props.modelValue)
       case 'evasion':
-        return Math.floor((a * 3 + s) / 5)
+        return calcEvasion(props.modelValue)
       case 'initiative':
         return Math.floor((a + i) / 2)
       case 'resistance':

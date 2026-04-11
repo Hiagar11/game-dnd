@@ -48,7 +48,6 @@
   import { useHeroesStore } from '../stores/heroes'
   import { useScenariosStore } from '../stores/scenarios'
   import { playTravelMusic, stopTravelMusic } from '../composables/useSound'
-  import { SYSTEM_TOKENS } from '../constants/systemTokens'
   import { buildReachableCells } from '../composables/useTokenMove'
   import AppBackground from '../components/AppBackground.vue'
   import GameMap from '../components/GameMap.vue'
@@ -57,9 +56,6 @@
   import GameTokens from '../components/GameTokens.vue'
   import AdminCursorOverlay from '../components/AdminCursorOverlay.vue'
   import ViewerMenu from '../components/ViewerMenu.vue'
-
-  // Базовый URL сервера — для построения imageUrl из imagePath
-  const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
   const route = useRoute()
   const auth = useAuthStore()
@@ -181,7 +177,7 @@
     stopTravelMusic()
     gameStore.currentScenario = null
     // Очищаем токены чтобы не было «статики» при переходе на другой маршрут
-    gameStore.placedTokens = []
+    gameStore.initPlacedTokens([])
   })
 
   // ── Загрузка сценария через REST API (без зависимости от tokensStore) ────────
@@ -192,7 +188,7 @@
       const full = await scenariosStore.fetchScenario(scenarioId)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.initWalls(full.walls ?? [])
-      gameStore.placedTokens = buildPlacedTokens(full.placedTokens ?? [])
+      gameStore.initPlacedTokens(full.placedTokens ?? [])
       gameStore.currentScenario = full
       mapSrc.value = full.mapImageUrl ?? ''
       ready.value = true
@@ -200,46 +196,6 @@
     } catch (err) {
       joinError.value = err.message || 'Не удалось загрузить карту'
     }
-  }
-
-  // Преобразует populate-данные REST в формат gameStore (без tokensStore)
-  function buildPlacedTokens(serverTokens) {
-    return serverTokens.map((pt) => {
-      if (pt.systemToken) {
-        const def = SYSTEM_TOKENS.find((t) => t.id === pt.systemToken)
-        return {
-          uid: pt.uid,
-          tokenId: null,
-          systemToken: pt.systemToken,
-          targetScenarioId: pt.targetScenarioId ? String(pt.targetScenarioId) : null,
-          col: pt.col,
-          row: pt.row,
-          hidden: false,
-          name: def?.name ?? pt.systemToken,
-          src: def?.src ?? '',
-          strength: 0,
-          agility: 0,
-          intellect: 0,
-          charisma: 0,
-        }
-      }
-
-      // tokenId — populated объект { _id, name, imagePath, stats } из REST
-      const tid = pt.tokenId
-      return {
-        uid: pt.uid,
-        tokenId: tid?._id ? String(tid._id) : null,
-        col: pt.col,
-        row: pt.row,
-        hidden: false,
-        name: tid?.name ?? 'Неизвестный',
-        src: tid?.imagePath ? `${API}/${tid.imagePath}` : '',
-        strength: tid?.stats?.strength ?? 0,
-        agility: tid?.stats?.agility ?? 0,
-        intellect: tid?.stats?.intellect ?? 0,
-        charisma: tid?.stats?.charisma ?? 0,
-      }
-    })
   }
 
   function onMapReady(canvas) {

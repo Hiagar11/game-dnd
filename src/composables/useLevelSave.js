@@ -29,6 +29,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
   const showSavePopup = ref(false)
   const levelName = ref('')
   const levelNameInputRef = ref(null)
+  const locationDescription = ref('')
   const saving = ref(false)
   const saveError = ref('')
   const saveSuccess = ref(false)
@@ -40,6 +41,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
   function openSavePopup() {
     levelName.value = ''
     saveError.value = ''
+    locationDescription.value = selectedScenario.value?.locationDescription ?? ''
     showSavePopup.value = true
     nextTick(() => levelNameInputRef.value?.focus())
   }
@@ -96,6 +98,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
         name: levelName.value,
         mapImagePath: selectedScenario.value.mapImagePath,
         cellSize: selectedScenario.value.cellSize,
+        locationDescription: locationDescription.value,
         placedTokens: tokens,
         walls,
       })
@@ -116,6 +119,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
     showSavePopup,
     levelName,
     levelNameInputRef,
+    locationDescription,
     saving,
     saveError,
     saveSuccess,

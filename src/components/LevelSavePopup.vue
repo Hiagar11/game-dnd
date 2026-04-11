@@ -14,6 +14,18 @@
         @keydown.enter="$emit('save')"
         @keydown.esc="$emit('close')"
       />
+      <p class="save-popup__hint save-popup__hint--location">
+        Описание локации для НПС
+        <span class="save-popup__hint-note">(необязательно)</span>
+      </p>
+      <textarea
+        class="save-popup__textarea"
+        :value="locationDescription"
+        placeholder="Таверна в городе Нейвен, вечер, шумная толпа..."
+        maxlength="600"
+        rows="3"
+        @input="$emit('update:locationDescription', $event.target.value)"
+      />
       <p v-if="error" class="save-popup__error">{{ error }}</p>
     </div>
     <div class="save-popup__actions">
@@ -38,11 +50,12 @@
   const props = defineProps({
     visible: { type: Boolean, required: true },
     modelValue: { type: String, default: '' },
+    locationDescription: { type: String, default: '' },
     saving: { type: Boolean, default: false },
     error: { type: String, default: '' },
   })
 
-  const emit = defineEmits(['update:modelValue', 'save', 'close'])
+  const emit = defineEmits(['update:modelValue', 'update:locationDescription', 'save', 'close'])
 
   const { playHover, playClick } = useSound()
 
@@ -87,6 +100,28 @@
 
   .save-popup__input {
     @include form-input($font-size: 14px);
+  }
+
+  .save-popup__hint--location {
+    margin-top: var(--space-2);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+  }
+
+  .save-popup__hint-note {
+    opacity: 0.5;
+    font-size: 11px;
+  }
+
+  .save-popup__textarea {
+    @include form-input($font-size: 13px);
+
+    resize: none;
+    line-height: 1.5;
+    font-family: var(--font-ui);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .save-popup__error {

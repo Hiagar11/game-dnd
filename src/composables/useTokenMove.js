@@ -6,6 +6,14 @@
 // Радиус зоны хода — в клетках
 export const RANGE_RADIUS = 4
 
+// 4 направления 4-связного BFS: влево, вправо, вверх, вниз
+const DIRS = [
+  [-1, 0],
+  [1, 0],
+  [0, -1],
+  [0, 1],
+]
+
 /**
  * Проверяет, попадает ли клетка (col, row) ЦЕЛИКОМ в круг радиуса RANGE_RADIUS
  * с центром в центре клетки токена.
@@ -55,14 +63,6 @@ export function buildReachableCells(token, walls, radius = RANGE_RADIUS, occupie
   const queue = [[token.col, token.row, radius]]
   // Посещённые клетки — чтобы не обрабатывать одну клетку дважды
   const visited = new Set([`${token.col},${token.row}`])
-
-  // 4 направления: влево, вправо, вверх, вниз
-  const DIRS = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ]
 
   while (queue.length) {
     const [col, row, steps] = queue.shift()
@@ -116,13 +116,6 @@ export function findPath(token, target, walls, radius = RANGE_RADIUS, occupiedKe
   // stepCount[key] = количество шагов от старта до этой клетки
   const stepCount = new Map([[startKey, 0]])
   const queue = [[token.col, token.row]]
-
-  const DIRS = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ]
 
   outer: while (queue.length) {
     const [col, row] = queue.shift()
@@ -189,12 +182,6 @@ export function buildAttackCells(token, placedTokens, walls) {
   )
   if (!hostiles.length) return new Set()
 
-  const DIRS = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ]
   const attackCells = new Set()
 
   for (const enemy of hostiles) {
@@ -234,12 +221,6 @@ export function buildTalkCells(token, placedTokens, walls) {
   )
   if (!friendly.length) return new Set()
 
-  const DIRS = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-  ]
   const talkCells = new Set()
 
   for (const npc of friendly) {

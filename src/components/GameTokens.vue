@@ -45,7 +45,7 @@
           !props.viewerMode &&
           placed.systemToken === 'door' &&
           !!placed.targetScenarioId &&
-          isNonSystemSelected.value,
+          isNonSystemSelected,
         'game-tokens__token--flash-hit': flashMap.get(placed.uid) === 'hit',
         'game-tokens__token--flash-miss': flashMap.get(placed.uid) === 'miss',
         'game-tokens__token--active-turn': currentTurnUid === placed.uid,
@@ -71,16 +71,32 @@
         :system-token="!!placed.systemToken"
         @remove="handleRemove(placed.uid)"
         @edit="handleEdit(placed.uid)"
-        @abilities="closeContextMenu()"
-        @inventory="closeContextMenu()"
+        @abilities="handleAbilities(placed.uid)"
+        @inventory="handleInventory(placed.uid)"
       />
       <!-- Облако диалога: умное позиционирование — не выходит за вьюпорт, закрывается снаружи -->
       <GameDialogBubble
         v-if="dialogBubbles.has(placed.uid)"
-        :text="dialogBubbles.get(placed.uid)"
+        :messages="dialogBubbles.get(placed.uid).messages"
+        :loading="dialogBubbles.get(placed.uid).loading"
+        :npc-src="placed.src"
+        :player-src="dialogBubbles.get(placed.uid).heroSrc ?? null"
+        :npc-score="
+          dialogBubbles.get(placed.uid).npcScore ??
+          (placed.attitude === 'friendly' ? 50 : placed.attitude === 'hostile' ? -50 : 0)
+        "
+        @send="onDialogSend(placed.uid, $event)"
       />
       <!-- Столб золотого свечения активного хода — рендерится только для текущего токена -->
       <div v-if="currentTurnUid === placed.uid" class="game-tokens__turn-pillar" />
+      <!-- Индикатор изменения отношения: зелёная стрелка ↑ / красная ↓ -->
+      <Transition name="attitude-arrow">
+        <div
+          v-if="attitudeArrows[placed.uid]"
+          class="game-tokens__attitude-arrow"
+          :class="`game-tokens__attitude-arrow--${attitudeArrows[placed.uid]}`"
+        />
+      </Transition>
       <img :src="placed.src" :alt="placed.name" class="game-tokens__img" draggable="false" />
     </div>
   </div>
@@ -117,7 +133,8 @@
       :visible="editPlacedUid !== null"
       :placed-uid="editPlacedUid"
       :token-type="store.placedTokens.find((t) => t.uid === editPlacedUid)?.tokenType ?? 'npc'"
-      @close="editPlacedUid = null"
+      :initial-tab="editInitialTab"
+      @close="closeEditPopup"
     />
 
     <GameDoorPopup
@@ -132,7 +149,7 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch, onUnmounted } from 'vue'
+  import { ref, computed, watch } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useHeroesStore } from '../stores/heroes'
   import { useFogVisibility } from '../composables/useFogVisibility'
@@ -141,6 +158,9 @@
   import { useSocket } from '../composables/useSocket'
   import { buildReachableCells, findPath } from '../composables/useTokenMove'
   import { playSuccess, playFist } from '../composables/useSound'
+  import { HIT_DC, calcCritChance, calcDamageBonus } from '../utils/combatFormulas'
+  import { DIRS, useTokenReachability } from '../composables/useTokenReachability'
+  import { useNpcDialog } from '../composables/useNpcDialog'
   import GameTokenContextMenu from './GameTokenContextMenu.vue'
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
   import GameDoorPopup from './GameDoorPopup.vue'
@@ -163,51 +183,15 @@
   // ref на компонент DamageFloat — вызываем spawn() при нанесении урона
   const damageFloatRef = ref(null)
 
-  // uid токена → текст облака диалога. Map позволяет нескольким НПС говорить одновременно.
-  const dialogBubbles = ref(new Map())
-
-  // Map uid → функция очистки (снимает document-слушатель кликов снаружи)
-  const bubbleCleanups = new Map()
-
-  // Закрыть облако конкретного токена и снять слушатель
-  function closeBubble(uid) {
-    const m = new Map(dialogBubbles.value)
-    m.delete(uid)
-    dialogBubbles.value = m
-    bubbleCleanups.get(uid)?.()
-    bubbleCleanups.delete(uid)
-  }
-
-  // Показывает облако диалога. Закрывается по клику вне облака (без таймера).
-  function showDialogBubble(uid, text) {
-    // Сначала закрываем предыдущее облако этого токена, если было
-    closeBubble(uid)
-
-    const next = new Map(dialogBubbles.value)
-    next.set(uid, text)
-    dialogBubbles.value = next
-
-    // Запускаем слушатель с задержкой, чтобы не поймать текущий клик
-    const timer = setTimeout(() => {
-      function onOutsideClick(e) {
-        // composedPath позволяет правильно проверить клики внутри shadow DOM
-        const insideBubble = e.composedPath().some((el) => el.classList?.contains('dialog-bubble'))
-        if (!insideBubble) closeBubble(uid)
-      }
-      // capture: true — перехватываем до любого .stop в дочерних элементах
-      document.addEventListener('click', onOutsideClick, true)
-      bubbleCleanups.set(uid, () => document.removeEventListener('click', onOutsideClick, true))
-    }, 150)
-
-    // Пока таймер не сработал — cleanups хранит отмену таймера
-    bubbleCleanups.set(uid, () => clearTimeout(timer))
-  }
-
-  // Снимаем все слушатели при размонтировании компонента
-  onUnmounted(() => {
-    for (const cleanup of bubbleCleanups.values()) cleanup()
-    bubbleCleanups.clear()
-  })
+  const {
+    dialogBubbles,
+    attitudeArrows,
+    closeBubble,
+    openBubble,
+    addNpcMessage,
+    addPlayerMessage,
+    triggerAttitudeArrow,
+  } = useNpcDialog(store)
 
   // uid → 'hit' | 'miss' — токены с активным flash-эффектом
   const flashMap = ref(new Map())
@@ -234,17 +218,8 @@
     return !!(sel && !sel.systemToken)
   })
 
-  // Клетки в зоне достижимости выбранного героя — нужны для определения курсора над НПС
-  const heroReachable = computed(() => {
-    const sel = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
-    if (!sel || sel.systemToken || sel.tokenType !== 'hero') return new Set()
-    const ap = sel.actionPoints ?? 0
-    if (ap <= 0) return new Set()
-    const occupied = new Set(
-      store.placedTokens.filter((t) => t.uid !== sel.uid).map((t) => `${t.col},${t.row}`)
-    )
-    return buildReachableCells(sel, store.walls, ap, occupied)
-  })
+  const { heroReachable, npcReachable, isNpcReachable, isHeroReachableByNpc } =
+    useTokenReachability(store)
 
   // Следим за позициями токенов: как только враг входит в зону AP любого героя —
   // автоматически начинается боевой режим.
@@ -273,44 +248,6 @@
     { deep: false }
   )
 
-  // 8 направлений: 4 стороны + 4 диагонали
-  const DIRS = [
-    [-1, 0],
-    [1, 0],
-    [0, -1],
-    [0, 1],
-    [-1, -1],
-    [1, -1],
-    [-1, 1],
-    [1, 1],
-  ]
-
-  // Проверяет, есть ли хотя бы одна соседняя клетка НПС в зоне достижимости героя
-  function isNpcReachable(placed) {
-    const r = heroReachable.value
-    if (!r.size) return false
-    return DIRS.some(([dc, dr]) => r.has(`${placed.col + dc},${placed.row + dr}`))
-  }
-
-  // Клетки в зоне достижимости выбранного враждебного НПС — для курсора над героями
-  const npcReachable = computed(() => {
-    const sel = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
-    if (!sel || sel.systemToken || sel.tokenType !== 'npc' || sel.attitude !== 'hostile')
-      return new Set()
-    const ap = sel.actionPoints ?? 0
-    if (ap <= 0) return new Set()
-    const occupied = new Set(
-      store.placedTokens.filter((t) => t.uid !== sel.uid).map((t) => `${t.col},${t.row}`)
-    )
-    return buildReachableCells(sel, store.walls, ap, occupied)
-  })
-
-  // Проверяет, находится ли герой в зоне достижимости выбранного НПС
-  function isHeroReachableByNpc(placed) {
-    if (!npcReachable.value.size) return false
-    return DIRS.some(([dc, dr]) => npcReachable.value.has(`${placed.col + dc},${placed.row + dr}`))
-  }
-
   // ── Выделение в режиме зрителя ────────────────────────────────────────────
   // Зритель может выбрать героя кликом — уходит в heroesStore.selectedUid,
   // читается там же в useGridDraw для отрисовки зелёной зоны.
@@ -322,15 +259,6 @@
   // Без задержки onTokenClick срабатывает раньше onDblClick и атака запускается вместо выделения.
   let clickTimer = null
   const DBLCLICK_DELAY = 220 // мс — чуть больше стандартного браузерного порога
-
-  // ── Боевые формулы (дублируют GameCombatPopup, чтобы не тащить зависимость) ──
-  const HIT_DC = 10
-  function calcCritChance(t) {
-    return Math.floor(((t?.agility ?? 0) * 2 + (t?.strength ?? 0)) / 5)
-  }
-  function calcDamageBonus(t) {
-    return Math.floor(((t?.strength ?? 0) * 2 + (t?.agility ?? 0)) / 5)
-  }
 
   // Воспроизводит flash на токене-защищающемся: 'hit' (красный) или 'miss' (синий)
   function flashToken(uid, type) {
@@ -723,32 +651,59 @@
       closeContextMenu()
     }
 
-    // Показываем индикатор "печатает..." пока ИИ думает
-    showDialogBubble(npc.uid, '...')
+    // Открываем диалог и отправляем приветственный запрос к ИИ
+    openBubble(npc.uid, hero.src ?? null)
+    emitNpcTalk(npc, 'Привет!')
+  }
 
+  // Отправить сообщение НПС через сокет и подписаться на один ответ
+  function emitNpcTalk(npc, playerMessage) {
     const socket = getSocket()
-    if (socket) {
-      const scenarioId = String(store.currentScenario?.id ?? '')
-      // Отправляем запрос к ИИ через сервер
-      socket.emit('npc:talk', {
-        npcUid: npc.uid,
-        tokenId: npc.tokenId ?? null,
-        scenarioId,
-        playerMessage: 'Привет!',
-      })
-
-      // Один раз ловим ответ для этого конкретного НПС
-      function onReply({ npcUid, text, attitudeChange }) {
-        if (npcUid !== npc.uid) return
-        socket.off('npc:reply', onReply)
-        showDialogBubble(npc.uid, text)
-        // Применяем смену отношения к placed-токену (цвет и поведение изменятся автоматически)
-        if (attitudeChange && ['hostile', 'friendly', 'neutral'].includes(attitudeChange)) {
-          store.editPlacedToken(npc.uid, { attitude: attitudeChange })
-        }
+    if (!socket) return
+    const scenarioId = String(store.currentScenario?.id ?? '')
+    socket.emit('npc:talk', {
+      npcUid: npc.uid,
+      tokenId: npc.tokenId ?? null,
+      scenarioId,
+      placedAttitude: npc.attitude ?? 'neutral',
+      placedName: npc.npcName || npc.name || '',
+      playerMessage,
+    })
+    function onReply({ npcUid, text, attitudeDelta, displayDelta, newScore, newAttitude }) {
+      if (npcUid !== npc.uid) return
+      socket.off('npc:reply', onReply)
+      addNpcMessage(npc.uid, text, newScore)
+      // Attitude обновляется через token:attitude broadcast от сервера при смене порога,
+      // но на всякий случай синхронизируем и локально
+      if (newAttitude && ['hostile', 'friendly', 'neutral'].includes(newAttitude)) {
+        store.editPlacedToken(npc.uid, { attitude: newAttitude })
       }
-      socket.on('npc:reply', onReply)
+      // displayDelta — реальное мнение ИИ (не зануленное кулдауном);
+      // показываем стрелку и всплывающий текст всегда, даже если кулдаун временно заблокировал рост
+      const arrowDelta = displayDelta ?? attitudeDelta
+      if (arrowDelta > 0) {
+        triggerAttitudeArrow(npc.uid, 'up')
+        const cell = store.cellSize
+        const x = npc.col * cell + cell * 0.75
+        const y = npc.row * cell + cell * 0.25
+        damageFloatRef.value?.spawn(npc.uid, '▲', x, y, '#4ade80')
+      } else if (arrowDelta < 0) {
+        triggerAttitudeArrow(npc.uid, 'down')
+        const cell = store.cellSize
+        const x = npc.col * cell + cell * 0.75
+        const y = npc.row * cell + cell * 0.25
+        damageFloatRef.value?.spawn(npc.uid, '▼', x, y, '#f87171')
+      }
     }
+    socket.on('npc:reply', onReply)
+  }
+
+  // Игрок набрал ответ в облаке — добавляем его сообщение и запрашиваем НПС
+  function onDialogSend(uid, playerText) {
+    const npc = store.placedTokens.find((t) => t.uid === uid)
+    if (!npc) return
+    addPlayerMessage(uid, playerText)
+    emitNpcTalk(npc, playerText)
   }
 
   // Герой идёт в ближайшую ячейку рядом с НПС и после этого появляется значок сстычки мечей.
@@ -928,6 +883,7 @@
   }
 
   const editPlacedUid = ref(null)
+  const editInitialTab = ref('stats')
   const doorPlacedUid = ref(null)
 
   function handleEdit(uid) {
@@ -936,8 +892,26 @@
     if (placed?.systemToken === 'door') {
       doorPlacedUid.value = uid
     } else {
+      editInitialTab.value = 'stats'
       editPlacedUid.value = uid
     }
+  }
+
+  function handleInventory(uid) {
+    closeContextMenu()
+    editInitialTab.value = 'inventory'
+    editPlacedUid.value = uid
+  }
+
+  function handleAbilities(uid) {
+    closeContextMenu()
+    editInitialTab.value = 'abilities'
+    editPlacedUid.value = uid
+  }
+
+  function closeEditPopup() {
+    editPlacedUid.value = null
+    editInitialTab.value = 'stats'
   }
 
   // Двойной клик: выбрать токен / снять выбор;
@@ -1350,5 +1324,81 @@
 
   .combat-leave-to {
     opacity: 0;
+  }
+
+  /* ── Стрелка изменения отношения ─────────────────────────────────────────── */
+
+  .game-tokens__attitude-arrow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+    z-index: 10;
+
+    &--up {
+      clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+      background: #4ade80;
+      filter: drop-shadow(0 0 4px rgb(74 222 128 / 90%));
+    }
+
+    &--down {
+      clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
+      background: #f87171;
+      filter: drop-shadow(0 0 4px rgb(248 113 113 / 90%));
+    }
+  }
+
+  /* Анимация применяется через комбинированный селектор, чтобы направление (вверх/вниз)
+     было правильным — translate(-50%,-50%) сохраняет центрирование внутри keyframe */
+  .attitude-arrow-enter-active.game-tokens__attitude-arrow--up {
+    animation: attitude-fly-up 1.5s ease-out forwards;
+  }
+
+  .attitude-arrow-enter-active.game-tokens__attitude-arrow--down {
+    animation: attitude-fly-down 1.5s ease-out forwards;
+  }
+
+  .attitude-arrow-leave-active {
+    transition: opacity 0.1s;
+  }
+
+  .attitude-arrow-leave-to {
+    opacity: 0;
+  }
+
+  @keyframes attitude-fly-up {
+    0% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+
+    60% {
+      opacity: 1;
+      transform: translate(-50%, calc(-50% - 24px)) scale(1.1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% - 44px)) scale(0.7);
+    }
+  }
+
+  @keyframes attitude-fly-down {
+    0% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+
+    60% {
+      opacity: 1;
+      transform: translate(-50%, calc(-50% + 24px)) scale(1.1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 44px)) scale(0.7);
+    }
   }
 </style>

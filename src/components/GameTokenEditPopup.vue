@@ -78,10 +78,8 @@
     </div>
 
     <!-- Панель: Инвентарь -->
-    <div v-if="activeTab === 'inventory'" class="token-edit-popup__panel-empty">
-      <PhBackpack :size="40" weight="duotone" class="token-edit-popup__panel-empty-icon" />
-      <p class="token-edit-popup__panel-empty-text">Инвентарь пока не реализован</p>
-      <p class="token-edit-popup__panel-empty-hint">Здесь будут предметы, зелья и снаряжение</p>
+    <div v-if="activeTab === 'inventory'" class="token-edit-popup__panel-inventory">
+      <GameInventoryPanel />
     </div>
 
     <!-- Панель: Способности -->
@@ -118,6 +116,21 @@
         </div>
       </div>
 
+      <!-- Нрав: определяет пороги союзника/врага и скорость сближения -->
+      <div class="token-edit-popup__disposition-row">
+        <span class="token-edit-popup__disposition-label">Нрав</span>
+        <div class="token-edit-popup__disposition-select-wrap">
+          <select v-model="form.dispositionType" class="token-edit-popup__disposition-select">
+            <option v-for="opt in DISPOSITION_OPTIONS" :key="opt.value" :value="opt.value">
+              {{ opt.label }}
+            </option>
+          </select>
+          <span class="token-edit-popup__disposition-hint">
+            {{ DISPOSITION_OPTIONS.find((o) => o.value === form.dispositionType)?.hint ?? '' }}
+          </span>
+        </div>
+      </div>
+
       <div class="token-edit-popup__personality-body">
         <!-- Левая колонка: textarea + счётчик -->
         <div class="token-edit-popup__personality-left">
@@ -129,6 +142,23 @@
             maxlength="500"
           />
           <p class="token-edit-popup__personality-counter">{{ form.personality.length }} / 500</p>
+
+          <label class="token-edit-popup__label token-edit-popup__label--notes">
+            <span class="token-edit-popup__notes-heading">
+              <PhNotebook :size="13" weight="duotone" />
+              Память НПС
+              <span class="token-edit-popup__notes-hint">(обновляется ИИ перед сохранением)</span>
+            </span>
+            <textarea
+              v-model="form.contextNotes"
+              class="token-edit-popup__textarea token-edit-popup__textarea--notes"
+              placeholder="Итоги сессий, знакомства, обещания..."
+              maxlength="800"
+            />
+            <p class="token-edit-popup__personality-counter">
+              {{ form.contextNotes.length }} / 800
+            </p>
+          </label>
         </div>
 
         <!-- Правая колонка: группы тегов -->
@@ -201,9 +231,11 @@
   import { ref, computed, watch, inject } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useTokensStore } from '../stores/tokens'
+  import { calcMaxHp } from '../utils/combatFormulas'
   import PopupShell from './PopupShell.vue'
   import TokenPreviewPicker from './TokenPreviewPicker.vue'
   import TokenStatsGrid from './TokenStatsGrid.vue'
+  import GameInventoryPanel from './GameInventoryPanel.vue'
   import {
     PhTrash,
     PhX,
@@ -214,9 +246,12 @@
     PhScroll,
     PhRobot,
     PhArrowsClockwise,
+    PhNotebook,
   } from '@phosphor-icons/vue'
   import { useSocket } from '../composables/useSocket'
   import { useSound } from '../composables/useSound'
+  import { DISPOSITION_OPTIONS } from '../constants/dispositionConfig'
+  import { PERSONALITY_TAGS, NPC_NAMES } from '../constants/personalityTags'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
@@ -228,6 +263,8 @@
     tokenType: { type: String, default: 'npc' },
     // Дефолтное отношение — предзаполняется из вкладки чтобы новый токен сразу попадал в нужную
     defaultAttitude: { type: String, default: 'neutral' },
+    // Таб, который будет активен при открытии ('stats' | 'inventory' | 'abilities' | 'personality')
+    initialTab: { type: String, default: 'stats' },
   })
 
   const emit = defineEmits(['close'])
@@ -257,8 +294,12 @@
   watch(
     () => props.visible,
     (val) => {
-      if (val) blockCursor?.()
-      else unblockCursor?.()
+      if (val) {
+        blockCursor?.()
+        activeTab.value = props.initialTab
+      } else {
+        unblockCursor?.()
+      }
     }
   )
 
@@ -278,160 +319,13 @@
     name: '',
     npcName: '',
     attitude: 'neutral',
+    dispositionType: 'neutral',
     personality: '',
+    contextNotes: '',
     ...DEFAULT_STATS,
   })
 
-  // ─── Теги личности ────────────────────────────────────────────────────────
-  // Каждая группа — характеристика; tag.phrase добавляется в textarea при клике.
-  const PERSONALITY_TAGS = [
-    {
-      id: 'aggression',
-      label: '⚔ Агрессивность',
-      color: '#f87171',
-      tags: [
-        { label: 'Миролюбивый', phrase: 'Избегает конфликтов, никогда не начинает драку первым.' },
-        { label: 'Осторожный', phrase: 'Насторожён, но не агрессивен.' },
-        { label: 'Вспыльчивый', phrase: 'Легко выходит из себя.' },
-        { label: 'Воинственный', phrase: 'Жаждет битвы, провоцирует соперников.' },
-      ],
-    },
-    {
-      id: 'honesty',
-      label: '🔍 Честность',
-      color: '#60a5fa',
-      tags: [
-        { label: 'Кристально честный', phrase: 'Никогда не лжёт, даже во вред себе.' },
-        { label: 'Дипломатичный', phrase: 'Говорит правду, но осторожно подбирает слова.' },
-        { label: 'Хитрый', phrase: 'Умело уводит разговор в сторону, избегая прямых ответов.' },
-        { label: 'Лжец', phrase: 'Врёт непринуждённо и с удовольствием.' },
-      ],
-    },
-    {
-      id: 'speech',
-      label: '💬 Речь',
-      color: '#a78bfa',
-      tags: [
-        { label: 'Немногословный', phrase: 'Говорит коротко, только по делу.' },
-        { label: 'Цветистый', phrase: 'Любит сложные обороты, украшает речь метафорами.' },
-        { label: 'Уличный', phrase: 'Говорит грубо, с жаргоном.' },
-        { label: 'Велеречивый', phrase: 'Не может остановиться — отвечает длинными монологами.' },
-        { label: 'Шёпот', phrase: 'Говорит тихо и осторожно, будто вокруг враги.' },
-      ],
-    },
-    {
-      id: 'humor',
-      label: '😄 Юмор',
-      color: '#fbbf24',
-      tags: [
-        { label: 'Серьёзный', phrase: 'Лишён чувства юмора, воспринимает всё буквально.' },
-        { label: 'Саркастичный', phrase: 'Часто говорит с иронией и сарказмом.' },
-        { label: 'Балагур', phrase: 'Любит шутки, прибаутки и каламбуры.' },
-        { label: 'Чёрный юмор', phrase: 'Шутит о смерти и трагедиях без смущения.' },
-      ],
-    },
-    {
-      id: 'flirt',
-      label: '💘 Флирт',
-      color: '#f472b6',
-      tags: [
-        { label: 'Холодный', phrase: 'Равнодушен к лести и заигрываниям.' },
-        { label: 'Застенчивый', phrase: 'Краснеет и теряется от комплиментов.' },
-        { label: 'Кокетливый', phrase: 'Любит намекать и флиртовать.' },
-        { label: 'Обольститель', phrase: 'Виртуозно флиртует, умеет очаровывать.' },
-      ],
-    },
-    {
-      id: 'trust',
-      label: '🤝 Доверие',
-      color: '#34d399',
-      tags: [
-        { label: 'Параноик', phrase: 'Не доверяет никому, видит опасность в каждом.' },
-        { label: 'Осмотрительный', phrase: 'Доверяет, но сначала проверяет.' },
-        { label: 'Открытый', phrase: 'Легко сходится с людьми, доверяет незнакомцам.' },
-        { label: 'Наивный', phrase: 'Верит всему на слово, легко обмануть.' },
-      ],
-    },
-    {
-      id: 'knowledge',
-      label: '📚 Знания',
-      color: '#fb923c',
-      tags: [
-        { label: 'Невежда', phrase: 'Знает лишь своё ремесло, в остальном тёмен.' },
-        { label: 'Местный', phrase: 'Хорошо знает этот город и его слухи.' },
-        { label: 'Эрудит', phrase: 'Образован, знает историю, магию и географию.' },
-        { label: 'Шпион', phrase: 'Располагает тайными сведениями, но не спешит делиться.' },
-      ],
-    },
-    {
-      id: 'motive',
-      label: '🎯 Мотив',
-      color: '#e2e8f0',
-      tags: [
-        { label: 'Корыстный', phrase: 'Думает только о выгоде и деньгах.' },
-        { label: 'Мститель', phrase: 'Одержим местью — помнит каждую обиду.' },
-        { label: 'Защитник', phrase: 'Готов умереть ради тех, кого любит.' },
-        { label: 'Нигилист', phrase: 'Потерял смысл жизни, ему всё равно.' },
-        { label: 'Авантюрист', phrase: 'Любит риск и приключения ради самого процесса.' },
-      ],
-    },
-  ]
-
   const personalityTextarea = ref(null)
-
-  // Случайные фэнтезийные имена для НПС
-  const NPC_NAMES = [
-    'Арторик',
-    'Брандус',
-    'Вельгар',
-    'Гардимар',
-    'Дравен',
-    'Ерсика',
-    'Жанар',
-    'Зорин',
-    'Ирендир',
-    'Кастрон',
-    'Лунара',
-    'Малинда',
-    'Наера',
-    'Оринда',
-    'Палдрик',
-    'Равенна',
-    'Сальдур',
-    'Талана',
-    'Урван',
-    'Фалкрин',
-    'Хелена',
-    'Цветана',
-    'Шалира',
-    'Элдрик',
-    'Борин',
-    'Громмаш',
-    'Дургал',
-    'Жаргус',
-    'Крорн',
-    'Мурдак',
-    'Трогдар',
-    'Ульрик',
-    'Амара',
-    'Бенда',
-    'Галюна',
-    'Дария',
-    'Инара',
-    'Кира',
-    'Лилиа',
-    'Мира',
-    'Нари',
-    'Ольга',
-    'Рейна',
-    'Сильва',
-    'Таринья',
-    'Уна',
-    'Фарида',
-    'Халееда',
-    'Шара',
-    'Эвныя',
-  ]
 
   function randomizeName() {
     const pool = NPC_NAMES.filter((n) => n !== form.value.npcName)
@@ -486,67 +380,50 @@
     }
   )
 
+  function populateFormFromToken(token) {
+    const {
+      name,
+      npcName,
+      src,
+      strength,
+      agility,
+      intellect,
+      charisma,
+      attitude,
+      personality,
+      contextNotes,
+    } = token
+    form.value = {
+      name,
+      npcName: npcName ?? '',
+      attitude: attitude ?? 'neutral',
+      dispositionType: token.dispositionType ?? 'neutral',
+      personality: personality ?? '',
+      contextNotes: contextNotes ?? '',
+      strength,
+      agility,
+      intellect,
+      charisma,
+    }
+    previewSrc.value = src
+  }
+
   function resetForm() {
     saveError.value = ''
-    activeTab.value = 'stats'
     if (isPlacedMode.value) {
       const token = store.placedTokens.find((t) => t.uid === props.placedUid)
-      if (token) {
-        const {
-          name,
-          npcName,
-          src,
-          strength,
-          agility,
-          intellect,
-          charisma,
-          attitude,
-          personality,
-        } = token
-        form.value = {
-          name,
-          npcName: npcName ?? '',
-          attitude: attitude ?? 'neutral',
-          personality: personality ?? '',
-          strength,
-          agility,
-          intellect,
-          charisma,
-        }
-        previewSrc.value = src
-      }
+      if (token) populateFormFromToken(token)
     } else if (isEditMode.value) {
       const token = tokensStore.tokens.find((t) => t.id === props.tokenId)
-      if (token) {
-        const {
-          name,
-          npcName,
-          src,
-          strength,
-          agility,
-          intellect,
-          charisma,
-          attitude,
-          personality,
-        } = token
-        form.value = {
-          name,
-          npcName: npcName ?? '',
-          attitude: attitude ?? 'neutral',
-          personality: personality ?? '',
-          strength,
-          agility,
-          intellect,
-          charisma,
-        }
-        previewSrc.value = src
-      }
+      if (token) populateFormFromToken(token)
     } else {
       form.value = {
         name: props.defaultName,
         npcName: '',
         attitude: props.defaultAttitude ?? 'neutral',
+        dispositionType: 'neutral',
         personality: '',
+        contextNotes: '',
         ...DEFAULT_STATS,
       }
       previewSrc.value = null
@@ -555,9 +432,7 @@
   }
 
   // Шкала HP: для placed-режима читаем из стора, для шаблона — вычисляем по формуле
-  const formulaMaxHp = computed(
-    () => 10 + (form.value.strength ?? 0) * 2 + (form.value.agility ?? 0)
-  )
+  const formulaMaxHp = computed(() => calcMaxHp(form.value.strength ?? 0, form.value.agility ?? 0))
   const placedToken = computed(() =>
     isPlacedMode.value ? store.placedTokens.find((t) => t.uid === props.placedUid) : null
   )
@@ -583,22 +458,32 @@
     try {
       const { name, npcName, strength, agility, intellect, charisma } = form.value
       if (isPlacedMode.value) {
-        store.editPlacedToken(props.placedUid, {
+        const fields = {
           name,
           npcName,
           attitude: form.value.attitude,
+          dispositionType: form.value.dispositionType,
           personality: form.value.personality,
+          contextNotes: form.value.contextNotes,
           strength,
           agility,
           intellect,
           charisma,
-        })
+        }
+        store.editPlacedToken(props.placedUid, fields)
+        // Персистируем изменения в БД через сокет: иначе имя/поля потеряются при сохранении сессии
+        const scenarioId = String(store.currentScenario?.id ?? '')
+        if (scenarioId) {
+          getSocket()?.emit('token:edit', { scenarioId, uid: props.placedUid, fields })
+        }
       } else if (isEditMode.value) {
         await tokensStore.editToken(props.tokenId, {
           name,
           npcName,
           attitude: form.value.attitude,
+          dispositionType: form.value.dispositionType,
           personality: form.value.personality,
+          contextNotes: form.value.contextNotes,
           strength,
           agility,
           intellect,
@@ -611,7 +496,9 @@
         fd.append('npcName', npcName ?? '')
         fd.append('tokenType', props.tokenType)
         fd.append('attitude', form.value.attitude)
+        fd.append('dispositionType', form.value.dispositionType)
         fd.append('personality', form.value.personality)
+        fd.append('contextNotes', form.value.contextNotes)
         fd.append('strength', strength)
         fd.append('agility', agility)
         fd.append('intellect', intellect)
@@ -970,6 +857,51 @@
     font-weight: 600;
   }
 
+  // Строка выбора нрава
+  .token-edit-popup__disposition-row {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-2) 0 var(--space-3);
+    border-bottom: 1px solid rgb(255 255 255 / 8%);
+    margin-bottom: var(--space-2);
+  }
+
+  .token-edit-popup__disposition-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-muted, #9ca3af);
+    white-space: nowrap;
+    font-family: var(--font-ui);
+    min-width: 42px;
+  }
+
+  .token-edit-popup__disposition-select-wrap {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex: 1;
+    min-width: 0;
+  }
+
+  .token-edit-popup__disposition-select {
+    @include form-input(rgb(255 255 255 / 6%), 13px);
+
+    padding: 4px 8px;
+    height: 30px;
+    cursor: pointer;
+    min-width: 130px;
+  }
+
+  .token-edit-popup__disposition-hint {
+    font-size: 11px;
+    color: var(--color-text-muted, #9ca3af);
+    font-family: var(--font-ui);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   // Двухколоночная компоновка: textarea слева, теги справа
   .token-edit-popup__personality-body {
     display: grid;
@@ -992,6 +924,28 @@
     line-height: 1.6;
     font-family: var(--font-ui);
     white-space: pre-wrap;
+
+    &--notes {
+      height: 100px;
+      color: rgb(255 255 255 / 50%);
+    }
+  }
+
+  .token-edit-popup__label--notes {
+    margin-top: var(--space-3);
+  }
+
+  .token-edit-popup__notes-heading {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+
+  .token-edit-popup__notes-hint {
+    font-size: 10px;
+    opacity: 0.5;
   }
 
   .token-edit-popup__personality-counter {

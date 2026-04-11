@@ -14,8 +14,8 @@
       <!-- TL — Способности: скрыта для системных токенов (у дверей/стен нет способностей) -->
       <button
         v-if="!systemToken"
-        class="token-ctx-menu__btn token-ctx-menu__btn--tl token-ctx-menu__btn--disabled"
-        title="Способности (скоро)"
+        class="token-ctx-menu__btn token-ctx-menu__btn--tl"
+        title="Способности"
         @mouseenter="playHover"
         @click="onAbilities"
       >
@@ -35,8 +35,8 @@
       <!-- BL — Инвентарь: скрыт для системных токенов (у дверей/стен нет инвентаря) -->
       <button
         v-if="!systemToken"
-        class="token-ctx-menu__btn token-ctx-menu__btn--bl token-ctx-menu__btn--disabled"
-        title="Инвентарь (скоро)"
+        class="token-ctx-menu__btn token-ctx-menu__btn--bl"
+        title="Инвентарь"
         @mouseenter="playHover"
         @click="onInventory"
       >

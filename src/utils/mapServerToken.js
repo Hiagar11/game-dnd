@@ -8,6 +8,7 @@
 // поэтому нужно обрабатывать оба случая — строка и объект.
 
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
+import { calcMaxHp } from './combatFormulas'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
@@ -58,31 +59,38 @@ export function mapServerToken(serverToken, clientTokens) {
     col,
     row,
     hidden: hidden ?? false,
-    name: def?.name ?? tokenObj?.name ?? 'Неизвестный',
+    // Предпочитаем сохранённые в schema переопределения шаблонным значениям.
+    // serverToken.name / .tokenType / etc. равны null если не были явно заданы —
+    // в этом случае падаем на def (загруженный шаблон) или tokenObj (populate).
+    name: serverToken.name ?? def?.name ?? tokenObj?.name ?? 'Неизвестный',
+    tokenType: serverToken.tokenType ?? def?.tokenType ?? tokenObj?.tokenType ?? 'npc',
+    attitude: serverToken.attitude ?? def?.attitude ?? tokenObj?.attitude ?? 'neutral',
+    npcName: serverToken.npcName ?? def?.npcName ?? tokenObj?.npcName ?? '',
+    personality: serverToken.personality ?? def?.personality ?? tokenObj?.personality ?? '',
+    contextNotes: serverToken.contextNotes ?? def?.contextNotes ?? tokenObj?.contextNotes ?? '',
+    dispositionType:
+      serverToken.dispositionType ?? def?.dispositionType ?? tokenObj?.dispositionType ?? 'neutral',
     src: def?.src ?? fallbackSrc,
-    tokenType: def?.tokenType ?? tokenObj?.tokenType ?? 'npc',
-    attitude: def?.attitude ?? tokenObj?.attitude ?? 'neutral',
-    strength: def?.strength ?? tokenObj?.stats?.strength ?? 0,
-    agility: def?.agility ?? tokenObj?.stats?.agility ?? 0,
-    intellect: def?.intellect ?? tokenObj?.stats?.intellect ?? 0,
-    charisma: def?.charisma ?? tokenObj?.stats?.charisma ?? 0,
+    strength: serverToken.strength ?? def?.strength ?? tokenObj?.stats?.strength ?? 0,
+    agility: serverToken.agility ?? def?.agility ?? tokenObj?.stats?.agility ?? 0,
+    intellect: serverToken.intellect ?? def?.intellect ?? tokenObj?.stats?.intellect ?? 0,
+    charisma: serverToken.charisma ?? def?.charisma ?? tokenObj?.stats?.charisma ?? 0,
     // Опыт и уровень — берём из шаблона (def из tokensStore) или из populated tokenId
     xp: def?.xp ?? tokenObj?.xp ?? 0,
     level: def?.level ?? tokenObj?.level ?? 1,
-    // HP: берём сохранённое значение или пересчитываем из характеристик по формуле
-    // maxHp = 10 + strength*2 + agility
+    // HP: берём сохранённое override-значение или пересчитываем из характеристик по формуле
     maxHp:
       serverToken.maxHp ??
-      10 +
-        (def?.strength ?? tokenObj?.stats?.strength ?? 0) * 2 +
-        (def?.agility ?? tokenObj?.stats?.agility ?? 0),
+      calcMaxHp(
+        serverToken.strength ?? def?.strength ?? tokenObj?.stats?.strength ?? 0,
+        serverToken.agility ?? def?.agility ?? tokenObj?.stats?.agility ?? 0
+      ),
     hp:
       serverToken.hp ??
-      10 +
-        (def?.strength ?? tokenObj?.stats?.strength ?? 0) * 2 +
-        (def?.agility ?? tokenObj?.stats?.agility ?? 0),
+      calcMaxHp(
+        serverToken.strength ?? def?.strength ?? tokenObj?.stats?.strength ?? 0,
+        serverToken.agility ?? def?.agility ?? tokenObj?.stats?.agility ?? 0
+      ),
     actionPoints: serverToken.actionPoints ?? 4,
-    npcName: def?.npcName ?? tokenObj?.npcName ?? '',
-    personality: def?.personality ?? tokenObj?.personality ?? '',
   }
 }
