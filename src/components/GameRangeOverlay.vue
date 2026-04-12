@@ -29,6 +29,10 @@
   import { useSocket } from '../composables/useSocket'
   import { buildReachableCells, findPath } from '../composables/useTokenMove'
   import { useTokenDrop } from '../composables/useTokenDrop'
+  import { getSelectedNonSystemToken } from '../utils/tokenFilters'
+  import { getCurrentScenarioId } from '../utils/scenario'
+  import { TOKEN_MOVE_STEP_DELAY_MS } from '../constants/timing'
+  import { sleep } from '../utils/async'
 
   defineProps({
     // Размеры карты — оверлей должен покрывать её полностью
@@ -53,8 +57,7 @@
   // Токен, который сейчас выбран (null если ни один, и null для системных токенов —
   // дверей, факелов и пр., которые не перемещаются)
   const selectedToken = computed(() => {
-    const t = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
-    return t && !t.systemToken ? t : null
+    return getSelectedNonSystemToken(store.placedTokens, store.selectedPlacedUid)
   })
 
   // Множество достижимых клеток (обновляется при смене токена или стен).
@@ -115,7 +118,7 @@
       // Захватываем uid и AP до снятия выделения — после deselect computed вернёт null
       const uid = selectedToken.value.uid
       const ap = selectedToken.value.actionPoints ?? 0
-      const scenarioId = String(store.currentScenario?.id ?? '')
+      const scenarioId = getCurrentScenarioId(store)
 
       // Путь строится с ограничением по AP
       const path = findPath(selectedToken.value, { col, row }, store.walls, ap)
@@ -137,7 +140,7 @@
           if (scenarioId) {
             getSocket()?.emit('token:move', { scenarioId, uid, col: step.col, row: step.row })
           }
-          await new Promise((resolve) => setTimeout(resolve, 380))
+          await sleep(TOKEN_MOVE_STEP_DELAY_MS)
         }
         // Мирное время: если все AP потрачены — восстанавливаем всем без сброса выделения
         if (!store.combatMode) {

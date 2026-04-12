@@ -18,6 +18,7 @@
   import { computed } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useTokensStore } from '../stores/tokens'
+  import { getSelectedToken } from '../utils/tokenFilters'
 
   const gameStore = useGameStore()
   const tokensStore = useTokensStore()
@@ -27,7 +28,7 @@
   // Если ничего не выбрано на карте — показываем выбранный в меню.
   const activeToken = computed(() => {
     if (gameStore.selectedPlacedUid) {
-      const placed = gameStore.placedTokens.find((t) => t.uid === gameStore.selectedPlacedUid)
+      const placed = getSelectedToken(gameStore.placedTokens, gameStore.selectedPlacedUid)
       if (!placed) return null
       const def = tokensStore.tokens.find((t) => t.id === placed.tokenId)
       // src берём из шаблона, npcName — из placed-токена (может быть отредактирован)

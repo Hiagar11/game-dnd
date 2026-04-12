@@ -6,6 +6,7 @@ import { ref } from 'vue'
 import { useGameStore } from '../stores/game'
 import { useHeroesStore } from '../stores/heroes'
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
+import { getNpcAttitude } from '../utils/tokenFilters'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
@@ -107,7 +108,7 @@ export function useViewerSync(socket) {
           name: tokenName ?? 'Неизвестный',
           src,
           tokenType: tokenType ?? 'npc',
-          attitude: attitude ?? 'neutral',
+          attitude: getNpcAttitude(attitude),
           strength: 0,
           agility: 0,
           intellect: 0,

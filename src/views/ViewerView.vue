@@ -2,13 +2,11 @@
   <div class="viewer-view">
     <AppBackground src="/video/maw.gif" />
 
-    <!-- Загрузка / ошибка -->
     <div v-if="!ready" class="viewer-view__status">
       <p v-if="joinError" class="viewer-view__error">{{ joinError }}</p>
       <p v-else class="viewer-view__hint">Загрузка…</p>
     </div>
 
-    <!-- Игровое поле -->
     <template v-if="ready">
       <div
         ref="mapRef"
@@ -24,10 +22,8 @@
 
     <router-link class="viewer-view__back" :to="{ name: 'lobby' }">← Выйти</router-link>
 
-    <!-- Меню зрителя: список героев от мастера (видно всегда, даже пока карта загружается) -->
     <ViewerMenu />
 
-    <!-- Курсор мастера — виден только зрителям (Teleport внутри компонента монтирует в body) -->
     <AdminCursorOverlay
       :map-x="filteredCursorPos.x"
       :map-y="filteredCursorPos.y"
@@ -82,13 +78,10 @@
     onScenarioChange,
   } = useViewerSync(socket)
 
-  // Курсор мастера виден только в зелёной зоне хода выбранного героя.
-  // Пересчитывается реактивно при любом изменении выбора, позиции курсора или стен.
   const filteredCursorPos = computed(() => {
     if (cursorMapX.value === null || cursorMapY.value === null) return { x: null, y: null }
     if (!gameStore.cellSize) return { x: null, y: null }
 
-    // Определяем активный uid: приоритет у мастера, потом у локального выбора игрока
     const activeUid = heroesStore.adminSelectedUid ?? heroesStore.selectedUid
     if (!activeUid) return { x: null, y: null }
 
@@ -104,7 +97,6 @@
     return { x: cursorMapX.value, y: cursorMapY.value }
   })
 
-  // Мастер перешёл в другую локацию через дверь
   onScenarioChange(async (scenarioId) => {
     ready.value = false
     mapSize.value = { width: 0, height: 0 }
@@ -115,43 +107,32 @@
 
   onMounted(async () => {
     const sessionId = route.params.sessionId
-    // scenarioId передаётся из лобби через query-параметр —
-    // это позволяет загрузить карту через REST ДО подключения сокета.
     const scenarioIdFromRoute = route.query.scenarioId
 
-    // ШАГ 1 — загружаем карту и токены через REST.
-    // Не зависит от сокета: карта появится даже при задержке соединения.
     if (scenarioIdFromRoute) {
       await loadScenario(scenarioIdFromRoute)
     }
 
-    // ШАГ 2 — подключаемся к сокету для синхронизации камеры и live-обновлений.
     function joinSession() {
       socket.emit('game:session:join', { sessionId }, async (res) => {
         if (!res?.ok) {
-          // Если карта уже загрузилась — не блокируем экран ошибкой сокета
           if (!ready.value) joinError.value = res?.error ?? 'Не удалось войти в сессию'
           return
         }
-        // Синхронизируем камеру: mapCenter → offset под размер экрана зрителя.
-        // null означает, что мастер ещё не двигал карту — остаёмся в (0, 0).
+
         if (res.session.mapCenterX !== null) {
           offsetX.value = window.innerWidth / 2 - res.session.mapCenterX
           offsetY.value = window.innerHeight / 2 - res.session.mapCenterY
         }
 
-        // Инициализируем курсор мастера (координаты карты + иконка)
         cursorMapX.value = res.session.cursorMapX ?? null
         cursorMapY.value = res.session.cursorMapY ?? null
         cursorIconUrl.value = res.session.cursorIconDataUrl ?? ''
 
-        // Инициализируем список героев из текущего состояния сессии
         heroesStore.setHeroes(res.session.heroes ?? [])
 
-        // Инициализируем выбранный токен мастера
         heroesStore.adminSelectedUid = res.session.selectedTokenUid ?? null
 
-        // Резервный путь: если scenarioId не было в URL (прямой переход по ссылке)
         if (!scenarioIdFromRoute && !ready.value) {
           await loadScenario(res.session.scenarioId)
         }
@@ -176,13 +157,9 @@
     socket.off('connect', undefined)
     stopTravelMusic()
     gameStore.currentScenario = null
-    // Очищаем токены чтобы не было «статики» при переходе на другой маршрут
     gameStore.initPlacedTokens([])
   })
 
-  // ── Загрузка сценария через REST API (без зависимости от tokensStore) ────────
-  // Сервер возвращает placedTokens с populate token: { _id, name, imagePath, stats }.
-  // Строим src прямо из imagePath — игрок не имеет своих токенов, tokensStore пуст.
   async function loadScenario(scenarioId) {
     try {
       const full = await scenariosStore.fetchScenario(scenarioId)
@@ -207,76 +184,4 @@
   }
 </script>
 
-<style scoped>
-  .viewer-view {
-    position: relative;
-    width: 100vw;
-    height: 100dvh;
-    overflow: hidden;
-    font-family: var(--font-ui);
-    color: var(--color-text);
-  }
-
-  .viewer-view__map {
-    position: absolute;
-    top: 0;
-    left: 0;
-    will-change: transform;
-
-    /* Плавная интерполяция между обновлениями от сервера (30fps → визуально 60fps) */
-    transition: transform 50ms linear;
-
-    /* Декоративная рамка карты — та же, что в GameView */
-    &::after {
-      content: '';
-      position: absolute;
-      inset: calc(-1 * var(--map-border-size));
-      z-index: var(--z-map-border);
-      pointer-events: none;
-      border: var(--map-border-size) solid transparent;
-      border-image: url('/systemImage/border.jpg') var(--map-border-slice) round;
-      clip-path: inset(0 round var(--map-border-radius));
-    }
-  }
-
-  .viewer-view__status {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-  }
-
-  .viewer-view__hint,
-  .viewer-view__error {
-    font-size: 16px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--space-4) var(--space-6);
-  }
-
-  .viewer-view__error {
-    color: var(--color-danger);
-    border-color: var(--color-danger);
-  }
-
-  .viewer-view__back {
-    position: fixed;
-    top: var(--space-4);
-    left: var(--space-4);
-    z-index: 10;
-    font-size: 13px;
-    color: var(--color-text-muted);
-    text-decoration: none;
-    background: color-mix(in srgb, var(--color-surface) 80%, transparent);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    transition: color var(--transition-fast);
-
-    &:hover {
-      color: var(--color-primary);
-    }
-  }
-</style>
+<style scoped src="../assets/styles/views/viewerView.css"></style>

@@ -3,14 +3,17 @@ import { useGameStore } from '../stores/game'
 import { useScenariosStore } from '../stores/scenarios'
 
 function buildTokensPayload(placedTokens, includeHidden = false) {
-  return placedTokens.map(({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden }) => ({
-    uid,
-    ...(systemToken ? { systemToken } : { tokenId }),
-    ...(targetScenarioId ? { targetScenarioId } : {}),
-    col,
-    row,
-    hidden: includeHidden ? (hidden ?? false) : false,
-  }))
+  return placedTokens.map(
+    ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden, inventory }) => ({
+      uid,
+      ...(systemToken ? { systemToken } : { tokenId }),
+      ...(targetScenarioId ? { targetScenarioId } : {}),
+      col,
+      row,
+      hidden: includeHidden ? (hidden ?? false) : false,
+      inventory: inventory ?? null,
+    })
+  )
 }
 
 function buildWallsPayload(walls) {

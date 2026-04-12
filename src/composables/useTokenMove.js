@@ -1,3 +1,5 @@
+import { isHostileNpcToken, isTalkableNpcToken } from '../utils/tokenFilters'
+
 export const RANGE_RADIUS = 4
 
 const DIRS = [
@@ -102,9 +104,7 @@ export function buildAttackCells(token, placedTokens, walls) {
 
   const reachable = buildReachableCells(token, walls)
 
-  const hostiles = placedTokens.filter(
-    (t) => t.tokenType === 'npc' && t.attitude === 'hostile' && t.uid !== token.uid
-  )
+  const hostiles = placedTokens.filter((t) => isHostileNpcToken(t) && t.uid !== token.uid)
   if (!hostiles.length) return new Set()
 
   const attackCells = new Set()
@@ -124,12 +124,7 @@ export function buildTalkCells(token, placedTokens, walls) {
 
   const reachable = buildReachableCells(token, walls)
 
-  const friendly = placedTokens.filter(
-    (t) =>
-      t.tokenType === 'npc' &&
-      (t.attitude === 'neutral' || t.attitude === 'friendly') &&
-      t.uid !== token.uid
-  )
+  const friendly = placedTokens.filter((t) => isTalkableNpcToken(t) && t.uid !== token.uid)
   if (!friendly.length) return new Set()
 
   const talkCells = new Set()

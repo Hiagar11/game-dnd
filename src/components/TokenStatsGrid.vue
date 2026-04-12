@@ -7,15 +7,28 @@
           <component :is="row.primary.icon" :size="18" weight="bold" />
           {{ row.primary.label }}
         </span>
-        <input
-          :value="modelValue[row.primary.key]"
-          type="number"
-          min="0"
-          class="stats-grid__input"
-          @input="
-            $emit('update:modelValue', { ...modelValue, [row.primary.key]: +$event.target.value })
-          "
-        />
+        <div class="stats-grid__primary-values">
+          <input
+            :value="modelValue[row.primary.key]"
+            type="number"
+            min="0"
+            class="stats-grid__input"
+            @input="
+              $emit('update:modelValue', { ...modelValue, [row.primary.key]: +$event.target.value })
+            "
+          />
+          <span
+            v-if="primaryBonus(row.primary.key)"
+            class="stats-grid__bonus"
+            :class="
+              primaryBonus(row.primary.key) > 0
+                ? 'stats-grid__bonus--pos'
+                : 'stats-grid__bonus--neg'
+            "
+          >
+            {{ formatBonus(primaryBonus(row.primary.key)) }}
+          </span>
+        </div>
       </label>
 
       <!-- Разделитель -->
@@ -23,19 +36,30 @@
 
       <!-- Правая часть: два пассивных навыка -->
       <div class="stats-grid__pair">
-        <template v-for="(stat, idx) in row.derived" :key="stat.key">
+        <template v-for="stat in row.derived" :key="stat.key">
           <div class="stats-grid__sep" aria-hidden="true" />
           <div class="stats-grid__derived" :title="stat.hint">
             <component :is="stat.icon" :size="15" />
             <span class="stats-grid__derived-name">{{ stat.label }}</span>
-            <span
-              class="stats-grid__derived-value"
-              :class="{
-                'stats-grid__derived-value--up': flashingKeys.has(stat.key),
-                'stats-grid__derived-value--arrow': arrowKeys.has(stat.key),
-              }"
-              >{{ computeDerived(stat.key) }}</span
-            >
+            <div class="stats-grid__derived-values">
+              <span
+                class="stats-grid__derived-value"
+                :class="{
+                  'stats-grid__derived-value--up': flashingKeys.has(stat.key),
+                  'stats-grid__derived-value--arrow': arrowKeys.has(stat.key),
+                }"
+                >{{ computeDerived(stat.key) }}</span
+              >
+              <span
+                v-if="derivedBonus(stat.key)"
+                class="stats-grid__bonus"
+                :class="
+                  derivedBonus(stat.key) > 0 ? 'stats-grid__bonus--pos' : 'stats-grid__bonus--neg'
+                "
+              >
+                {{ formatBonus(derivedBonus(stat.key)) }}
+              </span>
+            </div>
           </div>
         </template>
       </div>
@@ -44,156 +68,42 @@
 </template>
 
 <script setup>
-  import { ref, watch } from 'vue'
-  import {
-    PhSword,
-    PhFeather,
-    PhBrain,
-    PhStar,
-    PhFlame,
-    PhTarget,
-    PhShield,
-    PhShieldCheck,
-    PhWind,
-    PhLightning,
-    PhMagicWand,
-    PhChatTeardropText,
-  } from '@phosphor-icons/vue'
-  import {
-    calcCritChance,
-    calcDamageBonus,
-    calcEvasion,
-    calcDefense,
-  } from '../utils/combatFormulas'
+  import { toRef } from 'vue'
+  import { useTraitsStore } from '../stores/traits'
+  import { STAT_ROWS } from '../constants/tokenStatRows'
+  import { useTokenGearBonuses } from '../composables/useTokenGearBonuses'
+  import { useTokenDerivedStats } from '../composables/useTokenDerivedStats'
+  import { useDerivedStatFlash } from '../composables/useDerivedStatFlash'
 
-  const props = defineProps({ modelValue: { type: Object, required: true } })
+  const props = defineProps({
+    modelValue: { type: Object, required: true },
+    inventory: { type: Object, default: null },
+  })
   defineEmits(['update:modelValue'])
+  const traitsStore = useTraitsStore()
+  const modelValueRef = toRef(props, 'modelValue')
+  const inventoryRef = toRef(props, 'inventory')
 
-  // Строки: первичная характеристика + два пассивных навыка
-  const STAT_ROWS = [
-    {
-      primary: {
-        key: 'strength',
-        label: 'Сила',
-        icon: PhSword,
-        hint: 'Физическая мощь, тяжёлое оружие',
-      },
-      derived: [
-        { key: 'damage', label: 'Урон', icon: PhFlame, hint: 'Сила ×2 + Ловкость' },
-        { key: 'defense', label: 'Защита', icon: PhShield, hint: 'Сила + Ловкость' },
-      ],
-    },
-    {
-      primary: {
-        key: 'agility',
-        label: 'Ловкость',
-        icon: PhFeather,
-        hint: 'Скорость, точность движений, реакция',
-      },
-      derived: [
-        { key: 'critChance', label: 'Шанс удара', icon: PhTarget, hint: 'Ловкость ×2 + Сила' },
-        { key: 'evasion', label: 'Уклонение', icon: PhWind, hint: 'Ловкость ×3 + Сила' },
-      ],
-    },
-    {
-      primary: {
-        key: 'intellect',
-        label: 'Интеллект',
-        icon: PhBrain,
-        hint: 'Тактика, знание магии, концентрация',
-      },
-      derived: [
-        { key: 'initiative', label: 'Инициатива', icon: PhLightning, hint: 'Ловкость + Интеллект' },
-        { key: 'magicPower', label: 'Маг. сила', icon: PhMagicWand, hint: 'Интеллект ×2' },
-      ],
-    },
-    {
-      primary: {
-        key: 'charisma',
-        label: 'Харизма',
-        icon: PhStar,
-        hint: 'Воля, командный дух, устойчивость',
-      },
-      derived: [
-        {
-          key: 'persuasion',
-          label: 'Убеждение',
-          icon: PhChatTeardropText,
-          hint: 'Харизма ×2 + Интеллект',
-        },
-        {
-          key: 'resistance',
-          label: 'Сопротивление',
-          icon: PhShieldCheck,
-          hint: 'Интеллект + Сила',
-        },
-      ],
-    },
-  ]
+  const { totalStats, primaryBonus, directDerivedBonus } = useTokenGearBonuses({
+    inventory: inventoryRef,
+    modelValue: modelValueRef,
+    traitsStore,
+  })
 
-  function computeDerived(key) {
-    const { strength: s = 0, agility: a = 0, intellect: i = 0, charisma: c = 0 } = props.modelValue
-    switch (key) {
-      case 'damage':
-        return calcDamageBonus(props.modelValue)
-      case 'critChance':
-        return calcCritChance(props.modelValue)
-      case 'defense':
-        return calcDefense(props.modelValue)
-      case 'evasion':
-        return calcEvasion(props.modelValue)
-      case 'initiative':
-        return Math.floor((a + i) / 2)
-      case 'resistance':
-        return Math.floor((i + s) / 3)
-      case 'magicPower':
-        return Math.floor((i * 2) / 3)
-      case 'persuasion':
-        return Math.floor((c * 2 + i) / 3)
-      default:
-        return 0
-    }
+  const { computeDerived, derivedBonus } = useTokenDerivedStats({
+    totalStats,
+    modelValue: modelValueRef,
+    directDerivedBonus,
+  })
+
+  function formatBonus(value) {
+    return `${value > 0 ? '+' : ''}${value}`
   }
 
-  // Анимация повышения пассивных характеристик
-  const ALL_DERIVED_KEYS = [
-    'damage',
-    'critChance',
-    'defense',
-    'evasion',
-    'initiative',
-    'resistance',
-    'magicPower',
-    'persuasion',
-  ]
-  const flashingKeys = ref(new Set())
-  const arrowKeys = ref(new Set())
-
-  // Храним предыдущие значения пассивных характеристик до изменения
-  let prevDerived = Object.fromEntries(ALL_DERIVED_KEYS.map((k) => [k, computeDerived(k)]))
-
-  watch(
-    () => props.modelValue,
-    () => {
-      const newFlashing = new Set()
-      for (const key of ALL_DERIVED_KEYS) {
-        const next = computeDerived(key)
-        if (next > prevDerived[key]) newFlashing.add(key)
-        prevDerived[key] = next
-      }
-      if (newFlashing.size > 0) {
-        flashingKeys.value = newFlashing
-        arrowKeys.value = new Set(newFlashing)
-        setTimeout(() => {
-          flashingKeys.value = new Set()
-        }, 600)
-        setTimeout(() => {
-          arrowKeys.value = new Set()
-        }, 2600)
-      }
-    },
-    { deep: true }
-  )
+  const { flashingKeys, arrowKeys } = useDerivedStatFlash({
+    modelValue: modelValueRef,
+    computeDerived,
+  })
 </script>
 
 <style scoped>
@@ -220,6 +130,13 @@
     align-items: center;
     gap: var(--space-3);
     cursor: default;
+  }
+
+  .stats-grid__primary-values,
+  .stats-grid__derived-values {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
   }
 
   .stats-grid__primary-name {
@@ -289,8 +206,27 @@
     font-family: var(--font-ui);
     font-weight: 600;
     color: var(--color-primary);
-    margin-left: auto;
     transition: color 0.2s;
+  }
+
+  .stats-grid__derived-values {
+    margin-left: auto;
+  }
+
+  .stats-grid__bonus {
+    min-width: 2.5rem;
+    text-align: right;
+    font-size: 1rem;
+    font-family: var(--font-ui);
+    font-weight: 700;
+  }
+
+  .stats-grid__bonus--pos {
+    color: #4ade80;
+  }
+
+  .stats-grid__bonus--neg {
+    color: #f87171;
   }
 
   .stats-grid__derived-value--up {

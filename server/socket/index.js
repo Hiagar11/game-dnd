@@ -246,20 +246,24 @@ export function setupSocket(io) {
           'agility',
           'intellect',
           'charisma',
+          'inventory',
         ]
-        const update = {}
+        const ptUpdate = {}
+        const defUpdate = {}
         for (const key of ALLOWED) {
           if (Object.prototype.hasOwnProperty.call(fields, key)) {
-            update[`placedTokens.$.${key}`] = fields[key] ?? null
+            ptUpdate[`placedTokens.$[pt].${key}`] = fields[key] ?? null
+            defUpdate[`defaultPlacedTokens.$[def].${key}`] = fields[key] ?? null
           }
         }
-        if (Object.keys(update).length === 0) {
+        if (Object.keys(ptUpdate).length === 0) {
           ack?.({ ok: true })
           return
         }
         await Scenario.findOneAndUpdate(
           { _id: scenarioId, 'placedTokens.uid': uid },
-          { $set: update }
+          { $set: { ...ptUpdate, ...defUpdate } },
+          { arrayFilters: [{ 'pt.uid': uid }, { 'def.uid': uid }] }
         )
         ack?.({ ok: true })
       } catch {

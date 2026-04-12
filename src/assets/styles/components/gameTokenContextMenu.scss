@@ -1,0 +1,147 @@
+.token-ctx-menu {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  overflow: visible;
+
+  --btn-half: 14px;
+  --offset: calc(var(--cell, 60px) / 2 - var(--btn-half));
+}
+
+.token-ctx-menu__btn {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface, #1a1a2e);
+  border: 1px solid var(--color-primary, #a78bfa);
+  border-radius: 8px;
+  color: var(--color-text, #e2e8f0);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    box-shadow 150ms ease,
+    transform 100ms ease;
+  box-shadow:
+    0 3px 10px rgb(0 0 0 / 65%),
+    0 0 6px var(--color-primary-glow, rgb(167 139 250 / 30%));
+
+  &:hover {
+    background: rgb(255 255 255 / 14%);
+    box-shadow:
+      0 4px 14px rgb(0 0 0 / 70%),
+      0 0 10px var(--color-primary-glow, rgb(167 139 250 / 50%));
+    transform: scale(1.12);
+  }
+
+  &--danger {
+    border-color: #ef4444;
+    box-shadow:
+      0 3px 10px rgb(0 0 0 / 65%),
+      0 0 6px rgb(239 68 68 / 30%);
+
+    &:hover {
+      background: rgb(200 40 40 / 30%);
+      box-shadow:
+        0 4px 14px rgb(0 0 0 / 70%),
+        0 0 10px rgb(239 68 68 / 55%);
+    }
+  }
+
+  &--disabled {
+    opacity: 0.55;
+    cursor: default;
+
+    &:hover {
+      background: rgb(255 255 255 / 8%);
+      transform: none;
+    }
+  }
+}
+
+.token-ctx-menu__btn--tl {
+  top: 0;
+  left: 0;
+}
+
+.token-ctx-menu__btn--tr {
+  top: 0;
+  right: 0;
+}
+
+.token-ctx-menu__btn--bl {
+  bottom: 0;
+  left: 0;
+}
+
+.token-ctx-menu__btn--br {
+  bottom: 0;
+  right: 0;
+}
+
+.ctx-enter-active .token-ctx-menu__btn {
+  transition:
+    transform 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 200ms ease;
+}
+
+.ctx-leave-active .token-ctx-menu__btn {
+  transition:
+    transform 200ms ease-in,
+    border-radius 200ms ease-in,
+    opacity 150ms ease-in;
+}
+
+.ctx-enter-from .token-ctx-menu__btn,
+.ctx-leave-to .token-ctx-menu__btn {
+  opacity: 0;
+  border-radius: 50%;
+}
+
+.ctx-enter-from .token-ctx-menu__btn--tl,
+.ctx-leave-to .token-ctx-menu__btn--tl {
+  transform: translate(var(--offset), var(--offset));
+}
+
+.ctx-enter-from .token-ctx-menu__btn--tr,
+.ctx-leave-to .token-ctx-menu__btn--tr {
+  transform: translate(calc(var(--offset) * -1), var(--offset));
+}
+
+.ctx-enter-from .token-ctx-menu__btn--bl,
+.ctx-leave-to .token-ctx-menu__btn--bl {
+  transform: translate(var(--offset), calc(var(--offset) * -1));
+}
+
+.ctx-enter-from .token-ctx-menu__btn--br,
+.ctx-leave-to .token-ctx-menu__btn--br {
+  transform: translate(calc(var(--offset) * -1), calc(var(--offset) * -1));
+}
+
+.ctx-enter-to .token-ctx-menu__btn,
+.ctx-leave-from .token-ctx-menu__btn {
+  transform: translate(0, 0);
+  border-radius: 8px;
+  opacity: 1;
+}
+
+.ctx-enter-active .token-ctx-menu__btn--tl {
+  transition-delay: 0ms;
+}
+
+.ctx-enter-active .token-ctx-menu__btn--tr {
+  transition-delay: 40ms;
+}
+
+.ctx-enter-active .token-ctx-menu__btn--bl {
+  transition-delay: 80ms;
+}
+
+.ctx-enter-active .token-ctx-menu__btn--br {
+  transition-delay: 120ms;
+}

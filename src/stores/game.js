@@ -7,6 +7,8 @@ import { SYSTEM_TOKENS } from '../constants/systemTokens'
 import { useTokensStore } from './tokens'
 import { mapServerToken } from '../utils/mapServerToken'
 import { calcMaxHp } from '../utils/combatFormulas'
+import { createEmptyInventory } from '../utils/inventoryState'
+import { getHeroTokens, getHostileNpcTokens, getNpcAttitude } from '../utils/tokenFilters'
 
 // Re-export для обратной совместимости (GameMenuSystem.vue)
 export { SYSTEM_TOKENS }
@@ -70,7 +72,7 @@ export const useGameStore = defineStore('game', () => {
 
   /** Проверяет, находится ли токен в зоне видимости хотя бы одного героя */
   function isTokenVisible(token) {
-    const heroes = placedTokens.value.filter((t) => t.tokenType === 'hero')
+    const heroes = getHeroTokens(placedTokens.value)
     return heroes.some((hero) => {
       const dc = Math.abs(hero.col - token.col)
       const dr = Math.abs(hero.row - token.row)
@@ -93,7 +95,7 @@ export const useGameStore = defineStore('game', () => {
         name: t.name,
         src: t.src,
         tokenType: t.tokenType ?? 'npc',
-        attitude: t.attitude ?? 'neutral',
+        attitude: getNpcAttitude(t),
       }))
       .sort((a, b) => b.initiative - a.initiative)
   }
@@ -116,7 +118,7 @@ export const useGameStore = defineStore('game', () => {
           name: t.name,
           src: t.src,
           tokenType: t.tokenType ?? 'npc',
-          attitude: t.attitude ?? 'neutral',
+          attitude: getNpcAttitude(t),
         })
       }
     }
@@ -142,9 +144,7 @@ export const useGameStore = defineStore('game', () => {
 
   /** Проверка условия конца боя: нет живых видимых врагов */
   function checkCombatEnd() {
-    const hostiles = placedTokens.value.filter(
-      (t) => t.tokenType === 'npc' && t.attitude === 'hostile'
-    )
+    const hostiles = getHostileNpcTokens(placedTokens.value)
     if (!hostiles.length) {
       exitCombat()
       return
@@ -213,7 +213,7 @@ export const useGameStore = defineStore('game', () => {
       personality: def?.personality ?? '',
       src: def?.src ?? '',
       tokenType: def?.tokenType ?? 'npc',
-      attitude: def?.attitude ?? 'neutral',
+      attitude: getNpcAttitude(def?.attitude),
       strength: str,
       agility: agi,
       intellect: def?.intellect ?? 0,
@@ -221,6 +221,7 @@ export const useGameStore = defineStore('game', () => {
       maxHp: mhp,
       hp: mhp,
       actionPoints: 4,
+      inventory: createEmptyInventory(),
     })
     return uid
   }
@@ -305,9 +306,7 @@ export const useGameStore = defineStore('game', () => {
       combatRound.value++
 
       // Обновить счётчики скрытых ходов для враждебных токенов
-      const hostiles = placedTokens.value.filter(
-        (t) => t.tokenType === 'npc' && t.attitude === 'hostile'
-      )
+      const hostiles = getHostileNpcTokens(placedTokens.value)
       for (const t of hostiles) {
         if (isTokenVisible(t)) {
           enemyHiddenTurns.value[t.uid] = 0

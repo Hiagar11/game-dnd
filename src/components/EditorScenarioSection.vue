@@ -1,6 +1,5 @@
 <template>
   <div class="scenario-editor">
-    <!-- ── Левая панель: список сценариев ────────────────────────── -->
     <CampaignPanel
       :campaigns="campaignsStore.campaigns"
       :loading="campaignsStore.loading"
@@ -16,7 +15,6 @@
       @delete="deleteCampaign"
     />
 
-    <!-- ── Главный холст графа ───────────────────────────────── -->
     <div ref="canvasRef" class="scenario-canvas">
       <div
         class="scenario-canvas__content"
@@ -24,7 +22,6 @@
         @mouseup="onMouseUp"
         @mouseleave="onMouseUp"
       >
-        <!-- Подсказки -->
         <p v-if="!levels.length" class="scenario-canvas__hint">
           Нет заполненных карт. Сначала расставьте токены на картах в разделе «Заполнить карты».
         </p>
@@ -32,13 +29,9 @@
           Перетящите <strong>золотую точку</strong> на карточке к другой, чтобы создать связь.
         </p>
 
-        <!-- SVG: рёбра графа -->
         <svg class="scenario-canvas__svg" width="3000" height="2000">
-          <!-- Существующие связи -->
           <g v-for="edge in displayEdges" :key="edge.key">
-            <!-- Видимая линия -->
             <line :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" class="scenario-edge" />
-            <!-- Невидимая широкая полоса для клика -->
             <line
               :x1="edge.x1"
               :y1="edge.y1"
@@ -51,7 +44,6 @@
             />
           </g>
 
-          <!-- Временная даштная линия при создании связи -->
           <line
             v-if="connecting"
             :x1="connectingStart.x"
@@ -62,7 +54,6 @@
           />
         </svg>
 
-        <!-- Карточки локаций (узлы графа) -->
         <ScenarioNodeCard
           v-for="node in levelsWithNodes"
           :key="node.scenarioId"
@@ -136,8 +127,6 @@
     deleteCampaign,
   } = useCampaignCrud(graph)
 
-  // Горизонтальный скролл колёсиком мыши.
-  // Нужен { passive: false }, чтобы вызов e.preventDefault() не игнорировался браузером.
   function onCanvasWheel(e) {
     e.preventDefault()
     canvasRef.value.scrollLeft += e.deltaY
@@ -147,9 +136,6 @@
     canvasRef.value?.removeEventListener('wheel', onCanvasWheel)
   })
 
-  // Двойной клик по узлу: открываем редактор дверей для этого сценария.
-  // Строим временный объект кампании с текущими рёбрами (даже если не сохранены) —
-  // GameDoorPopup читает campaign.edges и фильтрует список связанных локаций.
   function onNodeDblClick(node) {
     const tempCampaign = {
       id: activeCampaignId.value,
@@ -166,7 +152,6 @@
 </script>
 
 <style scoped lang="scss">
-  /* ─── Общая разметка ────────────────────────────────────────────── */
   .scenario-editor {
     display: flex;
     width: 100%;
@@ -174,7 +159,6 @@
     overflow: hidden;
   }
 
-  /* ─── Холст графа ──────────────────────────────────────────────── */
   .scenario-canvas {
     flex: 1;
     overflow: auto hidden;
@@ -196,7 +180,6 @@
         rgb(255 255 255 / 3%) 40px
       );
 
-    /* ─── Кастомный горизонтальный скроллбар ────────────────────── */
     &::-webkit-scrollbar {
       height: 5px;
     }
@@ -245,7 +228,6 @@
     }
   }
 
-  /* ─── SVG рёбра ─────────────────────────────────────────────────── */
   .scenario-edge {
     stroke: var(--color-primary);
     stroke-width: 2;

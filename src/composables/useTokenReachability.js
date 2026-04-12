@@ -3,6 +3,7 @@
 // и функции проверки для клика-атаки и клика-разговора.
 import { computed } from 'vue'
 import { buildReachableCells } from './useTokenMove'
+import { getSelectedToken, isHeroToken } from '../utils/tokenFilters'
 
 // 8 направлений: 4 стороны + 4 диагонали.
 // Экспортируется, т.к. используется в GameTokens.vue для проверки смежных клеток.
@@ -20,8 +21,8 @@ export const DIRS = [
 export function useTokenReachability(store) {
   // Клетки в зоне достижимости выбранного героя — нужны для определения курсора над НПС
   const heroReachable = computed(() => {
-    const sel = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
-    if (!sel || sel.systemToken || sel.tokenType !== 'hero') return new Set()
+    const sel = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
+    if (!sel || sel.systemToken || !isHeroToken(sel)) return new Set()
     const ap = sel.actionPoints ?? 0
     if (ap <= 0) return new Set()
     const occupied = new Set(
@@ -32,7 +33,7 @@ export function useTokenReachability(store) {
 
   // Клетки в зоне достижимости выбранного враждебного НПС — для курсора над героями
   const npcReachable = computed(() => {
-    const sel = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+    const sel = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
     if (!sel || sel.systemToken || sel.tokenType !== 'npc' || sel.attitude !== 'hostile')
       return new Set()
     const ap = sel.actionPoints ?? 0

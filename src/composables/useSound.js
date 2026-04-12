@@ -47,8 +47,33 @@ function fadeAudio(audio, targetVol, durationMs, onDone) {
 
 // ── Боевая музыка ─────────────────────────────────────────────────────────────
 let battleFadeId = null
+let travelFadeId = null
+let menuFadeId = null
+
+function hardStopBattleMusic() {
+  if (battleFadeId) clearInterval(battleFadeId)
+  battleFadeId = null
+  battleMusic.pause()
+  battleMusic.volume = 0
+}
+
+function hardStopTravelMusic() {
+  if (travelFadeId) clearInterval(travelFadeId)
+  travelFadeId = null
+  travelMusic.pause()
+  travelMusic.volume = 0
+}
+
+function hardStopMainMenuMusic() {
+  if (menuFadeId) clearInterval(menuFadeId)
+  menuFadeId = null
+  mainMenuMusic.pause()
+  mainMenuMusic.volume = 0
+}
 
 export function playBattleMusic() {
+  hardStopTravelMusic()
+  hardStopMainMenuMusic()
   if (battleFadeId) clearInterval(battleFadeId)
   if (battleMusic.paused) {
     battleMusic.volume = 0
@@ -69,9 +94,10 @@ export function stopBattleMusic() {
 }
 
 // ── Мирная музыка ─────────────────────────────────────────────────────────────
-let travelFadeId = null
 
 export function playTravelMusic() {
+  hardStopBattleMusic()
+  hardStopMainMenuMusic()
   if (travelFadeId) clearInterval(travelFadeId)
   if (travelMusic.paused) {
     travelMusic.volume = 0
@@ -100,9 +126,10 @@ export function playFist() {
   fistSound.currentTime = 0
   fistSound.play().catch(() => {})
 } // ── Музыка главного меню ─────────────────────────────────────────
-let menuFadeId = null
 
 export function playMainMenuMusic() {
+  hardStopBattleMusic()
+  hardStopTravelMusic()
   if (menuFadeId) clearInterval(menuFadeId)
   if (mainMenuMusic.paused) {
     mainMenuMusic.volume = 0

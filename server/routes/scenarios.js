@@ -65,7 +65,16 @@ router.post('/', requireAdmin, async (req, res) => {
 
     const normalizedTokens = Array.isArray(placedTokens)
       ? placedTokens.map(
-          ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden = false }) => ({
+          ({
+            uid,
+            tokenId,
+            systemToken,
+            targetScenarioId,
+            col,
+            row,
+            hidden = false,
+            inventory,
+          }) => ({
             uid: String(uid),
             // Системные токены (дверь, ловушка) не ссылаются на шаблон Token —
             // они хранятся через поле systemToken.
@@ -78,6 +87,7 @@ router.post('/', requireAdmin, async (req, res) => {
             col: Number(col),
             row: Number(row),
             hidden: Boolean(hidden),
+            inventory: inventory ?? null,
           })
         )
       : []
@@ -189,7 +199,7 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
     }
 
     scenario.placedTokens = placedTokens.map(
-      ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden = false }) => ({
+      ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden = false, inventory }) => ({
         uid,
         ...(systemToken
           ? { systemToken: String(systemToken) }
@@ -200,6 +210,7 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
         col,
         row,
         hidden,
+        inventory: inventory ?? null,
       })
     )
     // Редактор устанавливает эталон — синхронно обновляем defaultPlacedTokens

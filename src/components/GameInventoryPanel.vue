@@ -45,65 +45,38 @@
       </svg>
 
       <!-- ── Ячейки экипировки ──────────────────────────────────────── -->
-
-      <!-- Шлем — над головой по центру -->
-      <div class="inv-panel__slot inv-panel__slot--helmet" title="Шлем">
-        <span class="inv-panel__slot-label">Шлем</span>
-      </div>
-
-      <!-- Амулет — шея по центру -->
-      <div class="inv-panel__slot inv-panel__slot--amulet" title="Амулет">
-        <span class="inv-panel__slot-label">Амулет</span>
-      </div>
-
-      <!-- Плащ — правее от шеи -->
-      <div class="inv-panel__slot inv-panel__slot--cloak" title="Плащ">
-        <span class="inv-panel__slot-label">Плащ</span>
-      </div>
-
-      <!-- Броня — грудь по центру -->
-      <div class="inv-panel__slot inv-panel__slot--armor" title="Броня">
-        <span class="inv-panel__slot-label">Броня</span>
-      </div>
-
-      <!-- Оружие — левая рука -->
-      <div class="inv-panel__slot inv-panel__slot--weapon" title="Оружие (осн. рука)">
-        <span class="inv-panel__slot-label">Оружие</span>
-      </div>
-
-      <!-- Щит / доп. оружие — правая рука -->
-      <div class="inv-panel__slot inv-panel__slot--offhand" title="Щит / второе оружие">
-        <span class="inv-panel__slot-label">Щит</span>
-      </div>
-
-      <!-- Перчатки — под левой рукой -->
-      <div class="inv-panel__slot inv-panel__slot--gloves" title="Перчатки">
-        <span class="inv-panel__slot-label">Перч.</span>
-      </div>
-
-      <!-- Пояс — талия по центру -->
-      <div class="inv-panel__slot inv-panel__slot--belt" title="Пояс">
-        <span class="inv-panel__slot-label">Пояс</span>
-      </div>
-
-      <!-- Поножи — бёдра по центру -->
-      <div class="inv-panel__slot inv-panel__slot--legs" title="Поножи">
-        <span class="inv-panel__slot-label">Ноги</span>
-      </div>
-
-      <!-- Сапоги — ступни по центру -->
-      <div class="inv-panel__slot inv-panel__slot--boots" title="Сапоги">
-        <span class="inv-panel__slot-label">Сапоги</span>
-      </div>
-
-      <!-- Кольцо левое — по левую сторону от сапог -->
-      <div class="inv-panel__slot inv-panel__slot--ring-left" title="Кольцо (левая рука)">
-        <span class="inv-panel__slot-label">Кольцо</span>
-      </div>
-
-      <!-- Кольцо правое — по правую сторону от сапог -->
-      <div class="inv-panel__slot inv-panel__slot--ring-right" title="Кольцо (правая рука)">
-        <span class="inv-panel__slot-label">Кольцо</span>
+      <div
+        v-for="slot in EQUIP_SLOTS"
+        :key="slot.key"
+        :class="[
+          'inv-panel__slot',
+          `inv-panel__slot--${slot.key}`,
+          equipDragClass(slot.key),
+          { 'inv-panel__slot--ghost': slot.key === 'offhand' && isTwoHanded(equipped.weapon) },
+        ]"
+        :title="slot.title"
+        :draggable="
+          !!equipped[slot.key] && !(slot.key === 'offhand' && isTwoHanded(equipped.weapon))
+        "
+        @dragstart="onEquipDragStart($event, slot.key)"
+        @dragend="onDragEnd"
+        @dragover.prevent="onEquipDragOver($event, slot.key)"
+        @dragleave="onEquipDragLeave($event)"
+        @drop.prevent="onEquipDrop($event, slot.key)"
+        @mouseenter="showTooltipForItem($event, equipped[slot.key])"
+        @mouseleave="hideTooltip"
+      >
+        <span
+          v-if="slot.key === 'offhand' && isTwoHanded(equipped.weapon)"
+          class="inv-panel__slot-icon inv-panel__slot-icon--ghost"
+          :style="iconMaskStyleGhost(equipped.weapon)"
+        />
+        <span
+          v-else-if="equipped[slot.key]?.icon"
+          class="inv-panel__slot-icon"
+          :style="iconMaskStyle(equipped[slot.key])"
+        />
+        <span v-else class="inv-panel__slot-label">{{ slot.label }}</span>
       </div>
     </div>
 
@@ -114,367 +87,111 @@
         <div
           v-for="(cell, i) in cells"
           :key="i"
-          class="inv-panel__cell"
-          :title="cell ? cell.name : ''"
-          @contextmenu.prevent="openCtx($event, i)"
+          :class="[
+            'inv-panel__cell',
+            { 'inv-panel__cell--wide': isTwoHanded(cell) },
+            { 'inv-panel__cell--dragging': drag?.source === 'bag' && drag?.bagIdx === i },
+            { 'inv-panel__cell--drag-over': dragOverBag === i },
+          ]"
+          :draggable="!!cell"
+          @contextmenu.prevent="onBagRightClick($event, i)"
+          @dragstart="onBagDragStart($event, i)"
+          @dragend="onDragEnd"
+          @dragover.prevent="onBagDragOver($event, i)"
+          @dragleave="onBagDragLeave($event)"
+          @drop.prevent="onBagDrop($event, i)"
+          @mouseenter="showTooltipForItem($event, cell)"
+          @mouseleave="hideTooltip"
         >
-          <img
-            v-if="cell?.icon"
-            :src="gameIconUrl(cell.icon)"
-            class="inv-panel__cell-icon"
-            :alt="cell.name"
-          />
+          <span v-if="cell?.icon" class="inv-panel__cell-icon" :style="iconMaskStyle(cell)" />
           <span v-else-if="cell" class="inv-panel__cell-name">{{ cell.name }}</span>
         </div>
       </div>
     </div>
 
-    <!-- Контекстное меню списка предметов -->
+    <!-- Тултип предмета при наведении -->
     <Teleport to="body">
-      <div
-        v-if="ctx.visible"
-        class="inv-ctx"
-        :style="{ top: `${ctx.y}px`, left: `${ctx.x}px` }"
-        @mouseleave="closeCtx"
-      >
-        <p class="inv-ctx__title">Поместить предмет</p>
-        <p v-if="!itemsStore.items.length" class="inv-ctx__empty">
-          Нет созданных предметов.
-          <br />
-          Создайте во вкладке &laquo;Создание предметов&raquo;
-        </p>
-        <button
-          v-for="item in itemsStore.items"
-          :key="item.id"
-          class="inv-ctx__item"
-          @click="placeItem(item)"
-        >
-          <img
-            v-if="item.icon"
-            :src="gameIconUrl(item.icon)"
-            class="inv-ctx__item-icon"
-            :alt="item.name"
-          />
-          <span v-else class="inv-ctx__item-icon-placeholder">?</span>
-          <span>{{ item.name }}</span>
-        </button>
-      </div>
+      <Transition name="inv-tt">
+        <div v-show="tooltip.visible && tooltip.item" class="inv-tooltip" :style="tooltipStyle">
+          <template v-if="tooltip.item">
+            <div class="inv-tooltip__bar" :style="{ background: tooltip.item.rarityColor }" />
+            <p class="inv-tooltip__name" :style="{ color: tooltip.item.rarityColor }">
+              {{ tooltip.item.name }}
+            </p>
+            <p class="inv-tooltip__slot">{{ translateSlot(tooltip.item.slot) }}</p>
+            <ul v-if="tooltipRows(tooltip.item).length" class="inv-tooltip__list">
+              <li
+                v-for="(row, rowIndex) in tooltipRows(tooltip.item)"
+                :key="row.key ?? rowIndex"
+                class="inv-tooltip__item"
+              >
+                <span class="inv-tooltip__trait-name">{{ row.name }}</span>
+                <span
+                  v-for="(mod, mi) in row.mods"
+                  :key="`${row.key ?? rowIndex}_${mi}`"
+                  :class="[
+                    'inv-tooltip__mod',
+                    mod.positive ? 'inv-tooltip__mod--pos' : 'inv-tooltip__mod--neg',
+                  ]"
+                  >{{ mod.text }}</span
+                >
+              </li>
+            </ul>
+            <p v-else class="inv-tooltip__empty">Нет свойств</p>
+          </template>
+        </div>
+      </Transition>
     </Teleport>
   </div>
 </template>
 
 <script setup>
-  import { ref, onMounted, onUnmounted } from 'vue'
-  import { useItemsStore } from '../stores/items'
+  import { useInventoryPanel } from '../composables/useInventoryPanel'
 
-  const itemsStore = useItemsStore()
+  const props = defineProps({
+    modelValue: {
+      type: Object,
+      default: null,
+    },
+    generationLevel: {
+      type: Number,
+      default: 1,
+    },
+    ownerStats: {
+      type: Object,
+      default: () => ({}),
+    },
+  })
 
-  // ─── Состояние ячеек сумки ──────────────────────────────────────────
-  // index → item (null = пусто)
-  const cells = ref(Array(20).fill(null))
+  const emit = defineEmits(['update:modelValue'])
 
-  // ─── Контекстное меню ───────────────────────────────────────────────
-  const ctx = ref({ visible: false, x: 0, y: 0, cellIdx: null })
-
-  function gameIconUrl(slug) {
-    return `https://api.iconify.design/game-icons:${slug}.svg`
-  }
-
-  function openCtx(event, cellIdx) {
-    ctx.value = { visible: true, x: event.clientX, y: event.clientY, cellIdx }
-  }
-
-  function closeCtx() {
-    ctx.value.visible = false
-  }
-
-  function placeItem(item) {
-    if (ctx.value.cellIdx !== null) {
-      cells.value[ctx.value.cellIdx] = item
-    }
-    closeCtx()
-  }
-
-  // Закрытие по клику вне меню
-  function onDocClick() {
-    if (ctx.value.visible) closeCtx()
-  }
-
-  onMounted(() => document.addEventListener('click', onDocClick, true))
-  onUnmounted(() => document.removeEventListener('click', onDocClick, true))
+  const {
+    cells,
+    equipped,
+    drag,
+    dragOverBag,
+    tooltip,
+    tooltipStyle,
+    EQUIP_SLOTS,
+    isTwoHanded,
+    translateSlot,
+    tooltipRows,
+    iconMaskStyle,
+    iconMaskStyleGhost,
+    equipDragClass,
+    onEquipDragStart,
+    onDragEnd,
+    onEquipDragOver,
+    onEquipDragLeave,
+    onEquipDrop,
+    onBagRightClick,
+    onBagDragStart,
+    onBagDragOver,
+    onBagDragLeave,
+    onBagDrop,
+    showTooltipForItem,
+    hideTooltip,
+  } = useInventoryPanel(props, emit)
 </script>
 
-<style scoped>
-  /* ── Корневой контейнер ─────────────────────────────────────────────── */
-
-  .inv-panel {
-    display: flex;
-    gap: var(--space-6);
-    align-items: flex-start;
-  }
-
-  /* ── Бумажная кукла ─────────────────────────────────────────────────── */
-
-  .inv-panel__doll {
-    position: relative;
-    width: 320px;
-    height: 470px;
-    flex-shrink: 0;
-  }
-
-  .inv-panel__silhouette {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-
-    /* Призрачный силуэт — намекает на зоны надевания */
-    fill: var(--color-primary);
-    opacity: 0.08;
-  }
-
-  /* ── Базовый стиль ячейки экипировки ───────────────────────────────── */
-
-  .inv-panel__slot {
-    position: absolute;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgb(0 0 0 / 40%);
-    border: 1px solid rgb(200 154 74 / 30%);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition:
-      border-color var(--transition-fast),
-      background var(--transition-fast);
-
-    &:hover {
-      border-color: var(--color-primary);
-      background: rgb(200 154 74 / 8%);
-    }
-  }
-
-  .inv-panel__slot-label {
-    font-size: 7px;
-    font-family: var(--font-ui);
-    color: var(--color-text-muted);
-    text-align: center;
-    line-height: 1.1;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  /* ── Позиции каждой ячейки ──────────────────────────────────────────── */
-
-  /* Центрирование по горизонтали: left: calc(50% - 22px) */
-
-  .inv-panel__slot--helmet {
-    top: 2px;
-    left: calc(50% - 22px);
-  }
-
-  .inv-panel__slot--amulet {
-    top: 90px;
-    left: calc(50% - 22px);
-  }
-
-  /* Плащ — справа от шеи */
-  .inv-panel__slot--cloak {
-    top: 84px;
-    right: 5px;
-  }
-
-  .inv-panel__slot--armor {
-    top: 165px;
-    left: calc(50% - 22px);
-  }
-
-  /* Руки — по бокам на уровне груди */
-  .inv-panel__slot--weapon {
-    top: 198px;
-    left: 5px;
-  }
-
-  .inv-panel__slot--offhand {
-    top: 198px;
-    right: 5px;
-  }
-
-  /* Перчатки — под оружием (левая рука) */
-  .inv-panel__slot--gloves {
-    top: 252px;
-    left: 5px;
-  }
-
-  .inv-panel__slot--belt {
-    top: 252px;
-    left: calc(50% - 22px);
-  }
-
-  .inv-panel__slot--legs {
-    top: 310px;
-    left: calc(50% - 22px);
-  }
-
-  .inv-panel__slot--boots {
-    top: 416px;
-    left: calc(50% - 22px);
-  }
-
-  /* Кольца — по бокам от сапог */
-  .inv-panel__slot--ring-left {
-    top: 416px;
-    left: 5px;
-  }
-
-  .inv-panel__slot--ring-right {
-    top: 416px;
-    right: 5px;
-  }
-
-  /* ── Сетка вещей ────────────────────────────────────────────────────── */
-
-  .inv-panel__bag {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-    height: 470px;
-  }
-
-  .inv-panel__bag-title {
-    margin: 0;
-    font-size: 11px;
-    font-family: var(--font-ui);
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-  }
-
-  .inv-panel__grid {
-    flex: 1;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(5, 1fr);
-    gap: 6px;
-  }
-
-  .inv-panel__cell {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgb(0 0 0 / 40%);
-    border: 1px solid rgb(200 154 74 / 20%);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    transition:
-      border-color var(--transition-fast),
-      background var(--transition-fast);
-
-    &:hover {
-      border-color: var(--color-primary);
-      background: rgb(200 154 74 / 8%);
-    }
-  }
-
-  .inv-panel__cell-icon {
-    width: 60%;
-    height: 60%;
-    object-fit: contain;
-    filter: invert(1) sepia(1) saturate(2) hue-rotate(5deg) brightness(0.85);
-    pointer-events: none;
-  }
-
-  .inv-panel__cell-name {
-    font-size: 8px;
-    font-family: var(--font-ui);
-    color: var(--color-text-muted);
-    text-align: center;
-    line-height: 1.1;
-    padding: 2px;
-    overflow: hidden;
-    overflow-wrap: break-word;
-  }
-
-  /* ── Контекстное меню списка предметов ────────────────────────────── */
-
-  .inv-ctx {
-    position: fixed;
-    z-index: var(--z-popup, 300);
-    min-width: 200px;
-    max-width: 280px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-primary);
-    border-radius: var(--radius-md);
-    padding: var(--space-2);
-    box-shadow:
-      0 8px 32px rgb(0 0 0 / 70%),
-      0 0 10px var(--color-primary-glow);
-  }
-
-  .inv-ctx__title {
-    margin: 0 0 var(--space-2);
-    padding: 0 var(--space-2);
-    font-size: 11px;
-    font-family: var(--font-ui);
-    color: var(--color-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border-bottom: 1px solid var(--color-border);
-    padding-bottom: var(--space-1);
-  }
-
-  .inv-ctx__empty {
-    margin: var(--space-2) 0;
-    padding: 0 var(--space-2);
-    font-size: 12px;
-    font-family: var(--font-ui);
-    color: var(--color-text-muted);
-    line-height: 1.5;
-  }
-
-  .inv-ctx__item {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    width: 100%;
-    padding: var(--space-1) var(--space-2);
-    background: none;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-    font-family: var(--font-ui);
-    font-size: 13px;
-    cursor: pointer;
-    text-align: left;
-    transition: background var(--transition-fast);
-
-    &:hover {
-      background: rgb(200 154 74 / 12%);
-      color: var(--color-primary);
-    }
-  }
-
-  .inv-ctx__item-icon {
-    width: 22px;
-    height: 22px;
-    flex-shrink: 0;
-    object-fit: contain;
-    filter: invert(1) sepia(1) saturate(2) hue-rotate(5deg) brightness(0.85);
-  }
-
-  .inv-ctx__item-icon-placeholder {
-    width: 22px;
-    height: 22px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    color: var(--color-text-muted);
-  }
-</style>
+<style scoped src="../assets/styles/components/gameInventoryPanel.css"></style>

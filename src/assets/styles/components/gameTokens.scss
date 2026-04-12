@@ -1,0 +1,468 @@
+﻿  .game-tokens {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: var(--z-tokens);
+
+    /* РџСѓСЃС‚РѕРµ РїСЂРѕСЃС‚СЂР°РЅСЃС‚РІРѕ СЃР»РѕСЏ РЅРµ РїРµСЂРµС…РІР°С‚С‹РІР°РµС‚ РєР»РёРєРё вЂ” РїСЂРѕС…РѕРґСЏС‚ Рє РєР°СЂС‚Рµ */
+    pointer-events: none;
+  }
+
+  /*
+    Р’С‹РґРµР»РµРЅРёРµ РЅР° СЃС‚РѕСЂРѕРЅРµ Р·СЂРёС‚РµР»СЏ вЂ” РїСѓР»СЊСЃРёСЂСѓСЋС‰РµРµ Р·РµР»С‘РЅРѕРµ РєРѕР»СЊС†Рѕ.
+    РћС‚Р»РёС‡Р°РµС‚СЃСЏ РѕС‚ admin-РІС‹РґРµР»РµРЅРёСЏ (РІСЂР°С‰Р°СЋС‰РёР№СЃСЏ РіСЂР°РґРёРµРЅС‚) С‡С‚РѕР±С‹ РІРёР·СѓР°Р»СЊРЅРѕ
+    СЂР°Р·РіСЂР°РЅРёС‡РёС‚СЊ В«РІС‹Р±СЂР°Р» РјР°СЃС‚РµСЂВ» Рё В«РІС‹Р±СЂР°Р» РёРіСЂРѕРєВ».
+  */
+
+  /*
+    Р’С‹РґРµР»РµРЅРёРµ С‚РѕРєРµРЅР° РјР°СЃС‚РµСЂРѕРј вЂ” Р·РѕР»РѕС‚РѕРµ/СЏРЅС‚Р°СЂРЅРѕРµ РєРѕР»СЊС†Рѕ.
+    РћС‚Р»РёС‡Р°РµС‚СЃСЏ РѕС‚ Р·РµР»С‘РЅРѕРіРѕ РєРѕР»СЊС†Р° РёРіСЂРѕРєР°.
+  */
+  .game-tokens__token--admin-selected::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-full);
+    padding: 3px;
+    background: conic-gradient(
+      rgb(250 204 21) 0deg,
+      rgb(234 179 8) 90deg,
+      transparent 160deg,
+      transparent 200deg,
+      rgb(234 179 8) 270deg,
+      rgb(250 204 21) 360deg
+    );
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: token-spin 2s linear infinite;
+  }
+
+  .game-tokens__token--viewer-selected::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-full);
+    padding: 3px;
+    background: conic-gradient(
+      rgb(74 222 128) 0deg,
+      rgb(34 197 94) 90deg,
+      transparent 160deg,
+      transparent 200deg,
+      rgb(34 197 94) 270deg,
+      rgb(74 222 128) 360deg
+    );
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: token-spin 3s linear infinite;
+  }
+
+  .game-tokens__token {
+    position: absolute;
+    padding: 4px;
+
+    /* Р’РєР»СЋС‡Р°РµРј РєР»РёРєРё РѕР±СЂР°С‚РЅРѕ С‚РѕР»СЊРєРѕ РЅР° СЃР°РјРѕРј С‚РѕРєРµРЅРµ */
+    pointer-events: auto;
+    cursor: pointer;
+
+    /*
+      РџР»Р°РІРЅРѕРµ РїРµСЂРµРјРµС‰РµРЅРёРµ РїСЂРё СЃРјРµРЅРµ col/row С‡РµСЂРµР· moveToken().
+      left Рё top РјРµРЅСЏСЋС‚СЃСЏ РјРіРЅРѕРІРµРЅРЅРѕ РІ JS, Р° transition Р°РЅРёРјРёСЂСѓРµС‚ РёС….
+      0.35s вЂ” РїР°СѓР·Р° РґРѕСЃС‚Р°С‚РѕС‡РЅР°СЏ, С‡С‚РѕР±С‹ РґРІРёР¶РµРЅРёРµ РІС‹РіР»СЏРґРµР»Рѕ РїР»Р°РІРЅС‹Рј, РЅРѕ РЅРµ Р·Р°С‚СЏР¶РЅС‹Рј.
+    */
+    transition:
+      left 0.35s ease,
+      top 0.35s ease;
+  }
+
+  /*
+    РўРѕРєРµРЅ РІ РїРѕСЃРµС‰С‘РЅРЅРѕР№ (dim) Р·РѕРЅРµ вЂ” СЃРєСЂС‹С‚, РЅРѕ СЃРѕС…СЂР°РЅСЏРµС‚ СЃРІРѕС‘ РјРµСЃС‚Рѕ РІ РїРѕС‚РѕРєРµ.
+    pointer-events: none вЂ” РЅРµ СЂРµР°РіРёСЂСѓРµС‚ РЅР° РєР»РёРєРё РїРѕРєР° РЅРµРІРёРґРёРј.
+    РўСѓРјР°РЅ (fog GIF) РѕС‚РѕР±СЂР°Р¶Р°РµС‚СЃСЏ РїРѕРІРµСЂС…: unvisited-РєР»РµС‚РєРё СѓР¶Рµ СЃРєСЂС‹С‚С‹ РёРј;
+    visited-РєР»РµС‚РєРё СЃРєСЂС‹С‚С‹ СЌС‚РёРј РїСЂР°РІРёР»РѕРј.
+  */
+  .game-tokens__token--fog-hidden {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /*
+    Р¦РІРµС‚РЅР°СЏ СЂР°РјРєР° РѕС‚РЅРѕС€РµРЅРёСЏ РќРџРЎ вЂ” outline РЅР° СЃР°РјРѕРј РґРёРІРµ С‚РѕРєРµРЅР°.
+    outline РЅРµ СЃРґРІРёРіР°РµС‚ layout (РІ РѕС‚Р»РёС‡РёРµ РѕС‚ border) Рё СЂРёСЃСѓРµС‚СЃСЏ РїРѕРІРµСЂС… padding, РїРѕСЌС‚РѕРјСѓ
+    РІСЃРµРіРґР° РІРёРґРµРЅ РЅРµР·Р°РІРёСЃРёРјРѕ РѕС‚ РґСЂСѓРіРёС… РїСЃРµРІРґРѕСЌР»РµРјРµРЅС‚РѕРІ.
+    Р”РµС„РѕР»С‚ (neutral) вЂ” СЃРёРЅРёР№, friendly вЂ” Р·РµР»С‘РЅС‹Р№, hostile вЂ” РєСЂР°СЃРЅС‹Р№.
+  */
+
+  /* Р“РµСЂРѕРё вЂ” Р·РѕР»РѕС‚РѕРµ СЃРІРµС‡РµРЅРёРµ, РІСЃРµРіРґР° РІРёРґРЅРѕ РЅР° РєР°СЂС‚Рµ */
+  .game-tokens__token--hero {
+    outline: 2px solid rgb(250 204 21 / 95%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
+    filter: drop-shadow(0 0 5px rgb(250 204 21 / 65%));
+  }
+
+  .game-tokens__token--neutral {
+    outline: 2px solid rgb(96 165 250 / 80%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
+  }
+
+  .game-tokens__token--hostile {
+    outline: 2px solid rgb(248 113 113 / 90%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
+  }
+
+  .game-tokens__token--friendly {
+    outline: 2px solid rgb(74 222 128 / 90%);
+    outline-offset: -2px;
+    border-radius: var(--radius-full);
+  }
+
+  /* РљСѓСЂСЃРѕСЂ В«РјРµС‡РёВ» вЂ” РІСЂР°Р¶РґРµР±РЅС‹Р№ РќРџРЎ РІ Р·РѕРЅРµ Р°С‚Р°РєРё РіРµСЂРѕСЏ */
+  .game-tokens__token--cursor-attack {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cg transform='rotate(-45 20 20)' opacity='0.95'%3E%3Crect x='18.5' y='4' width='3' height='22' rx='1' fill='%23f87171'/%3E%3Crect x='14' y='10' width='12' height='2.5' rx='1' fill='%23fca5a5'/%3E%3Cpolygon points='20,2 18,6 22,6' fill='%23fca5a5'/%3E%3C/g%3E%3Cg transform='rotate(45 20 20)' opacity='0.70'%3E%3Crect x='18.5' y='4' width='3' height='22' rx='1' fill='%23f87171'/%3E%3Crect x='14' y='10' width='12' height='2.5' rx='1' fill='%23fca5a5'/%3E%3Cpolygon points='20,2 18,6 22,6' fill='%23fca5a5'/%3E%3C/g%3E%3C/svg%3E")
+        20 20,
+      crosshair;
+  }
+
+  /* РљСѓСЂСЃРѕСЂ В«РїСѓР·С‹СЂСЊВ» вЂ” РЅРµР№С‚СЂР°Р»СЊРЅС‹Р№/СЃРѕСЋР·РЅС‹Р№ РќРџРЎ РІ Р·РѕРЅРµ РґРёР°Р»РѕРіР° РіРµСЂРѕСЏ */
+  .game-tokens__token--cursor-talk {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect x='6' y='6' width='22' height='16' rx='4' fill='%2360a5fa' opacity='0.9'/%3E%3Cpolygon points='10,22 8,28 16,22' fill='%2360a5fa' opacity='0.9'/%3E%3Ccircle cx='13' cy='14' r='2' fill='white'/%3E%3Ccircle cx='18' cy='14' r='2' fill='white'/%3E%3Ccircle cx='23' cy='14' r='2' fill='white'/%3E%3C/svg%3E")
+        20 20,
+      pointer;
+  }
+
+  /*
+    РљСѓСЂСЃРѕСЂ В«РґРІРµСЂСЊВ» вЂ” СЃРёСЃС‚РµРјРЅС‹Р№ С‚РѕРєРµРЅ-РґРІРµСЂСЊ РєРѕРіРґР° РІС‹Р±СЂР°РЅ РЅРµ-СЃРёСЃС‚РµРјРЅС‹Р№ С‚РѕРєРµРЅ.
+    Р—РѕР»РѕС‚Р°СЏ Р°СЂРєР° вЂ” РЅР°РјС‘Рє РЅР° РїСЂРѕС…РѕРґ РІ РґСЂСѓРіСѓСЋ Р»РѕРєР°С†РёСЋ.
+  */
+  .game-tokens__token--cursor-door {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect x='12' y='14' width='16' height='18' rx='1' fill='none' stroke='%23fbbf24' stroke-width='2.5' opacity='0.9'/%3E%3Cpath d='M12 14 Q20 4 28 14' fill='none' stroke='%23fbbf24' stroke-width='2.5' opacity='0.9'/%3E%3Crect x='22' y='21' width='3' height='3' rx='1.5' fill='%23fbbf24' opacity='0.9'/%3E%3Ccircle cx='30' cy='10' r='4' fill='%23fbbf24' opacity='0.5'/%3E%3Ccircle cx='30' cy='10' r='2' fill='%23fbbf24' opacity='0.9'/%3E%3C/svg%3E")
+        20 20,
+      pointer;
+  }
+
+  .game-tokens__img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: var(--radius-full);
+
+    /*
+      position: relative + z-index: 1 РіР°СЂР°РЅС‚РёСЂСѓСЋС‚, С‡С‚Рѕ РєР°СЂС‚РёРЅРєР° С‚РѕРєРµРЅР°
+      РІСЃРµРіРґР° РїРѕРІРµСЂС… РєРѕРЅС‚РµРєСЃС‚РЅРѕРіРѕ РјРµРЅСЋ (z-index: 0).
+    */
+    position: relative;
+    z-index: 1;
+  }
+
+  /*
+    Р’СЂР°С‰Р°СЋС‰РёР№СЃСЏ Р±РѕСЂРґРµСЂ С‡РµСЂРµР· ::before + conic-gradient + CSS mask.
+
+    РљР°Рє СЌС‚Рѕ СЂР°Р±РѕС‚Р°РµС‚:
+    1. ::before Р·Р°РЅРёРјР°РµС‚ РІСЃСЋ РїР»РѕС‰Р°РґСЊ С‚РѕРєРµРЅР° (inset: 0).
+    2. padding: 3px СЃРѕР·РґР°С‘С‚ В«РєРѕР»СЊС†РѕВ» вЂ” СЂР°Р·РЅРёС†Сѓ РјРµР¶РґСѓ content-box Рё border-box.
+    3. background: conic-gradient СЂРёСЃСѓРµС‚ РєРѕРЅРёС‡РµСЃРєРёР№ РіСЂР°РґРёРµРЅС‚ РЅР° РІСЃС‘Рј РєСЂСѓРіРµ.
+    4. mask СѓР±РёСЂР°РµС‚ РІРЅСѓС‚СЂРµРЅРЅСЋСЋ С‡Р°СЃС‚СЊ (content-box), РѕСЃС‚Р°РІР»СЏСЏ С‚РѕР»СЊРєРѕ РєРѕР»СЊС†Рѕ:
+         - РїРµСЂРІР°СЏ РјР°СЃРєР°: content-box (РІРЅСѓС‚СЂРµРЅРЅРёР№ РєСЂСѓРі) вЂ” Р±РµР»С‹Р№ = РІРёРґРёРјС‹Р№
+         - РІС‚РѕСЂР°СЏ РјР°СЃРєР°: РІРµСЃСЊ СЌР»РµРјРµРЅС‚ вЂ” Р±РµР»С‹Р№ = РІРёРґРёРјС‹Р№
+         - mask-composite: exclude = XOR: РІРёРґРЅРѕ С‚РѕР»СЊРєРѕ С‚Рѕ, С‡С‚Рѕ РµСЃС‚СЊ РІ РѕРґРЅРѕР№ РјР°СЃРєРµ
+           в†’ РѕСЃС‚Р°С‘С‚СЃСЏ С‚РѕР»СЊРєРѕ РєРѕР»СЊС†Рѕ С€РёСЂРёРЅРѕР№ padding.
+    5. animation РІСЂР°С‰Р°РµС‚ ::before вЂ” РІРјРµСЃС‚Рµ СЃ РЅРёРј РІСЂР°С‰Р°РµС‚СЃСЏ Рё РіСЂР°РґРёРµРЅС‚.
+  */
+
+  .game-tokens__token--selected::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: var(--radius-full);
+    padding: 3px;
+    background: conic-gradient(
+      var(--color-primary) 0deg,
+      var(--color-primary-dark) 90deg,
+      transparent 160deg,
+      transparent 200deg,
+      var(--color-primary-dark) 270deg,
+      var(--color-primary) 360deg
+    );
+    mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    animation: token-spin 3s linear infinite;
+  }
+
+  @keyframes token-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  /* в”Ђв”Ђ РђРєС‚РёРІРЅС‹Р№ С…РѕРґ: РїСѓР»СЊСЃР°С†РёСЏ С‚РѕРєРµРЅР° в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+  .game-tokens__token--active-turn .game-tokens__img {
+    animation: token-pulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes token-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+
+    50% {
+      transform: scale(1.06);
+    }
+  }
+
+  /* в”Ђв”Ђ РЎС‚РѕР»Р± Р·РѕР»РѕС‚РѕРіРѕ СЃРІРµС‡РµРЅРёСЏ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+
+  /*
+    .game-tokens__turn-pillar вЂ” Р°Р±СЃРѕР»СЋС‚РЅРѕ РїРѕР·РёС†РёРѕРЅРёСЂРѕРІР°РЅ РІРЅСѓС‚СЂРё С‚РѕРєРµРЅР°.
+    РЎС‚РѕР»Р± СѓС…РѕРґРёС‚ РІРІРµСЂС… РёР· С†РµРЅС‚СЂР° С‚РѕРєРµРЅР°: РІС‹СЃРѕРєРёР№ РіСЂР°РґРёРµРЅС‚ СЃРЅРёР·Сѓ РІРІРµСЂС…,
+    Р°РЅРёРјРёСЂСѓРµС‚СЃСЏ РѕРґРёРЅ СЂР°Р· РїСЂРё РїРѕСЏРІР»РµРЅРёРё.
+    pointer-events: none вЂ” РЅРµ РїРµСЂРµС…РІР°С‚С‹РІР°РµС‚ РєР»РёРєРё.
+  */
+  .game-tokens__turn-pillar {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    width: 40px;
+    height: 180px;
+    transform: translateX(-50%);
+    background: linear-gradient(
+      to top,
+      rgb(250 204 21 / 85%) 0%,
+      rgb(250 204 21 / 40%) 40%,
+      rgb(250 204 21 / 0%) 100%
+    );
+    filter: blur(6px);
+    pointer-events: none;
+    animation: pillar-rise 2s ease-out forwards;
+  }
+
+  @keyframes pillar-rise {
+    0% {
+      opacity: 0;
+      height: 0;
+      filter: blur(4px);
+    }
+
+    20% {
+      opacity: 1;
+    }
+
+    70% {
+      opacity: 0.85;
+      height: 180px;
+    }
+
+    100% {
+      opacity: 0;
+      height: 200px;
+      filter: blur(12px);
+    }
+  }
+
+  /* РўСЂСЏСЃРєР° С‚РѕРєРµРЅР° вЂ” Р·Р°РїСѓСЃРєР°РµС‚СЃСЏ РєРѕРіРґР° РґРІРµСЂСЊ РЅРµ РЅР°СЃС‚СЂРѕРµРЅР° РїРµСЂРµРґ СЃРѕС…СЂР°РЅРµРЅРёРµРј */
+  .game-tokens__token--shaking .game-tokens__img {
+    animation: token-shake 0.65s ease;
+  }
+
+  /* в”Ђв”Ђ Р­РєСЃРїСЂРµСЃСЃ-Р±РѕР№: flash-СЌС„С„РµРєС‚С‹ РЅР° С‚РѕРєРµРЅРµ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+
+  /* РџРѕРїР°РґР°РЅРёРµ вЂ” РєСЂР°СЃРЅРѕРµ СЃРІРµС‡РµРЅРёРµ */
+  .game-tokens__token--flash-hit .game-tokens__img {
+    animation: token-flash-hit 0.6s ease;
+  }
+
+  @keyframes token-flash-hit {
+    0% {
+      filter: brightness(1);
+    }
+
+    20% {
+      filter: brightness(2.5) sepia(1) saturate(5) hue-rotate(-20deg);
+    }
+
+    50% {
+      filter: brightness(1.8) sepia(1) saturate(4) hue-rotate(-20deg);
+      box-shadow: 0 0 20px 8px rgb(239 68 68 / 70%);
+    }
+
+    100% {
+      filter: brightness(1);
+    }
+  }
+
+  /* РџСЂРѕРјР°С… вЂ” СЃРёРЅРµРµ СЃРІРµС‡РµРЅРёРµ */
+  .game-tokens__token--flash-miss .game-tokens__img {
+    animation: token-flash-miss 0.6s ease;
+  }
+
+  @keyframes token-flash-miss {
+    0% {
+      filter: brightness(1);
+    }
+
+    20% {
+      filter: brightness(2) sepia(1) saturate(5) hue-rotate(190deg);
+    }
+
+    50% {
+      filter: brightness(1.6) sepia(1) saturate(4) hue-rotate(190deg);
+    }
+
+    100% {
+      filter: brightness(1);
+    }
+  }
+
+  @keyframes token-shake {
+    0%,
+    100% {
+      transform: translateX(0) rotate(0);
+    }
+
+    15% {
+      transform: translateX(-7px) rotate(-4deg);
+    }
+
+    30% {
+      transform: translateX(7px) rotate(4deg);
+    }
+
+    45% {
+      transform: translateX(-6px) rotate(-3deg);
+    }
+
+    60% {
+      transform: translateX(6px) rotate(3deg);
+    }
+
+    75% {
+      transform: translateX(-3px) rotate(-1deg);
+    }
+
+    90% {
+      transform: translateX(3px) rotate(1deg);
+    }
+  }
+
+  /* Р—РЅР°Рє СЃРєСЂРµС‰РµРЅРЅС‹С… РјРµС‡РµР№ вЂ” РїРѕСЏРІР»СЏРµС‚СЃСЏ РјРµР¶РґСѓ С‚РѕРєРµРЅР°РјРё РІ РјРѕРјРµРЅС‚ Р°С‚Р°РєРё */
+  .game-tokens__combat-icon {
+    position: absolute;
+    z-index: calc(var(--z-tokens) + 1);
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    filter: drop-shadow(0 0 6px rgb(239 68 68 / 80%));
+    animation: combat-pop 0.25s ease-out both;
+  }
+
+  @keyframes combat-pop {
+    from {
+      transform: translate(-50%, -50%) scale(0.3);
+      opacity: 0;
+    }
+
+    to {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+  }
+
+  /* Transition РґР»СЏ Transition-РєРѕРјРїРѕРЅРµРЅС‚Р° */
+  .combat-enter-active {
+    animation: combat-pop 0.25s ease-out both;
+  }
+
+  .combat-leave-active {
+    transition: opacity 0.3s ease;
+  }
+
+  .combat-leave-to {
+    opacity: 0;
+  }
+
+  /* в”Ђв”Ђ РЎС‚СЂРµР»РєР° РёР·РјРµРЅРµРЅРёСЏ РѕС‚РЅРѕС€РµРЅРёСЏ в”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђв”Ђ */
+
+  .game-tokens__attitude-arrow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 18px;
+    height: 18px;
+    pointer-events: none;
+    z-index: 10;
+
+    &--up {
+      clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+      background: #4ade80;
+      filter: drop-shadow(0 0 4px rgb(74 222 128 / 90%));
+    }
+
+    &--down {
+      clip-path: polygon(50% 100%, 0% 0%, 100% 0%);
+      background: #f87171;
+      filter: drop-shadow(0 0 4px rgb(248 113 113 / 90%));
+    }
+  }
+
+  /* РђРЅРёРјР°С†РёСЏ РїСЂРёРјРµРЅСЏРµС‚СЃСЏ С‡РµСЂРµР· РєРѕРјР±РёРЅРёСЂРѕРІР°РЅРЅС‹Р№ СЃРµР»РµРєС‚РѕСЂ, С‡С‚РѕР±С‹ РЅР°РїСЂР°РІР»РµРЅРёРµ (РІРІРµСЂС…/РІРЅРёР·)
+     Р±С‹Р»Рѕ РїСЂР°РІРёР»СЊРЅС‹Рј вЂ” translate(-50%,-50%) СЃРѕС…СЂР°РЅСЏРµС‚ С†РµРЅС‚СЂРёСЂРѕРІР°РЅРёРµ РІРЅСѓС‚СЂРё keyframe */
+  .attitude-arrow-enter-active.game-tokens__attitude-arrow--up {
+    animation: attitude-fly-up 1.5s ease-out forwards;
+  }
+
+  .attitude-arrow-enter-active.game-tokens__attitude-arrow--down {
+    animation: attitude-fly-down 1.5s ease-out forwards;
+  }
+
+  .attitude-arrow-leave-active {
+    transition: opacity 0.1s;
+  }
+
+  .attitude-arrow-leave-to {
+    opacity: 0;
+  }
+
+  @keyframes attitude-fly-up {
+    0% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+
+    60% {
+      opacity: 1;
+      transform: translate(-50%, calc(-50% - 24px)) scale(1.1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% - 44px)) scale(0.7);
+    }
+  }
+
+  @keyframes attitude-fly-down {
+    0% {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1.3);
+    }
+
+    60% {
+      opacity: 1;
+      transform: translate(-50%, calc(-50% + 24px)) scale(1.1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: translate(-50%, calc(-50% + 44px)) scale(0.7);
+    }
+  }

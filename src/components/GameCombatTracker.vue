@@ -1,7 +1,6 @@
 <template>
   <Transition name="tracker">
     <div v-if="store.combatMode" class="combat-tracker">
-      <!-- Бейдж: режим + раунд -->
       <div class="combat-tracker__badge">
         <svg
           class="combat-tracker__sword-icon"
@@ -19,28 +18,21 @@
         <span class="combat-tracker__round">· раунд {{ store.combatRound }}</span>
       </div>
 
-      <!-- Список инициативы -->
       <div ref="listRef" class="combat-tracker__list">
         <TransitionGroup name="entry">
           <div
             v-for="(entry, i) in store.initiativeOrder"
             :key="entry.uid"
-            ref="itemRefs"
             class="combat-tracker__item"
             :class="{
               'combat-tracker__item--current': i === store.currentInitiativeIndex,
-              'combat-tracker__item--hero': entry.tokenType === 'hero',
-              'combat-tracker__item--hostile':
-                entry.tokenType === 'npc' && entry.attitude === 'hostile',
+              'combat-tracker__item--hero': isHeroToken(entry),
+              'combat-tracker__item--hostile': isHostileNpcToken(entry),
             }"
           >
-            <!-- Метка инициативы -->
             <span class="combat-tracker__init">{{ entry.initiative }}</span>
-            <!-- Аватар -->
             <img class="combat-tracker__avatar" :src="entry.src" :alt="entry.name" />
-            <!-- Имя токена -->
             <span class="combat-tracker__name">{{ entry.name }}</span>
-            <!-- Стрелка текущего хода -->
             <span v-if="i === store.currentInitiativeIndex" class="combat-tracker__arrow">▶</span>
           </div>
         </TransitionGroup>
@@ -52,12 +44,11 @@
 <script setup>
   import { ref, watch, nextTick } from 'vue'
   import { useGameStore } from '../stores/game'
+  import { isHeroToken, isHostileNpcToken } from '../utils/tokenFilters'
 
   const store = useGameStore()
   const listRef = ref(null)
-  const itemRefs = ref([])
 
-  // Прокрутить список к текущему участнику при смене хода
   watch(
     () => store.currentInitiativeIndex,
     async () => {
@@ -97,7 +88,6 @@
     pointer-events: none;
   }
 
-  /* ── Бейдж режима ─────────────────────────────────────────────────────────── */
   .combat-tracker__badge {
     display: flex;
     align-items: center;
@@ -123,7 +113,6 @@
     letter-spacing: 0.06em;
   }
 
-  /* ── Список ──────────────────────────────────────────────────────────────── */
   .combat-tracker__list {
     display: flex;
     align-items: center;
@@ -137,7 +126,6 @@
     }
   }
 
-  /* ── Элемент инициативы ──────────────────────────────────────────────────── */
   .combat-tracker__item {
     display: flex;
     align-items: center;
@@ -151,17 +139,14 @@
       box-shadow 0.25s;
     flex-shrink: 0;
 
-    /* Герой — золотая рамка */
     &--hero {
       border-color: rgb(200 160 50 / 30%);
     }
 
-    /* Враг — красная рамка */
     &--hostile {
       border-color: rgb(200 60 60 / 30%);
     }
 
-    /* Текущий ход — яркая подсветка */
     &--current {
       background: rgb(255 200 60 / 10%);
       border-color: rgb(220 160 50 / 70%);
@@ -229,7 +214,6 @@
     }
   }
 
-  /* ── Анимации входа/выхода трекера ─────────────────────────────────────── */
   .tracker-enter-active,
   .tracker-leave-active {
     transition:
@@ -243,7 +227,6 @@
     transform: translateX(-50%) translateY(12px);
   }
 
-  /* ── Анимации элементов списка (вылет при побеге врага) ─────────────────── */
   .entry-leave-active {
     transition:
       opacity 0.3s ease,

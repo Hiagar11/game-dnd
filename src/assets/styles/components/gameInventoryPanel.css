@@ -1,0 +1,359 @@
+/* ── Корневой контейнер ─────────────────────────────────────────────── */
+
+.inv-panel {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+/* ── Бумажная кукла ─────────────────────────────────────────────────── */
+
+.inv-panel__doll {
+  position: relative;
+  width: 320px;
+  height: 470px;
+  flex-shrink: 0;
+}
+
+.inv-panel__silhouette {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+
+  /* Призрачный силуэт — намекает на зоны надевания */
+  fill: var(--color-primary);
+  opacity: 0.08;
+}
+
+/* ── Базовый стиль ячейки экипировки ───────────────────────────────── */
+
+.inv-panel__slot {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 40%);
+  border: 1px solid rgb(200 154 74 / 30%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+    background: rgb(200 154 74 / 8%);
+  }
+}
+
+.inv-panel__slot-label {
+  font-size: 6px;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.1;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Позиции каждой ячейки ──────────────────────────────────────────── */
+
+/* Центрирование по горизонтали: left: calc(50% - 22px) */
+
+.inv-panel__slot--helmet {
+  top: 2px;
+  left: calc(50% - 22px);
+}
+
+.inv-panel__slot--amulet {
+  top: 90px;
+  left: calc(50% - 22px);
+}
+
+/* Плащ — справа от шеи */
+.inv-panel__slot--cloak {
+  top: 84px;
+  right: 5px;
+}
+
+.inv-panel__slot--armor {
+  top: 165px;
+  left: calc(50% - 22px);
+}
+
+/* Руки — по бокам на уровне груди */
+.inv-panel__slot--weapon {
+  top: 198px;
+  left: 5px;
+}
+
+.inv-panel__slot--offhand {
+  top: 198px;
+  right: 5px;
+}
+
+/* Перчатки — под оружием (левая рука) */
+.inv-panel__slot--gloves {
+  top: 252px;
+  left: 5px;
+}
+
+.inv-panel__slot--belt {
+  top: 252px;
+  left: calc(50% - 22px);
+}
+
+.inv-panel__slot--legs {
+  top: 310px;
+  left: calc(50% - 22px);
+}
+
+.inv-panel__slot--boots {
+  top: 416px;
+  left: calc(50% - 22px);
+}
+
+/* Кольца — по бокам от сапог */
+.inv-panel__slot--ring-left {
+  top: 416px;
+  left: 5px;
+}
+
+.inv-panel__slot--ring-right {
+  top: 416px;
+  right: 5px;
+}
+
+/* ── Сетка вещей ────────────────────────────────────────────────────── */
+
+.inv-panel__bag {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  height: 470px;
+}
+
+.inv-panel__bag-title {
+  margin: 0;
+  font-size: 10px;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+}
+
+.inv-panel__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.inv-panel__cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 40%);
+  border: 1px solid rgb(200 154 74 / 20%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+    background: rgb(200 154 74 / 8%);
+  }
+}
+
+.inv-panel__cell-icon {
+  display: block;
+  width: 60%;
+  height: 60%;
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.inv-panel__cell-name {
+  font-size: 7px;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.2;
+  padding: 2px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  letter-spacing: 0.04em;
+}
+
+/* ── Тултип предмета при наведении ────────────────────────────────── */
+
+/* Плавное появление */
+.inv-tt-enter-active,
+.inv-tt-leave-active {
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+.inv-tt-enter-from,
+.inv-tt-leave-to {
+  opacity: 0;
+  transform: translateX(-10px) scale(0.95);
+}
+
+.inv-tooltip {
+  position: fixed;
+  z-index: var(--z-popup, 300);
+  min-width: 180px;
+  max-width: 260px;
+  background: linear-gradient(160deg, #0d1220 0%, #16213e 100%);
+  border: 1px solid rgb(200 154 74 / 50%);
+  border-radius: var(--radius-md);
+  padding: 0;
+  box-shadow:
+    0 12px 40px rgb(0 0 0 / 80%),
+    0 0 20px rgb(200 154 74 / 20%),
+    inset 0 1px 0 rgb(255 255 255 / 5%);
+  backdrop-filter: blur(10px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Полоска редкости наверху окна */
+.inv-tooltip__bar {
+  height: 3px;
+  width: 100%;
+  opacity: 0.85;
+}
+
+.inv-tooltip__name {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) 0;
+  font-size: 13px;
+  font-family: var(--font-fantasy);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  line-height: 1.3;
+  text-shadow: 0 0 14px currentcolor;
+}
+
+.inv-tooltip__slot {
+  margin: 0;
+  padding: 2px var(--space-3) var(--space-1);
+  font-size: 10px;
+  font-family: var(--font-fantasy);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgb(200 154 74 / 65%);
+}
+
+.inv-tooltip__list {
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-top: 1px solid rgb(200 154 74 / 15%);
+}
+
+.inv-tooltip__item {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+  line-height: 1.4;
+}
+
+.inv-tooltip__trait-name {
+  font-size: 11px;
+  font-family: var(--font-fantasy);
+  font-weight: 400;
+  color: var(--color-text);
+}
+
+.inv-tooltip__mod {
+  font-size: 10px;
+  font-family: var(--font-fantasy);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.inv-tooltip__mod--pos {
+  color: #4caf82;
+  text-shadow: 0 0 8px rgb(76 175 130 / 60%);
+}
+
+.inv-tooltip__mod--neg {
+  color: #e05c5c;
+  text-shadow: 0 0 8px rgb(224 92 92 / 60%);
+}
+
+.inv-tooltip__empty {
+  margin: 0;
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  font-size: 11px;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  border-top: 1px solid rgb(200 154 74 / 15%);
+}
+
+/* ── Иконка предмета в слоте экипировки ──────────────────────────── */
+
+.inv-panel__slot-icon {
+  display: block;
+  width: 65%;
+  height: 65%;
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* ── Визуал при перетаскивании ──────────────────────────────────────── */
+
+.inv-panel__slot--drag-valid {
+  border-color: #4caf82 !important;
+  background: rgb(76 175 130 / 18%) !important;
+  box-shadow: 0 0 14px rgb(76 175 130 / 35%);
+}
+
+.inv-panel__slot--drag-invalid {
+  border-color: #e05c5c !important;
+  background: rgb(224 92 92 / 10%) !important;
+}
+
+/* Двуручное в offhand: затемнён, недрагабельный, пунктирная рамка */
+.inv-panel__slot--ghost {
+  border-color: rgb(200 154 74 / 20%) !important;
+  background: rgb(0 0 0 / 20%) !important;
+  cursor: default;
+  border-style: dashed;
+}
+
+.inv-panel__cell--dragging {
+  opacity: 0.3;
+}
+
+.inv-panel__cell--drag-over {
+  border-color: var(--color-primary) !important;
+  background: rgb(200 154 74 / 15%) !important;
+}
+
+/* Двуручное/лук — занимает 2 колонки */
+.inv-panel__cell--wide {
+  grid-column: span 2;
+}

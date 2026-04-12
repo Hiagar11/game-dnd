@@ -12,6 +12,7 @@ import { useGameStore } from '../stores/game'
 import { useTokensStore } from '../stores/tokens'
 import { useHeroesStore } from '../stores/heroes'
 import { RANGE_RADIUS } from './useTokenMove'
+import { getHeroTokens } from '../utils/tokenFilters'
 
 const REVEAL_RADIUS = RANGE_RADIUS + 2
 
@@ -135,7 +136,7 @@ export function useFogVisibility() {
   // На стороне зрителя tokensStore пуст — heroesStore заполняется через сокет.
   const currentCells = computed(() => {
     const heroIds = new Set([
-      ...tokensStore.tokens.filter((t) => t.tokenType === 'hero').map((t) => t.id),
+      ...getHeroTokens(tokensStore.tokens).map((t) => t.id),
       ...heroesStore.heroes.map((t) => t.id),
     ])
 

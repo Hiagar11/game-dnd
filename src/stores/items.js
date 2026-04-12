@@ -19,9 +19,15 @@ function saveToStorage(items) {
 export const useItemsStore = defineStore('items', () => {
   const items = ref(loadFromStorage())
 
-  function addItem({ name, icon, traitIds }) {
+  function addItem({ name, icon, traitIds, category }) {
     const id = `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-    items.value.push({ id, name: name.trim(), icon, traitIds: traitIds ?? [] })
+    items.value.push({
+      id,
+      name: name.trim(),
+      icon,
+      category: category ?? 'other',
+      traitIds: traitIds ?? [],
+    })
     saveToStorage(items.value)
     return id
   }

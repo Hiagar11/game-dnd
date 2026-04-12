@@ -1,6 +1,5 @@
 <template>
   <div class="maps-section">
-    <!-- Режим без карты: левый сайдбар + правая форма -->
     <div v-if="!form.mapImageUrl" class="maps-layout">
       <EditorSidebar
         :scenarios="store.scenarios.filter((s) => !s.tokensCount)"
@@ -40,7 +39,6 @@
       </main>
     </div>
 
-    <!-- Режим с картой: canvas перекрывает весь экран. Ctrl+колёсико — зум. ПКМ+drag — пан. -->
     <div v-else class="maps-fullscreen">
       <div
         ref="canvasWrapRef"
@@ -73,7 +71,6 @@
       />
     </div>
 
-    <!-- Скрытый input[type=file] — живёт вне условных блоков -->
     <input
       ref="mapInputRef"
       type="file"
@@ -125,7 +122,6 @@
 
   const mapInputRef = ref(null)
 
-  // Обёртки комбинируют сброс canvas и изменение формы
   function newScenario() {
     clearImage()
     resetForm()
@@ -188,89 +184,4 @@
   )
 </script>
 
-<style scoped lang="scss">
-  .maps-section {
-    position: relative;
-    width: 100%;
-    height: 100%;
-  }
-
-  /* Скрытый input — вызывается программно через triggerMapPicker */
-  .maps-file-input {
-    display: none;
-  }
-
-  /* ─── Режим без карты: сайдбар + форма ───────────────────────────────────── */
-  .maps-layout {
-    display: flex;
-    height: 100%;
-  }
-
-  .maps-main {
-    flex: 1;
-    overflow-y: auto;
-    padding: var(--space-6) var(--space-8);
-  }
-
-  .maps-form {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-    max-width: 800px;
-  }
-
-  .maps-form__label {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-
-    @include field-label;
-  }
-
-  .maps-form__input {
-    @include form-input(rgb(0 0 0 / 30%), 14px);
-  }
-
-  .maps-form__error {
-    font-size: 13px;
-    color: var(--color-error, #f87171);
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    background: rgb(220 38 38 / 10%);
-    border: 1px solid rgb(220 38 38 / 30%);
-  }
-
-  .maps-map {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  /* ─── Режим с картой: fullscreen canvas ───────────────────────────────────── */
-
-  /* Перекрывает весь экран поверх навигации редактора (z-index 50 > z-index 1 у editor-body) */
-  .maps-fullscreen {
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-  }
-
-  /* Обрезает canvas за краями и ловит события колеса/мыши */
-  .maps-canvas-wrap {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    background: #000;
-    cursor: grab;
-
-    &--panning {
-      cursor: grabbing;
-    }
-  }
-
-  /* Canvas рисуется в натуральном разрешении; CSS-трансформ управляется из useEditorCanvas */
-  .maps-canvas {
-    display: block;
-    transform-origin: 0 0;
-  }
-</style>
+<style scoped lang="scss" src="../assets/styles/components/editorMapsSection.scss"></style>

@@ -58,6 +58,7 @@
   import { useTokensStore } from '../stores/tokens'
   import { useTokenDrag } from '../composables/useTokenDrag'
   import { useSound } from '../composables/useSound'
+  import { getHeroTokens, getNpcAttitude } from '../utils/tokenFilters'
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
 
   const props = defineProps({
@@ -87,10 +88,10 @@
   const emitHeroes = inject('emitHeroes', null)
 
   const filteredTokens = computed(() => {
-    if (props.tokenType === 'hero') return store.tokens.filter((t) => t.tokenType === 'hero')
+    if (props.tokenType === 'hero') return getHeroTokens(store.tokens)
     const npcs = store.tokens.filter((t) => t.tokenType !== 'hero')
     if (!props.attitude) return npcs
-    return npcs.filter((t) => (t.attitude ?? 'neutral') === props.attitude)
+    return npcs.filter((t) => getNpcAttitude(t) === props.attitude)
   })
 
   function onAdd() {

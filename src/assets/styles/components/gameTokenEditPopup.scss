@@ -1,0 +1,516 @@
+.token-edit-popup__title {
+  margin: 0;
+  font-family: var(--font-base);
+  font-size: 20px;
+  font-weight: normal;
+  color: var(--color-primary);
+  text-align: center;
+  letter-spacing: 0.05em;
+}
+
+.token-edit-popup__body {
+  display: flex;
+  gap: var(--space-6);
+  align-items: flex-start;
+}
+
+.token-edit-popup__fields {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.token-edit-popup__label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+}
+
+.token-edit-popup__input {
+  @include form-input(rgb(255 255 255 / 6%), 14px);
+}
+
+// ─── Селектор отношения ────────────────────────────────────────────
+.token-edit-popup__attitude {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.token-edit-popup__attitude-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgb(255 255 255 / 12%);
+  background: rgb(255 255 255 / 4%);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: rgb(255 255 255 / 25%);
+    color: var(--color-text);
+  }
+
+  &--active.token-edit-popup__attitude-btn--neutral {
+    border-color: rgb(156 163 175 / 70%);
+    background: rgb(156 163 175 / 10%);
+    color: rgb(156 163 175);
+  }
+
+  &--active.token-edit-popup__attitude-btn--friendly {
+    border-color: rgb(74 222 128 / 70%);
+    background: rgb(74 222 128 / 10%);
+    color: rgb(74 222 128);
+  }
+
+  &--active.token-edit-popup__attitude-btn--hostile {
+    border-color: rgb(248 113 113 / 70%);
+    background: rgb(248 113 113 / 10%);
+    color: rgb(248 113 113);
+  }
+}
+
+.token-edit-popup__attitude-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+
+  .token-edit-popup__attitude-btn--neutral & {
+    background: rgb(156 163 175);
+  }
+
+  .token-edit-popup__attitude-btn--friendly & {
+    background: rgb(74 222 128);
+  }
+
+  .token-edit-popup__attitude-btn--hostile & {
+    background: rgb(248 113 113);
+  }
+}
+
+.token-edit-popup__footer {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.token-edit-popup__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-6);
+  font-size: 14px;
+
+  &--cancel {
+    @include btn-ghost;
+
+    padding: var(--space-2) var(--space-6);
+    font-size: 14px;
+
+    // Менее акцентный hover: text-muted → text (не primary)
+    &:hover {
+      border-color: var(--color-text-muted);
+      color: var(--color-text);
+    }
+  }
+
+  &--save {
+    @include btn-primary;
+
+    padding: var(--space-2) var(--space-6);
+    font-size: 14px;
+  }
+
+  &--delete {
+    @include btn-danger;
+
+    margin-right: auto;
+    padding: var(--space-2) var(--space-6);
+    font-size: 14px;
+  }
+}
+
+.token-edit-popup__spinner {
+  @include spinner(16px, $anim: token-spin, $light: false);
+}
+
+.token-edit-popup__save-error {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: rgb(220 38 38 / 10%);
+  border: 1px solid rgb(220 38 38 / 40%);
+  color: var(--color-error);
+  font-size: 13px;
+  text-align: center;
+}
+
+// ─── Шкала здоровья ───────────────────────────────────────────────
+.token-edit-popup__hp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.token-edit-popup__hp-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.token-edit-popup__hp-icon {
+  color: #f87171;
+  flex-shrink: 0;
+}
+
+.token-edit-popup__hp-label {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+}
+
+.token-edit-popup__hp-value {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 80%);
+  font-family: var(--font-ui);
+
+  b {
+    color: #f87171;
+    font-size: 16px;
+  }
+}
+
+.token-edit-popup__hp-bar {
+  width: 100%;
+  height: 7px;
+  background: rgb(255 255 255 / 10%);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.token-edit-popup__hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ef4444, #f87171);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.token-edit-popup__hp-hint {
+  margin: 0;
+  font-size: 11px;
+  color: rgb(255 255 255 / 25%);
+  font-family: var(--font-ui);
+}
+
+// ─── Табы ─────────────────────────────────────────────────────────
+.token-edit-popup__tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  margin-bottom: var(--space-4);
+}
+
+.token-edit-popup__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition:
+    color 150ms ease,
+    border-color 150ms ease;
+  margin-bottom: -1px;
+
+  &:hover {
+    color: var(--color-text);
+  }
+
+  &--active {
+    color: var(--color-primary);
+    border-bottom-color: var(--color-primary);
+  }
+}
+
+// ─── Панель личности ИИ ───────────────────────────────────────────
+.token-edit-popup__panel-personality {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
+.token-edit-popup__personality-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.token-edit-popup__personality-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.token-edit-popup__input--name {
+  width: 160px;
+  padding: var(--space-1) var(--space-3);
+  font-size: 13px;
+}
+
+.token-edit-popup__random-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgb(255 255 255 / 12%);
+  background: rgb(255 255 255 / 5%);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: rgb(from var(--color-primary) r g b / 10%);
+  }
+
+  &:active {
+    transform: rotate(180deg);
+  }
+}
+
+.token-edit-popup__personality-icon {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.token-edit-popup__personality-title {
+  font-size: 15px;
+  font-family: var(--font-ui);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+// Строка выбора нрава
+.token-edit-popup__disposition-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-3);
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  margin-bottom: var(--space-2);
+}
+
+.token-edit-popup__disposition-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted, #9ca3af);
+  white-space: nowrap;
+  font-family: var(--font-ui);
+  min-width: 42px;
+}
+
+.token-edit-popup__disposition-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+
+.token-edit-popup__disposition-select {
+  @include form-input(rgb(255 255 255 / 6%), 13px);
+
+  padding: 4px 8px;
+  height: 30px;
+  cursor: pointer;
+  min-width: 130px;
+}
+
+.token-edit-popup__disposition-hint {
+  font-size: 11px;
+  color: var(--color-text-muted, #9ca3af);
+  font-family: var(--font-ui);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// Двухколоночная компоновка: textarea слева, теги справа
+.token-edit-popup__personality-body {
+  display: grid;
+  grid-template-columns: 1fr 260px;
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.token-edit-popup__personality-left {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.token-edit-popup__textarea {
+  @include form-input(rgb(255 255 255 / 6%), 13px);
+
+  resize: none;
+  height: 220px;
+  line-height: 1.6;
+  font-family: var(--font-ui);
+  white-space: pre-wrap;
+
+  &--notes {
+    height: 100px;
+    color: rgb(255 255 255 / 50%);
+  }
+}
+
+.token-edit-popup__label--notes {
+  margin-top: var(--space-3);
+}
+
+.token-edit-popup__notes-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.token-edit-popup__notes-hint {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.token-edit-popup__personality-counter {
+  margin: 0;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 25%);
+  text-align: right;
+}
+
+// Правая колонка — прокручиваемый список групп тегов
+.token-edit-popup__personality-tags {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+
+  // Тонкий скроллбар
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 15%) transparent;
+}
+
+.token-edit-popup__tag-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.token-edit-popup__tag-group-label {
+  margin: 0;
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.token-edit-popup__tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.token-edit-popup__tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid rgb(from var(--tag-color) r g b / 30%);
+  background: rgb(from var(--tag-color) r g b / 7%);
+  color: rgb(from var(--tag-color) r g b / 70%);
+  font-size: 11px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+
+  &:hover {
+    border-color: rgb(from var(--tag-color) r g b / 60%);
+    color: var(--tag-color);
+    background: rgb(from var(--tag-color) r g b / 15%);
+  }
+
+  &--active {
+    border-color: var(--tag-color);
+    background: rgb(from var(--tag-color) r g b / 20%);
+    color: var(--tag-color);
+  }
+}
+
+// ─── Пустые панели (инвентарь / способности) ─────────────────────
+.token-edit-popup__panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+  min-height: 180px;
+}
+
+.token-edit-popup__panel-empty-icon {
+  color: rgb(255 255 255 / 15%);
+}
+
+.token-edit-popup__panel-empty-text {
+  margin: 0;
+  font-size: 14px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 40%);
+}
+
+.token-edit-popup__panel-empty-hint {
+  margin: 0;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 20%);
+}
+
+@keyframes token-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Ширина попапа подстраивается под содержимое
+:deep(.popup-shell__box) {
+  width: fit-content;
+  max-width: 94vw;
+}

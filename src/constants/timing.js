@@ -1,0 +1,1 @@
+export const TOKEN_MOVE_STEP_DELAY_MS = 380

@@ -4,6 +4,8 @@
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { useApi } from '../composables/useApi'
+import { useGameStore } from './game'
+import { getNpcAttitude } from '../utils/tokenFilters'
 
 export const useTokensStore = defineStore('tokens', () => {
   const api = useApi()
@@ -39,7 +41,7 @@ export const useTokensStore = defineStore('tokens', () => {
       name,
       npcName: npcName ?? '',
       tokenType: tokenType ?? 'npc',
-      attitude: attitude ?? 'neutral',
+      attitude: getNpcAttitude(attitude),
       personality: personality ?? '',
       contextNotes: contextNotes ?? '',
       src: imageUrl,
@@ -76,7 +78,6 @@ export const useTokensStore = defineStore('tokens', () => {
 
     // Если сейчас открыт сценарий — убираем все размещённые экземпляры этого шаблона.
     // Сервер уже удалил их из БД; здесь синхронизируем локальное состояние.
-    const { useGameStore } = await import('./game')
     const gameStore = useGameStore()
     gameStore.placedTokens = gameStore.placedTokens.filter((t) => t.tokenId !== id)
   }

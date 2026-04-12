@@ -5,14 +5,13 @@
 // Компонент GameGrid не знает деталей — он просто вешает canvasRef на элемент.
 import { onMounted, ref, watch } from 'vue'
 import { useGameStore } from '../stores/game'
-import { useTokensStore } from '../stores/tokens'
 import { useHeroesStore } from '../stores/heroes'
 import { buildReachableCells } from './useTokenMove'
+import { getSelectedToken, isNonSystemToken } from '../utils/tokenFilters'
 
 // props — объект пропсов компонента (ширина и высота карты)
 export function useGridDraw(props) {
   const store = useGameStore()
-  const tokensStore = useTokensStore()
   const heroesStore = useHeroesStore()
 
   const canvasRef = ref(null)
@@ -48,9 +47,9 @@ export function useGridDraw(props) {
       }
     } else {
       // Режим админа: зона только для выбранного токена.
-      const selected = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+      const selected = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
 
-      if (selected && !selected.systemToken) {
+      if (isNonSystemToken(selected)) {
         const ap = selected.actionPoints ?? 0
         const reachable = ap > 0 ? buildReachableCells(selected, store.walls, ap) : new Set()
 

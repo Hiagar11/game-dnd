@@ -45,6 +45,7 @@
   import { useTokensStore } from '../stores/tokens'
   import { useTokenDrag } from '../composables/useTokenDrag'
   import { useSound } from '../composables/useSound'
+  import { getHeroTokens } from '../utils/tokenFilters'
   import GameTokenEditPopup from './GameTokenEditPopup.vue'
 
   const store = useTokensStore()
@@ -63,7 +64,7 @@
     playClick()
   }
 
-  const heroTokens = computed(() => store.tokens.filter((t) => t.tokenType === 'hero'))
+  const heroTokens = computed(() => getHeroTokens(store.tokens))
 
   // inject из GameView — явно шлёт heroes зрителям сразу после добавления.
   // Это надёжнее чем watch: срабатывает синхронно в callback popup.

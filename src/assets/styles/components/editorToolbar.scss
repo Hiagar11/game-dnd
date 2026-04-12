@@ -1,0 +1,126 @@
+.editor-toolbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: rgb(0 0 0 / 65%);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+.editor-toolbar__back {
+  @include btn-ghost;
+
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-3);
+  font-size: 14px;
+}
+
+.editor-toolbar__name {
+  @include form-input;
+
+  flex-shrink: 0;
+  width: 200px;
+  padding: var(--space-1) var(--space-3);
+
+  &::placeholder {
+    color: rgb(255 255 255 / 45%);
+  }
+}
+
+.editor-toolbar__sep {
+  width: 1px;
+  height: 20px;
+  flex-shrink: 0;
+  background: rgb(255 255 255 / 15%);
+}
+
+.editor-toolbar__cell-label {
+  @include field-label;
+
+  flex-shrink: 0;
+}
+
+.editor-toolbar__slider {
+  width: 120px;
+  flex-shrink: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.editor-toolbar__number {
+  @include form-input($font-size: 12px);
+
+  width: 52px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.editor-toolbar__px {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.editor-toolbar__error {
+  @include text-error;
+
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.editor-toolbar__btn {
+  @include btn-ghost;
+
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-4);
+  font-size: 13px;
+
+  &:hover:not(:disabled) {
+    border-color: var(--color-text-muted);
+    color: var(--color-text);
+  }
+
+  &--save {
+    @include btn-primary;
+
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-4);
+  }
+
+  &--delete {
+    @include btn-danger;
+
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-4);
+  }
+}
+
+.editor-toolbar__spinner {
+  @include spinner(12px, $anim: toolbar-spin);
+
+  &--dark {
+    border-color: rgb(0 0 0 / 20%);
+    border-top-color: #1a1a1a;
+  }
+}
+
+@keyframes toolbar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

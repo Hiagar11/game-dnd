@@ -9,6 +9,8 @@
 
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
 import { calcMaxHp } from './combatFormulas'
+import { normalizeInventorySnapshot } from './inventoryState'
+import { getNpcAttitude } from './tokenFilters'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
@@ -39,6 +41,7 @@ export function mapServerToken(serverToken, clientTokens) {
       agility: 0,
       intellect: 0,
       charisma: 0,
+      inventory: null,
     }
   }
 
@@ -64,7 +67,7 @@ export function mapServerToken(serverToken, clientTokens) {
     // в этом случае падаем на def (загруженный шаблон) или tokenObj (populate).
     name: serverToken.name ?? def?.name ?? tokenObj?.name ?? 'Неизвестный',
     tokenType: serverToken.tokenType ?? def?.tokenType ?? tokenObj?.tokenType ?? 'npc',
-    attitude: serverToken.attitude ?? def?.attitude ?? tokenObj?.attitude ?? 'neutral',
+    attitude: getNpcAttitude(serverToken.attitude ?? def?.attitude ?? tokenObj?.attitude),
     npcName: serverToken.npcName ?? def?.npcName ?? tokenObj?.npcName ?? '',
     personality: serverToken.personality ?? def?.personality ?? tokenObj?.personality ?? '',
     contextNotes: serverToken.contextNotes ?? def?.contextNotes ?? tokenObj?.contextNotes ?? '',
@@ -92,5 +95,6 @@ export function mapServerToken(serverToken, clientTokens) {
         serverToken.agility ?? def?.agility ?? tokenObj?.stats?.agility ?? 0
       ),
     actionPoints: serverToken.actionPoints ?? 4,
+    inventory: normalizeInventorySnapshot(serverToken.inventory),
   }
 }

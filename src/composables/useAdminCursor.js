@@ -8,7 +8,7 @@
 
 import { watch, computed, onMounted, onUnmounted } from 'vue'
 import { useGameStore } from '../stores/game'
-import { useTokensStore } from '../stores/tokens'
+import { getSelectedToken, isHeroToken } from '../utils/tokenFilters'
 
 const THROTTLE_MS = 33 // ~30 fps
 const MAX_ICON_SIZE = 256_000 // 256 KB в base64-символах
@@ -16,16 +16,12 @@ const MAX_ICON_SIZE = 256_000 // 256 KB в base64-символах
 // offsetX/offsetY — реактивные рефы из useMapPan, передаются снаружи
 export function useAdminCursor(getSocket, sessionActiveRef, offsetX, offsetY) {
   const gameStore = useGameStore()
-  const tokensStore = useTokensStore()
 
   // Курсор виден зрителям только пока выбран токен-герой.
   // Проверяем: selectedPlacedUid → placedToken → tokenType === 'hero'
   const isHeroSelected = computed(() => {
-    if (!gameStore.selectedPlacedUid) return false
-    const placed = gameStore.placedTokens.find((t) => t.uid === gameStore.selectedPlacedUid)
-    if (!placed) return false
-    const token = tokensStore.tokens.find((t) => t.id === placed.tokenId)
-    return token?.tokenType === 'hero'
+    const placed = getSelectedToken(gameStore.placedTokens, gameStore.selectedPlacedUid)
+    return isHeroToken(placed)
   })
 
   // Когда герой снят с выбора — сразу прячем курсор у зрителей (не ждём движения мыши)

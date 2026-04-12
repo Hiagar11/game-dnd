@@ -52,6 +52,7 @@
   import { useCampaignsStore } from '../stores/campaigns'
   import PopupShell from './PopupShell.vue'
   import { useSound } from '../composables/useSound'
+  import { getCurrentScenarioId } from '../utils/scenario'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
@@ -78,7 +79,7 @@
   // если активна кампания — показываем только связанные боком мапа;
   // иначе — все заполненные карты кроме текущей.
   const otherLevels = computed(() => {
-    const currentId = String(gameStore.currentScenario?.id ?? '')
+    const currentId = getCurrentScenarioId(gameStore)
     const campaign = gameStore.activeCampaign
 
     const all = scenariosStore.scenarios.filter(

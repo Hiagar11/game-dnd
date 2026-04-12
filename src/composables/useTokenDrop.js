@@ -6,6 +6,7 @@
 
 import { useGameStore } from '../stores/game'
 import { useSocket } from './useSocket'
+import { getCurrentScenarioId } from '../utils/scenario'
 
 export function useTokenDrop(offsetX, offsetY) {
   function onDragOver(e) {
@@ -29,7 +30,7 @@ export function useTokenDrop(offsetX, offsetY) {
     const row = Math.floor(mapY / store.cellSize)
     if (col < 0 || row < 0) return
 
-    const scenarioId = String(store.currentScenario?.id ?? '')
+    const scenarioId = getCurrentScenarioId(store)
 
     // Сначала проверяем системный токен — у него свой action
     const systemToken = e.dataTransfer.getData('systemToken')

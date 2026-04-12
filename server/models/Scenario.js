@@ -39,6 +39,8 @@ const placedTokenSchema = new mongoose.Schema(
     agility: { type: Number, default: null },
     intellect: { type: Number, default: null },
     charisma: { type: Number, default: null },
+    // Персональный инвентарь экземпляра токена (сумка + экипировка)
+    inventory: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { _id: false }
 )

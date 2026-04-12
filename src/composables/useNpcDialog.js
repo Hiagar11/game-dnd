@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { getNpcAttitudeScore } from '../utils/tokenFilters'
 
 export function useNpcDialog(store) {
   const dialogBubbles = ref(new Map())
@@ -19,8 +20,7 @@ export function useNpcDialog(store) {
     closeBubble(uid)
     const next = new Map(dialogBubbles.value)
     const placed = store.placedTokens.find((t) => t.uid === uid)
-    const initScore =
-      placed?.attitude === 'friendly' ? 50 : placed?.attitude === 'hostile' ? -50 : 0
+    const initScore = getNpcAttitudeScore(placed)
     next.set(uid, { messages: [], loading: true, heroSrc, npcScore: initScore })
     dialogBubbles.value = next
     const timer = setTimeout(() => {
