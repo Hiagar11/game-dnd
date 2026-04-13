@@ -16,8 +16,21 @@ export { SYSTEM_TOKENS }
 export const useGameStore = defineStore('game', () => {
   // ─── Сетка ───────────────────────────────────────────────────────────────────
   const cellSize = ref(60)
+  const halfCell = computed(() => cellSize.value / 2)
   const colorGrid = ref('rgba(0,0,0,0.3)')
   const cellSizePx = computed(() => `${cellSize.value}px`)
+  // Смещение сетки (наследуется из Map → Scenario)
+  const gridOffsetX = ref(0)
+  const gridOffsetY = ref(0)
+  // Нормализованный offset в [0, cellSize) для рисования / позиционирования
+  const gridNormOX = computed(() => {
+    const cs = cellSize.value
+    return ((gridOffsetX.value % cs) + cs) % cs
+  })
+  const gridNormOY = computed(() => {
+    const cs = cellSize.value
+    return ((gridOffsetY.value % cs) + cs) % cs
+  })
 
   function setCellSize(size) {
     cellSize.value = size
@@ -25,11 +38,63 @@ export const useGameStore = defineStore('game', () => {
   function setColorGrid(color) {
     colorGrid.value = color
   }
+  function setGridOffset(x, y) {
+    gridOffsetX.value = x
+    gridOffsetY.value = y
+  }
 
   // ─── Токены на карте ──────────────────────────────────────────────────────────
   const placedTokens = ref([])
   const selectedPlacedUid = ref(null)
   const shakingTokenUid = ref(null)
+
+  // ─── Предметы на земле ──────────────────────────────────────────────────────
+  // Массив { id, col, row, items: [item, …] } — кучки лута, лежащие на карте.
+  const groundItems = ref([])
+
+  /**
+   * Добавить предмет на землю рядом с (col, row).
+   * Если в радиусе MERGE_RADIUS суб-клеток уже есть кучка — кладём туда.
+   * Иначе создаём новую.
+   */
+  const MERGE_RADIUS = 3
+  function addGroundLoot(col, row, item) {
+    let nearest = null
+    let bestDist = Infinity
+    for (const g of groundItems.value) {
+      const d = Math.abs(g.col - col) + Math.abs(g.row - row)
+      if (d <= MERGE_RADIUS && d < bestDist) {
+        bestDist = d
+        nearest = g
+      }
+    }
+    if (nearest) {
+      nearest.items.push(item)
+    } else {
+      groundItems.value.push({ id: crypto.randomUUID(), col, row, items: [item] })
+    }
+  }
+
+  /** Забрать предмет из кучки. Если кучка опустела — удалить. */
+  function pickupGroundItem(pileId, itemIdx) {
+    const pile = groundItems.value.find((g) => g.id === pileId)
+    if (!pile) return null
+    const [item] = pile.items.splice(itemIdx, 1)
+    if (!pile.items.length) {
+      groundItems.value = groundItems.value.filter((g) => g.id !== pileId)
+    }
+    return item ?? null
+  }
+
+  /** Инициализация предметов на земле из сервера. */
+  function initGroundItems(serverItems) {
+    groundItems.value = (serverItems ?? []).map((g) => ({
+      id: g.id ?? crypto.randomUUID(),
+      col: g.col,
+      row: g.row,
+      items: [...(g.items ?? [])],
+    }))
+  }
 
   // ─── Стены ────────────────────────────────────────────────────────────────────
   // Массив { col, row } — клетки, отмеченные как стена.
@@ -55,6 +120,12 @@ export const useGameStore = defineStore('game', () => {
   const hoveredCell = ref(null) // { col, row } | null
   function setHoveredCell(cell) {
     hoveredCell.value = cell ?? null
+  }
+
+  // Превью при перетаскивании токена — 2×2 sub-cell зона дропа
+  const dropPreviewCell = ref(null) // { col, row } | null
+  function setDropPreviewCell(cell) {
+    dropPreviewCell.value = cell ?? null
   }
 
   // ─── Боевой режим / инициатива ────────────────────────────────────────────────
@@ -138,7 +209,7 @@ export const useGameStore = defineStore('game', () => {
     enemyHiddenTurns.value = {}
     // Восстановить AP всем токенам
     for (const t of placedTokens.value) {
-      t.actionPoints = 4
+      t.actionPoints = 8
     }
   }
 
@@ -220,7 +291,7 @@ export const useGameStore = defineStore('game', () => {
       charisma: def?.charisma ?? 0,
       maxHp: mhp,
       hp: mhp,
-      actionPoints: 4,
+      actionPoints: 8,
       inventory: createEmptyInventory(),
     })
     return uid
@@ -246,7 +317,7 @@ export const useGameStore = defineStore('game', () => {
       charisma: 0,
       maxHp: 10,
       hp: 10,
-      actionPoints: 4,
+      actionPoints: 8,
     })
     return uid
   }
@@ -282,7 +353,7 @@ export const useGameStore = defineStore('game', () => {
   function endTurn() {
     if (!combatMode.value) {
       for (const t of placedTokens.value) {
-        t.actionPoints = 4
+        t.actionPoints = 8
       }
       return
     }
@@ -334,7 +405,7 @@ export const useGameStore = defineStore('game', () => {
     const nextUid = initiativeOrder.value[currentInitiativeIndex.value]?.uid
     const nextToken = placedTokens.value.find((t) => t.uid === nextUid)
     if (nextToken) {
-      nextToken.actionPoints = 4
+      nextToken.actionPoints = 8
       selectedPlacedUid.value = nextUid
     }
   }
@@ -347,6 +418,13 @@ export const useGameStore = defineStore('game', () => {
   function setDoorTarget(uid, targetScenarioId) {
     const token = placedTokens.value.find((t) => t.uid === uid)
     if (token) token.targetScenarioId = targetScenarioId || null
+  }
+
+  function setDoorGlobalMapExit(uid, isGlobal) {
+    const token = placedTokens.value.find((t) => t.uid === uid)
+    if (!token) return
+    token.globalMapExit = Boolean(isGlobal)
+    if (isGlobal) token.targetScenarioId = null
   }
 
   // ─── Инициализация из сервера ─────────────────────────────────────────────────
@@ -363,13 +441,20 @@ export const useGameStore = defineStore('game', () => {
 
   return {
     cellSize,
+    halfCell,
     colorGrid,
     cellSizePx,
+    gridOffsetX,
+    gridOffsetY,
+    gridNormOX,
+    gridNormOY,
+    setGridOffset,
     placedTokens,
     selectedPlacedUid,
     shakingTokenUid,
     walls,
     wallMode,
+    groundItems,
     combatPair,
     fogEnabled,
     currentScenario,
@@ -392,9 +477,15 @@ export const useGameStore = defineStore('game', () => {
     setHoveredPath,
     hoveredCell,
     setHoveredCell,
+    dropPreviewCell,
+    setDropPreviewCell,
     setDoorTarget,
+    setDoorGlobalMapExit,
     initPlacedTokens,
     initWalls,
+    initGroundItems,
+    addGroundLoot,
+    pickupGroundItem,
     hasWall,
     addWall,
     removeWall,

@@ -40,23 +40,22 @@ export function translateElement(element) {
   switch (element) {
     case 'fire':
       return 'Огонь'
-    case 'ice':
-      return 'Лед'
-    case 'lightning':
-      return 'Молния'
+    case 'water':
+      return 'Вода'
     case 'earth':
       return 'Земля'
-    case 'arcane':
-      return 'Аркана'
+    case 'air':
+      return 'Воздух'
     default:
       return element ?? 'Стихия'
   }
 }
 
-export function traitData(traitId, traits = []) {
+export function traitData(traitId, traits = [], overrides = {}) {
   const trait = traits.find((x) => x.id === traitId)
   if (!trait) return { name: '', mods: [] }
-  const mods = (trait.mods || []).map((mod) => ({
+  const modsSource = overrides[traitId] ?? trait.mods ?? []
+  const mods = modsSource.map((mod) => ({
     text: `${translateStat(mod.stat)} ${mod.value >= 0 ? '+' : ''}${mod.value}`,
     positive: mod.value >= 0,
   }))
@@ -127,8 +126,12 @@ export function effectRows(item) {
 }
 
 export function buildTooltipRows(item, traits = []) {
+  const overrides = item?.traitOverrides ?? {}
   return [
-    ...(item?.traitIds ?? []).map((traitId) => ({ key: traitId, ...traitData(traitId, traits) })),
+    ...(item?.traitIds ?? []).map((traitId) => ({
+      key: traitId,
+      ...traitData(traitId, traits, overrides),
+    })),
     ...effectRows(item),
   ]
 }

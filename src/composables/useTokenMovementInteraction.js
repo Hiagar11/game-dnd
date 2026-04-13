@@ -78,8 +78,12 @@ export function useTokenMovementInteraction({
     )
 
     if (!alreadyAdjacent) {
+      // Исключаем героя и дверь-цель из occupied — expandOccupied2x2 расширяет
+      // каждую позицию на ±1, и без исключения двери блокируются все соседние клетки
       const occupied = new Set(
-        store.placedTokens.filter((t) => t.uid !== uid).map((t) => `${t.col},${t.row}`)
+        store.placedTokens
+          .filter((t) => t.uid !== uid && t.uid !== door.uid)
+          .map((t) => `${t.col},${t.row}`)
       )
       const wallSet = new Set(store.walls.map((w) => `${w.col},${w.row}`))
 
@@ -119,6 +123,7 @@ export function useTokenMovementInteraction({
     const sourceScenarioId = store.currentScenario?.id ?? null
     emitDoorTransition({
       targetScenarioId: door.targetScenarioId,
+      globalMapExit: Boolean(door.globalMapExit),
       sourceScenarioId,
       buffer,
       initiatorUid: uid,

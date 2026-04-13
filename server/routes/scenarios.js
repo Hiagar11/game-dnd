@@ -1,56 +1,26 @@
 import { Router } from 'express'
-import multer from 'multer'
-import path from 'path'
-import fs from 'fs/promises'
-import { fileURLToPath } from 'url'
 import mongoose from 'mongoose'
 import Scenario from '../models/Scenario.js'
 import { requireAuth, requireAdmin } from '../middleware/auth.js'
-
-// ─── Multer: загрузка изображений карты ──────────────────────────────────────
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const mapUploadDir = path.join(__dirname, '..', 'uploads', 'maps')
-
-await fs.mkdir(mapUploadDir, { recursive: true })
-
-const mapStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, mapUploadDir),
-  filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase()
-    const base = path.basename(file.originalname, ext).replace(/\s+/g, '_')
-    cb(null, `${Date.now()}-${base}${ext}`)
-  },
-})
-
-const mapUpload = multer({
-  storage: mapStorage,
-  fileFilter: (_req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp']
-    cb(null, allowed.includes(file.mimetype))
-  },
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 МБ — карты бывают крупные
-})
 
 const router = Router()
 
 // Все роуты требуют авторизации
 router.use(requireAuth)
 
-// ─── POST /api/scenarios/upload-map ─────────────────────────────────────────
-// Загружает изображение карты на сервер. Возвращает путь и URL для превью.
-// Должен быть зарегистрирован ДО /:id, иначе Express перепутает 'upload-map' с id.
-router.post('/upload-map', requireAdmin, mapUpload.single('map'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Файл не выбран' })
-  // imagePath — относительный путь без ведущего /; используется при построении URL
-  const mapImagePath = `uploads/maps/${req.file.filename}`
-  const mapImageUrl = `${req.protocol}://${req.get('host')}/${mapImagePath}`
-  res.json({ mapImageUrl, mapImagePath })
-})
-
 // ─── POST /api/scenarios ──────────────────────────────────────────────────────
 // Создание нового сценария. Только для admin.
 router.post('/', requireAdmin, async (req, res) => {
-  const { name, mapImagePath, cellSize, placedTokens, walls, locationDescription } = req.body
+  const {
+    name,
+    mapImagePath,
+    cellSize,
+    gridOffsetX,
+    gridOffsetY,
+    placedTokens,
+    walls,
+    locationDescription,
+  } = req.body
 
   if (!name?.trim()) {
     return res.status(400).json({ error: 'Название обязательно' })
@@ -70,6 +40,7 @@ router.post('/', requireAdmin, async (req, res) => {
             tokenId,
             systemToken,
             targetScenarioId,
+            globalMapExit,
             col,
             row,
             hidden = false,
@@ -84,6 +55,7 @@ router.post('/', requireAdmin, async (req, res) => {
             targetScenarioId: targetScenarioId
               ? new mongoose.Types.ObjectId(String(targetScenarioId))
               : null,
+            globalMapExit: Boolean(globalMapExit),
             col: Number(col),
             row: Number(row),
             hidden: Boolean(hidden),
@@ -97,6 +69,8 @@ router.post('/', requireAdmin, async (req, res) => {
       name: name.trim(),
       mapImagePath: mapImagePath || '',
       cellSize: Number(cellSize) || 60,
+      gridOffsetX: Number(gridOffsetX) || 0,
+      gridOffsetY: Number(gridOffsetY) || 0,
       locationDescription:
         typeof locationDescription === 'string' ? locationDescription.slice(0, 600) : '',
       placedTokens: normalizedTokens,
@@ -163,10 +137,12 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (String(scenario.owner) !== String(req.user.id))
       return res.status(403).json({ error: 'Нет доступа' })
 
-    const { name, mapImagePath, cellSize, locationDescription } = req.body
+    const { name, mapImagePath, cellSize, gridOffsetX, gridOffsetY, locationDescription } = req.body
     if (name !== undefined) scenario.name = name.trim()
     if (mapImagePath !== undefined) scenario.mapImagePath = mapImagePath
     if (cellSize !== undefined) scenario.cellSize = Number(cellSize)
+    if (gridOffsetX !== undefined) scenario.gridOffsetX = Number(gridOffsetX)
+    if (gridOffsetY !== undefined) scenario.gridOffsetY = Number(gridOffsetY)
     if (locationDescription !== undefined)
       scenario.locationDescription = String(locationDescription).slice(0, 600)
 
@@ -199,7 +175,17 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
     }
 
     scenario.placedTokens = placedTokens.map(
-      ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden = false, inventory }) => ({
+      ({
+        uid,
+        tokenId,
+        systemToken,
+        targetScenarioId,
+        globalMapExit,
+        col,
+        row,
+        hidden = false,
+        inventory,
+      }) => ({
         uid,
         ...(systemToken
           ? { systemToken: String(systemToken) }
@@ -207,6 +193,7 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
         targetScenarioId: targetScenarioId
           ? new mongoose.Types.ObjectId(String(targetScenarioId))
           : null,
+        globalMapExit: Boolean(globalMapExit),
         col,
         row,
         hidden,
@@ -251,7 +238,7 @@ router.post('/:id/reset', requireAdmin, async (req, res) => {
 })
 
 // ─── DELETE /api/scenarios/:id ────────────────────────────────────────────────
-// Вместе со сценарием удаляем файл карты с диска, чтобы не засорять uploads/.
+// Удаляет сценарий. Файл карты НЕ удаляется — им владеет библиотека карт (Map).
 router.delete('/:id', requireAdmin, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id))
     return res.status(400).json({ error: 'Некорректный id' })
@@ -259,13 +246,6 @@ router.delete('/:id', requireAdmin, async (req, res) => {
     const scenario = await Scenario.findOne({ _id: req.params.id, owner: req.user.id })
     if (!scenario) return res.status(404).json({ error: 'Сценарий не найден' })
     await scenario.deleteOne()
-
-    // Если у сценария была карта — удаляем файл. Ошибку игнорируем:
-    // файл мог быть уже удалён вручную или путь мог не совпасть.
-    if (scenario.mapImagePath) {
-      const filePath = path.join(__dirname, '..', scenario.mapImagePath)
-      await fs.unlink(filePath).catch(() => {})
-    }
 
     res.status(204).end()
   } catch {
@@ -286,6 +266,8 @@ function formatScenario(scenario, req, { full = false, showHidden = false } = {}
     mapImagePath: scenario.mapImagePath,
     mapImageUrl,
     cellSize: scenario.cellSize,
+    gridOffsetX: scenario.gridOffsetX ?? 0,
+    gridOffsetY: scenario.gridOffsetY ?? 0,
     locationDescription: scenario.locationDescription ?? '',
     tokensCount: scenario.placedTokens?.length ?? 0,
     createdAt: scenario.createdAt,

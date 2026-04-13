@@ -32,15 +32,40 @@
         class="dialog-bubble__msg-row"
         :class="`dialog-bubble__msg-row--${msg.who}`"
       >
-        <div class="dialog-bubble__msg" :class="`dialog-bubble__msg--${msg.who}`">
-          {{ msg.text }}
-        </div>
-        <img
-          v-if="msg.who === 'player' && playerSrc"
-          :src="playerSrc"
-          class="dialog-bubble__player-avatar"
-          aria-hidden="true"
-        />
+        <!-- Обычное сообщение NPC / игрока -->
+        <template v-if="msg.who === 'npc' || msg.who === 'player'">
+          <div class="dialog-bubble__msg" :class="`dialog-bubble__msg--${msg.who}`">
+            {{ msg.text }}
+          </div>
+          <span v-if="msg.who === 'npc' && npcName" class="dialog-bubble__npc-name">
+            {{ npcName }}
+          </span>
+          <img
+            v-if="msg.who === 'player' && playerSrc"
+            :src="playerSrc"
+            class="dialog-bubble__player-avatar"
+            aria-hidden="true"
+          />
+        </template>
+
+        <!-- Бросок кубика (проверка убеждения) -->
+        <template v-if="msg.who === 'dice'">
+          <div
+            class="dialog-bubble__dice"
+            :class="msg.success ? 'dialog-bubble__dice--success' : 'dialog-bubble__dice--fail'"
+          >
+            <span class="dialog-bubble__dice-icon">🎲</span>
+            <span class="dialog-bubble__dice-label">Убеждение</span>
+            <span class="dialog-bubble__dice-roll">
+              {{ msg.d20 }}
+              <span v-if="msg.mod" class="dialog-bubble__dice-mod">+{{ msg.mod }}</span>
+              = {{ msg.total }} / {{ msg.dc }}
+            </span>
+            <span class="dialog-bubble__dice-result">
+              {{ msg.success ? 'Успех!' : 'Провал' }}
+            </span>
+          </div>
+        </template>
       </div>
 
       <!-- Анимация "печатает..." пока ИИ думает -->
@@ -93,6 +118,7 @@
     messages: { type: Array, required: true },
     loading: { type: Boolean, default: false },
     npcSrc: { type: String, default: null },
+    npcName: { type: String, default: '' },
     playerSrc: { type: String, default: null },
     npcScore: { type: Number, default: 0 },
   })

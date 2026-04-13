@@ -13,12 +13,17 @@
   <div
     v-if="selectedToken && !isWalking"
     class="game-range-overlay"
-    :class="{ 'game-range-overlay--boot': cursorInRange }"
+    :class="[
+      cursorInRange && !hoveredToken ? 'game-range-overlay--boot' : '',
+      hoveredTokenCursorClass,
+    ]"
     :style="{ width: `${width}px`, height: `${height}px` }"
     @mousemove="onMouseMove"
     @click.stop="onClick"
+    @contextmenu.stop.prevent="onRightClick"
     @mouseleave="onMouseLeave"
     @dragover="onDragOver"
+    @dragleave="onDragLeave"
     @drop="onDrop"
   />
 </template>
@@ -29,7 +34,11 @@
   import { useSocket } from '../composables/useSocket'
   import { buildReachableCells, findPath } from '../composables/useTokenMove'
   import { useTokenDrop } from '../composables/useTokenDrop'
-  import { getSelectedNonSystemToken } from '../utils/tokenFilters'
+  import {
+    getSelectedNonSystemToken,
+    isHostileNpcToken,
+    isTalkableNpcToken,
+  } from '../utils/tokenFilters'
   import { getCurrentScenarioId } from '../utils/scenario'
   import { TOKEN_MOVE_STEP_DELAY_MS } from '../constants/timing'
   import { sleep } from '../utils/async'
@@ -46,10 +55,46 @@
   // Получаем смещение карты от GameView (provide/inject) — нужно для useTokenDrop
   const offsetX = inject('offsetX')
   const offsetY = inject('offsetY')
-  const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
+  const { onDragOver, onDragLeave, onDrop } = useTokenDrop(offsetX, offsetY)
+
+  // Обработчики кликов по токену, зарегистрированные GameTokens через provide/inject
+  const overlayTokenClick = inject('overlayTokenClick', ref(null))
+  const overlayTokenContextMenu = inject('overlayTokenContextMenu', ref(null))
 
   // true — курсор над клеткой в зоне хода → показываем следы
   const cursorInRange = ref(false)
+
+  // Токен (не выбранный) под курсором мыши — для курсора и перенаправления кликов
+  const hoveredToken = ref(null)
+
+  /**
+   * Ищет размещённый токен (кроме выбранного) чей 2×2-блок покрывает (col, row).
+   */
+  function getTokenAtCell(col, row) {
+    return (
+      store.placedTokens.find(
+        (t) =>
+          t.uid !== selectedToken.value?.uid &&
+          col >= t.col &&
+          col <= t.col + 1 &&
+          row >= t.row &&
+          row <= t.row + 1
+      ) ?? null
+    )
+  }
+
+  /**
+   * CSS-класс курсора в зависимости от типа токена под мышью.
+   */
+  const hoveredTokenCursorClass = computed(() => {
+    const t = hoveredToken.value
+    if (!t) return ''
+    if (isHostileNpcToken(t)) return 'game-range-overlay--cursor-attack'
+    if (isTalkableNpcToken(t)) return 'game-range-overlay--cursor-talk'
+    if (t.systemToken === 'door' && (t.targetScenarioId || t.globalMapExit))
+      return 'game-range-overlay--cursor-door'
+    return ''
+  })
 
   // true — идёт анимация ходьбы. Блокируем повторные клики в этот период.
   const isWalking = ref(false)
@@ -68,7 +113,12 @@
     if (!t) return new Set()
     const ap = t.actionPoints ?? 0
     if (ap <= 0) return new Set()
-    return buildReachableCells(t, store.walls, ap)
+    const occupied = new Set(
+      store.placedTokens
+        .filter((entry) => entry.uid !== t.uid)
+        .map((entry) => `${entry.col},${entry.row}`)
+    )
+    return buildReachableCells(t, store.walls, ap, occupied)
   })
   /**
    * Переводит позицию мыши (clientX/Y) в координату клетки (col, row).
@@ -79,14 +129,16 @@
     const rect = e.currentTarget.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
+    const hc = store.halfCell
     return {
-      col: Math.floor(x / store.cellSize),
-      row: Math.floor(y / store.cellSize),
+      col: Math.floor((x - store.gridNormOX) / hc),
+      row: Math.floor((y - store.gridNormOY) / hc),
     }
   }
 
   function onMouseLeave() {
     cursorInRange.value = false
+    hoveredToken.value = null
     store.setHoveredPath([])
     store.setHoveredCell(null)
   }
@@ -94,18 +146,35 @@
   function onMouseMove(e) {
     if (!selectedToken.value) return
     const { col, row } = getCellAt(e)
+
+    // Проверяем, есть ли чужой токен под курсором
+    hoveredToken.value = getTokenAtCell(col, row)
+
     const key = `${col},${row}`
     const inRange = reachableCells.value.has(key)
-    cursorInRange.value = inRange
+    cursorInRange.value = inRange && !hoveredToken.value
 
-    if (inRange) {
+    if (inRange && !hoveredToken.value) {
       store.setHoveredCell({ col, row })
       const ap = selectedToken.value.actionPoints ?? 0
-      const path = findPath(selectedToken.value, { col, row }, store.walls, ap)
+      const occupied = new Set(
+        store.placedTokens
+          .filter((entry) => entry.uid !== selectedToken.value.uid)
+          .map((entry) => `${entry.col},${entry.row}`)
+      )
+      const path = findPath(selectedToken.value, { col, row }, store.walls, ap, occupied)
       store.setHoveredPath(path ?? [])
     } else {
       store.setHoveredCell(null)
       store.setHoveredPath([])
+    }
+  }
+
+  function onRightClick(e) {
+    const { col, row } = getCellAt(e)
+    const hitToken = hoveredToken.value ?? getTokenAtCell(col, row)
+    if (hitToken && overlayTokenContextMenu.value) {
+      overlayTokenContextMenu.value(hitToken)
     }
   }
 
@@ -114,14 +183,26 @@
 
     const { col, row } = getCellAt(e)
 
+    // Используем токен, уже найденный в onMouseMove (надёжнее повторного getTokenAtCell)
+    const hitToken = hoveredToken.value ?? getTokenAtCell(col, row)
+    if (hitToken && overlayTokenClick.value) {
+      overlayTokenClick.value(hitToken)
+      return
+    }
+
     if (reachableCells.value.has(`${col},${row}`)) {
       // Захватываем uid и AP до снятия выделения — после deselect computed вернёт null
       const uid = selectedToken.value.uid
       const ap = selectedToken.value.actionPoints ?? 0
       const scenarioId = getCurrentScenarioId(store)
+      const occupied = new Set(
+        store.placedTokens
+          .filter((entry) => entry.uid !== uid)
+          .map((entry) => `${entry.col},${entry.row}`)
+      )
 
       // Путь строится с ограничением по AP
-      const path = findPath(selectedToken.value, { col, row }, store.walls, ap)
+      const path = findPath(selectedToken.value, { col, row }, store.walls, ap, occupied)
       if (!path || path.length === 0) {
         store.selectPlacedToken(null)
         return
@@ -146,7 +227,7 @@
         if (!store.combatMode) {
           const remainingAP = store.placedTokens.find((t) => t.uid === uid)?.actionPoints ?? 0
           if (remainingAP === 0) {
-            for (const t of store.placedTokens) t.actionPoints = 4
+            for (const t of store.placedTokens) t.actionPoints = 8
           }
         }
         isWalking.value = false
@@ -183,6 +264,32 @@
       - Левая нога (спереди, 90% opacity): низ, слева
     Каждая нога — эллипс (пад) + 4 круга (пальцы).
   */
+
+  /* Курсор «мечи» — враждебный НПС */
+  .game-range-overlay--cursor-attack {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cg transform='rotate(-45 20 20)' opacity='0.95'%3E%3Crect x='18.5' y='4' width='3' height='22' rx='1' fill='%23f87171'/%3E%3Crect x='14' y='10' width='12' height='2.5' rx='1' fill='%23fca5a5'/%3E%3Cpolygon points='20,2 18,6 22,6' fill='%23fca5a5'/%3E%3C/g%3E%3Cg transform='rotate(45 20 20)' opacity='0.70'%3E%3Crect x='18.5' y='4' width='3' height='22' rx='1' fill='%23f87171'/%3E%3Crect x='14' y='10' width='12' height='2.5' rx='1' fill='%23fca5a5'/%3E%3Cpolygon points='20,2 18,6 22,6' fill='%23fca5a5'/%3E%3C/g%3E%3C/svg%3E")
+        20 20,
+      crosshair;
+  }
+
+  /* Курсор «пузырь» — нейтральный/союзный НПС */
+  .game-range-overlay--cursor-talk {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect x='6' y='6' width='22' height='16' rx='4' fill='%2360a5fa' opacity='0.9'/%3E%3Cpolygon points='10,22 8,28 16,22' fill='%2360a5fa' opacity='0.9'/%3E%3Ccircle cx='13' cy='14' r='2' fill='white'/%3E%3Ccircle cx='18' cy='14' r='2' fill='white'/%3E%3Ccircle cx='23' cy='14' r='2' fill='white'/%3E%3C/svg%3E")
+        20 20,
+      pointer;
+  }
+
+  /* Курсор «дверь» — системный токен-дверь с настроенным переходом */
+  .game-range-overlay--cursor-door {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect x='12' y='14' width='16' height='18' rx='1' fill='none' stroke='%23fbbf24' stroke-width='2.5' opacity='0.9'/%3E%3Cpath d='M12 14 Q20 4 28 14' fill='none' stroke='%23fbbf24' stroke-width='2.5' opacity='0.9'/%3E%3Crect x='22' y='21' width='3' height='3' rx='1.5' fill='%23fbbf24' opacity='0.9'/%3E%3Ccircle cx='30' cy='10' r='4' fill='%23fbbf24' opacity='0.5'/%3E%3Ccircle cx='30' cy='10' r='2' fill='%23fbbf24' opacity='0.9'/%3E%3C/svg%3E")
+        20 20,
+      pointer;
+  }
+
+  /* Курсор «следы» — клетка в зоне хода */
   .game-range-overlay--boot {
     cursor:
       url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Cg opacity='0.35'%3E%3Cellipse cx='28' cy='16' rx='5' ry='8' fill='%234ade80'/%3E%3Ccircle cx='24' cy='7' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='28' cy='6' r='2.5' fill='%234ade80'/%3E%3Ccircle cx='32' cy='7' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='35' cy='10' r='1.8' fill='%234ade80'/%3E%3C/g%3E%3Cg opacity='0.9'%3E%3Cellipse cx='12' cy='28' rx='5' ry='8' fill='%234ade80'/%3E%3Ccircle cx='8' cy='19' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='12' cy='18' r='2.5' fill='%234ade80'/%3E%3Ccircle cx='16' cy='19' r='2.2' fill='%234ade80'/%3E%3Ccircle cx='19' cy='22' r='1.8' fill='%234ade80'/%3E%3C/g%3E%3C/svg%3E")

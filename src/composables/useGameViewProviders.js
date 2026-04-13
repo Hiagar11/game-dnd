@@ -1,4 +1,4 @@
-import { provide } from 'vue'
+import { provide, ref } from 'vue'
 import { useAdminCursor } from './useAdminCursor'
 
 export function useGameViewProviders({ getSocket, sessionActive, offsetX, offsetY }) {
@@ -14,6 +14,14 @@ export function useGameViewProviders({ getSocket, sessionActive, offsetX, offset
   provide('unblockCursor', unblockCursor)
   provide('offsetX', offsetX)
   provide('offsetY', offsetY)
+
+  // Общие ref для передачи кликов по токенам из GameRangeOverlay в GameTokens.
+  // GameTokens регистрирует обработчики, GameRangeOverlay вызывает их.
+  const overlayTokenClick = ref(null)
+  provide('overlayTokenClick', overlayTokenClick)
+
+  const overlayTokenContextMenu = ref(null)
+  provide('overlayTokenContextMenu', overlayTokenContextMenu)
 
   return {
     onMenuEnter,

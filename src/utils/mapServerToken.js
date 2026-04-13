@@ -32,6 +32,7 @@ export function mapServerToken(serverToken, clientTokens) {
       tokenId: null,
       systemToken,
       targetScenarioId: serverToken.targetScenarioId ? String(serverToken.targetScenarioId) : null,
+      globalMapExit: Boolean(serverToken.globalMapExit),
       col,
       row,
       hidden: hidden ?? false,

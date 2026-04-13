@@ -21,6 +21,7 @@
       </nav>
 
       <main class="editor-content">
+        <EditorGlobalMapSection v-if="activeSection === 'globalMap'" />
         <EditorMapsSection v-if="activeSection === 'maps'" />
         <EditorLevelSection
           v-if="activeSection === 'levels'"
@@ -45,9 +46,11 @@
   import EditorScenarioSection from '../components/EditorScenarioSection.vue'
   import EditorItemsSection from '../components/EditorItemsSection.vue'
   import EditorTraitsSection from '../components/EditorTraitsSection.vue'
+  import EditorGlobalMapSection from '../components/EditorGlobalMapSection.vue'
   import { useSound } from '../composables/useSound'
 
   const NAV_ITEMS = [
+    { key: 'globalMap', label: 'Глобальная карта' },
     { key: 'maps', label: 'Загрузить карты' },
     { key: 'levels', label: 'Заполнить карты' },
     { key: 'scenarios', label: 'Создать сценарий' },
@@ -56,7 +59,7 @@
   ]
 
   const router = useRouter()
-  const activeSection = ref('maps')
+  const activeSection = ref('globalMap')
   const { playHover, playClick } = useSound()
 
   function setSection(key) {

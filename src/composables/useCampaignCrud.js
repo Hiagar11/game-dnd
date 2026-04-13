@@ -9,6 +9,7 @@ export function useCampaignCrud(graph) {
   const activeCampaignId = ref(null)
   const campaignName = ref('')
   const startScenarioId = ref(null)
+  const globalMapId = ref(null)
   const saving = ref(false)
   const saveSuccess = ref(false)
   const saveError = ref('')
@@ -21,6 +22,7 @@ export function useCampaignCrud(graph) {
     activeCampaignId.value = campaign.id
     campaignName.value = campaign.name
     startScenarioId.value = campaign.startScenarioId ?? null
+    globalMapId.value = campaign.globalMapId ?? null
     saveSuccess.value = false
     saveError.value = ''
     graph.loadGraphFromCampaign(campaign)
@@ -31,6 +33,7 @@ export function useCampaignCrud(graph) {
     activeCampaignId.value = null
     campaignName.value = ''
     startScenarioId.value = null
+    globalMapId.value = null
     saveSuccess.value = false
     saveError.value = ''
     graph.resetGraph()
@@ -48,11 +51,15 @@ export function useCampaignCrud(graph) {
     saveError.value = ''
     saveSuccess.value = false
     try {
+      const gmNodePos = graph.nodePos[graph.GLOBAL_MAP_NODE_ID]
       const data = {
         name: campaignName.value,
         nodes: graph.levelsWithNodes.value.map(({ scenarioId, x, y }) => ({ scenarioId, x, y })),
         edges: graph.edges.value,
         startScenarioId: startScenarioId.value || null,
+        globalMapId: globalMapId.value || null,
+        globalMapNodeX: gmNodePos?.x ?? null,
+        globalMapNodeY: gmNodePos?.y ?? null,
       }
       if (activeCampaignId.value) {
         await campaignsStore.updateCampaign(activeCampaignId.value, data)
@@ -85,6 +92,7 @@ export function useCampaignCrud(graph) {
     activeCampaignId,
     campaignName,
     startScenarioId,
+    globalMapId,
     saving,
     saveSuccess,
     saveError,

@@ -1,5 +1,5 @@
 <template>
-  <div class="inv-panel">
+  <div class="inv-panel" @dragover.prevent @drop.prevent="onPanelDrop">
     <!-- ─── ЛЕВАЯ ЧАСТЬ: бумажная кукла с ячейками экипировки ──────── -->
     <div class="inv-panel__doll">
       <!-- Силуэт персонажа — декоративный, указывает зоны надевания -->
@@ -72,17 +72,28 @@
           :style="iconMaskStyleGhost(equipped.weapon)"
         />
         <span
-          v-else-if="equipped[slot.key]?.icon"
+          v-else-if="equipped[slot.key]?.icon && isIconLoaded(equipped[slot.key].icon)"
           class="inv-panel__slot-icon"
           :style="iconMaskStyle(equipped[slot.key])"
         />
+        <span v-else-if="equipped[slot.key]?.icon" class="inv-panel__slot-loader" />
         <span v-else class="inv-panel__slot-label">{{ slot.label }}</span>
       </div>
     </div>
 
     <!-- ─── ПРАВАЯ ЧАСТЬ: сетка предметов в сумке ─────────────────── -->
     <div class="inv-panel__bag">
-      <p class="inv-panel__bag-title">Сумка</p>
+      <div class="inv-panel__bag-header">
+        <p class="inv-panel__bag-title">Сумка</p>
+        <button
+          v-if="isDev"
+          class="inv-panel__clear-btn"
+          title="Очистить весь инвентарь (DEV)"
+          @click="clearAll()"
+        >
+          ✕ Очистить
+        </button>
+      </div>
       <div class="inv-panel__grid">
         <div
           v-for="(cell, i) in cells"
@@ -103,7 +114,12 @@
           @mouseenter="showTooltipForItem($event, cell)"
           @mouseleave="hideTooltip"
         >
-          <span v-if="cell?.icon" class="inv-panel__cell-icon" :style="iconMaskStyle(cell)" />
+          <span
+            v-if="cell?.icon && isIconLoaded(cell.icon)"
+            class="inv-panel__cell-icon"
+            :style="iconMaskStyle(cell)"
+          />
+          <span v-else-if="cell?.icon" class="inv-panel__cell-loader" />
           <span v-else-if="cell" class="inv-panel__cell-name">{{ cell.name }}</span>
         </div>
       </div>
@@ -148,6 +164,8 @@
 <script setup>
   import { useInventoryPanel } from '../composables/useInventoryPanel'
 
+  const isDev = import.meta.env.DEV
+
   const props = defineProps({
     modelValue: {
       type: Object,
@@ -163,7 +181,7 @@
     },
   })
 
-  const emit = defineEmits(['update:modelValue'])
+  const emit = defineEmits(['update:modelValue', 'drop-item'])
 
   const {
     cells,
@@ -178,6 +196,7 @@
     tooltipRows,
     iconMaskStyle,
     iconMaskStyleGhost,
+    isIconLoaded,
     equipDragClass,
     onEquipDragStart,
     onDragEnd,
@@ -191,6 +210,8 @@
     onBagDrop,
     showTooltipForItem,
     hideTooltip,
+    clearAll,
+    onPanelDrop,
   } = useInventoryPanel(props, emit)
 </script>
 

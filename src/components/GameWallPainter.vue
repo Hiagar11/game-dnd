@@ -43,9 +43,10 @@
    */
   function getCellAt(e) {
     const rect = e.currentTarget.getBoundingClientRect()
+    const hc = store.halfCell
     return {
-      col: Math.floor((e.clientX - rect.left) / store.cellSize),
-      row: Math.floor((e.clientY - rect.top) / store.cellSize),
+      col: Math.floor((e.clientX - rect.left - store.gridNormOX) / hc),
+      row: Math.floor((e.clientY - rect.top - store.gridNormOY) / hc),
     }
   }
 

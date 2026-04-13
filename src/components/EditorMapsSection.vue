@@ -1,15 +1,15 @@
 <template>
   <div class="maps-section">
-    <div v-if="!form.mapImageUrl" class="maps-layout">
+    <div v-if="!form.imageUrl" class="maps-layout">
       <EditorSidebar
-        :scenarios="store.scenarios.filter((s) => !s.tokensCount)"
+        :scenarios="store.maps"
         :loading="store.loading"
         :active-id="form.id"
         :show-back="false"
         title="Карты"
-        @select="loadScenario"
-        @create="newScenario"
-        @delete="handleDeleteScenario"
+        @select="loadMap"
+        @create="newMap"
+        @delete="handleDeleteMap"
       />
 
       <main class="maps-main">
@@ -43,12 +43,17 @@
       <div
         ref="canvasWrapRef"
         class="maps-canvas-wrap"
-        :class="{ 'maps-canvas-wrap--panning': isPanning }"
+        :class="{
+          'maps-canvas-wrap--panning': isPanning,
+          'maps-canvas-wrap--dragging': isDraggingGrid,
+        }"
         @wheel.prevent="onWheel"
+        @mousedown.left.prevent="onGridDragStart"
         @mousedown.right.prevent="onPanStart"
-        @mousemove="onPanMove"
+        @mousemove="onCanvasMouseMove"
+        @mouseup.left="onCanvasMouseUpLeft"
         @mouseup.right="onPanEnd"
-        @mouseleave="onPanEnd"
+        @mouseleave="onCanvasMouseLeave"
         @contextmenu.prevent
       >
         <canvas ref="previewCanvasRef" class="maps-canvas" :style="canvasTransformStyle" />
@@ -83,20 +88,22 @@
 
 <script setup>
   import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
-  import { useScenariosStore } from '../stores/scenarios'
+  import { useMapsStore } from '../stores/maps'
   import { useEditorCanvas } from '../composables/useEditorCanvas'
   import { useMapScenarioForm } from '../composables/useMapScenarioForm'
   import EditorSidebar from './EditorSidebar.vue'
   import EditorMapDropzone from './EditorMapDropzone.vue'
   import EditorToolbar from './EditorToolbar.vue'
 
-  const store = useScenariosStore()
+  const store = useMapsStore()
 
   const {
     previewCanvasRef,
     canvasWrapRef,
     canvasTransformStyle,
     isPanning,
+    isDraggingGrid,
+    setGridOffset,
     loadImageAndDraw,
     drawPreview,
     clearImage,
@@ -104,7 +111,16 @@
     onPanStart,
     onPanMove,
     onPanEnd,
+    onGridDragStart,
+    onGridDragEnd,
+    onGridOffsetChange,
   } = useEditorCanvas()
+
+  // Когда drag сетки завершён — синхронизируем offset обратно в форму
+  onGridOffsetChange((x, y) => {
+    form.value.gridOffsetX = x
+    form.value.gridOffsetY = y
+  })
 
   const {
     form,
@@ -113,28 +129,29 @@
     saveError,
     canSave,
     resetForm,
-    fillFormFromScenario,
+    fillFormFromMap,
     uploadMapFile,
     onSave,
     onDelete,
-    onDeleteScenario,
+    onDeleteMap,
   } = useMapScenarioForm()
 
   const mapInputRef = ref(null)
 
-  function newScenario() {
+  function newMap() {
     clearImage()
     resetForm()
   }
-  function loadScenario(s) {
+  function loadMap(m) {
     clearImage()
-    fillFormFromScenario(s)
+    setGridOffset(m.gridOffsetX ?? 0, m.gridOffsetY ?? 0)
+    fillFormFromMap(m)
   }
   function handleDelete() {
-    onDelete(newScenario)
+    onDelete(newMap)
   }
-  function handleDeleteScenario(s) {
-    onDeleteScenario(s, newScenario)
+  function handleDeleteMap(m) {
+    onDeleteMap(m, newMap)
   }
 
   function triggerMapPicker() {
@@ -149,15 +166,30 @@
   }
 
   function exitCanvas() {
-    newScenario()
+    newMap()
   }
 
   function handleSave() {
-    onSave(newScenario)
+    onSave(newMap)
+  }
+
+  // ─── Единые обработчики мыши для canvas-обёртки ────────────────────────────
+  // onPanMove обрабатывает и ПКМ-пан и ЛКМ-drag сетки внутри себя.
+  function onCanvasMouseMove(e) {
+    onPanMove(e)
+    // Перерисовываем сетку в реальном времени при drag
+    if (isDraggingGrid.value) drawPreview(form.value.cellSize)
+  }
+  function onCanvasMouseUpLeft() {
+    onGridDragEnd()
+  }
+  function onCanvasMouseLeave() {
+    onPanEnd()
+    onGridDragEnd()
   }
 
   onMounted(() => {
-    store.fetchScenarios()
+    store.fetchMaps()
     window.addEventListener('keydown', onKeyDown, { capture: true })
   })
 
@@ -165,20 +197,21 @@
 
   function onKeyDown(e) {
     if (e.key !== 'Escape') return
-    if (form.value.mapImageUrl) {
+    if (form.value.imageUrl) {
       e.stopImmediatePropagation()
       exitCanvas()
     }
   }
 
   watch(
-    () => form.value.mapImageUrl,
+    () => form.value.imageUrl,
     async (url) => {
       if (!url) {
         clearImage()
         return
       }
       await nextTick()
+      setGridOffset(form.value.gridOffsetX, form.value.gridOffsetY)
       loadImageAndDraw(url, form.value.cellSize)
     }
   )

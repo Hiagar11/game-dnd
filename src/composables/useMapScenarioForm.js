@@ -1,20 +1,21 @@
 // Composable для формы создания/редактирования карты (EditorMapsSection).
-// Инкапсулирует: состояние формы, загрузку карты, сохранение и удаление.
-// Очистка canvas (clearImage) — ответственность компонента, не composable.
+// Работает с Map-сущностью (библиотека карт), а не с Scenario.
 import { ref, computed } from 'vue'
-import { useScenariosStore } from '../stores/scenarios'
+import { useMapsStore } from '../stores/maps'
 
 const DEFAULT_CELL_SIZE = 60
 
 export function useMapScenarioForm() {
-  const store = useScenariosStore()
+  const store = useMapsStore()
 
   const form = ref({
     id: null,
     name: '',
-    mapImageUrl: null,
-    mapImagePath: null,
+    imageUrl: null,
+    imagePath: null,
     cellSize: DEFAULT_CELL_SIZE,
+    gridOffsetX: 0,
+    gridOffsetY: 0,
   })
   const saving = ref(false)
   const uploadingMap = ref(false)
@@ -23,43 +24,53 @@ export function useMapScenarioForm() {
   const canSave = computed(
     () =>
       form.value.name.length > 0 &&
-      form.value.mapImagePath !== null &&
+      (form.value.imagePath !== null || form.value._pendingFile != null) &&
       !uploadingMap.value &&
       !saving.value
   )
 
   // ─── Навигация по списку ─────────────────────────────────────────────────────
-  // Вызывать вместе с clearImage() в компоненте
   function resetForm() {
     saveError.value = ''
     form.value = {
       id: null,
       name: '',
-      mapImageUrl: null,
-      mapImagePath: null,
+      imageUrl: null,
+      imagePath: null,
       cellSize: DEFAULT_CELL_SIZE,
+      gridOffsetX: 0,
+      gridOffsetY: 0,
     }
   }
 
-  function fillFormFromScenario(s) {
+  function fillFormFromMap(m) {
     saveError.value = ''
     form.value = {
-      id: String(s.id),
-      name: s.name,
-      mapImageUrl: s.mapImageUrl ?? null,
-      mapImagePath: s.mapImagePath ?? null,
-      cellSize: s.cellSize ?? DEFAULT_CELL_SIZE,
+      id: String(m.id),
+      name: m.name,
+      imageUrl: m.imageUrl ?? null,
+      imagePath: m.imagePath ?? null,
+      cellSize: m.cellSize ?? DEFAULT_CELL_SIZE,
+      gridOffsetX: m.gridOffsetX ?? 0,
+      gridOffsetY: m.gridOffsetY ?? 0,
     }
   }
 
-  // ─── Загрузка изображения карты ──────────────────────────────────────────────
+  // ─── Загрузка изображения / создание новой карты ─────────────────────────────
   async function uploadMapFile(file) {
     uploadingMap.value = true
     saveError.value = ''
     try {
-      const result = await store.uploadMapImage(file)
-      form.value.mapImageUrl = result.mapImageUrl
-      form.value.mapImagePath = result.mapImagePath
+      if (form.value.id) {
+        // Замена изображения у существующей карты
+        const updated = await store.replaceMapImage(form.value.id, file)
+        form.value.imageUrl = updated.imageUrl
+        form.value.imagePath = updated.imagePath
+      } else {
+        // Временно показываем превью через blob URL (карта ещё не создана)
+        form.value.imageUrl = URL.createObjectURL(file)
+        form.value._pendingFile = file
+      }
     } catch (err) {
       saveError.value = err.message || 'Ошибка загрузки карты'
     } finally {
@@ -72,26 +83,37 @@ export function useMapScenarioForm() {
     if (!canSave.value) return
     saving.value = true
     saveError.value = ''
-    const payload = {
-      name: form.value.name,
-      mapImagePath: form.value.mapImagePath,
-      cellSize: form.value.cellSize,
-    }
     try {
       if (form.value.id) {
-        const updated = await store.updateScenario(form.value.id, payload)
+        // Обновляем мета-данные (имя, cellSize)
+        const updated = await store.updateMap(form.value.id, {
+          name: form.value.name,
+          cellSize: form.value.cellSize,
+          gridOffsetX: form.value.gridOffsetX,
+          gridOffsetY: form.value.gridOffsetY,
+        })
         form.value.id = String(updated.id)
       } else {
-        const duplicate = store.scenarios.find(
-          (s) => s.name.trim().toLowerCase() === form.value.name.toLowerCase()
-        )
-        if (duplicate) {
-          saveError.value = 'Карта с таким именем уже существует'
+        // Создаём новую карту (загрузка файла + мета-данные за один запрос)
+        const file = form.value._pendingFile
+        if (!file) {
+          saveError.value = 'Файл карты не выбран'
           saving.value = false
           return
         }
-        const created = await store.createScenario(payload)
+        const created = await store.uploadMap(
+          file,
+          form.value.name,
+          form.value.cellSize,
+          form.value.gridOffsetX,
+          form.value.gridOffsetY
+        )
+        // Заменяем blob URL на серверный
+        if (form.value.imageUrl?.startsWith('blob:')) URL.revokeObjectURL(form.value.imageUrl)
         form.value.id = String(created.id)
+        form.value.imageUrl = created.imageUrl
+        form.value.imagePath = created.imagePath
+        delete form.value._pendingFile
       }
       onSuccess?.()
     } catch (err) {
@@ -102,12 +124,11 @@ export function useMapScenarioForm() {
   }
 
   // ─── Удаление текущей карты ───────────────────────────────────────────────────
-  // Компонент должен вызвать clearImage() после успеха или передать resetFn
   async function onDelete(resetFn) {
     if (!confirm(`Удалить «${form.value.name}»?`)) return
     saving.value = true
     try {
-      await store.deleteScenario(form.value.id)
+      await store.deleteMap(form.value.id)
       resetFn?.()
     } catch (err) {
       saveError.value = err.message || 'Ошибка при удалении'
@@ -116,14 +137,14 @@ export function useMapScenarioForm() {
     }
   }
 
-  // Удаление из сайдбара — принимает объект сценария
-  async function onDeleteScenario(s, resetFn) {
-    if (!confirm(`Удалить «${s.name || 'Без названия'}»?`)) return
+  // Удаление из сайдбара — принимает объект карты
+  async function onDeleteMap(m, resetFn) {
+    if (!confirm(`Удалить «${m.name || 'Без названия'}»?`)) return
     saving.value = true
     saveError.value = ''
     try {
-      await store.deleteScenario(String(s.id))
-      if (String(s.id) === form.value.id) resetFn?.()
+      await store.deleteMap(String(m.id))
+      if (String(m.id) === form.value.id) resetFn?.()
     } catch (err) {
       saveError.value = err.message || 'Ошибка при удалении'
     } finally {
@@ -138,10 +159,10 @@ export function useMapScenarioForm() {
     saveError,
     canSave,
     resetForm,
-    fillFormFromScenario,
+    fillFormFromMap,
     uploadMapFile,
     onSave,
     onDelete,
-    onDeleteScenario,
+    onDeleteMap,
   }
 }

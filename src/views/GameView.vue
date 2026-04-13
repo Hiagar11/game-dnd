@@ -6,6 +6,7 @@
     @mousemove="onMouseMove"
     @contextmenu="onContextMenu"
     @dragover="onDragOver"
+    @dragleave="onDragLeave"
     @drop="onDrop"
   >
     <AppBackground src="/video/maw.gif" />
@@ -36,6 +37,7 @@
         <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
         <GameGrid :width="mapSize.width" :height="mapSize.height" />
         <GameRangeOverlay :width="mapSize.width" :height="mapSize.height" />
+        <GameGroundLoot :width="mapSize.width" :height="mapSize.height" @open-loot="onOpenLoot" />
         <GameTokens
           :width="mapSize.width"
           :height="mapSize.height"
@@ -79,6 +81,9 @@
       :visible="!!gameStore.combatPair"
       @close="gameStore.setCombatPair(null, null)"
     />
+
+    <!-- Попап подбора лута с земли — двойной инвентарь -->
+    <GameLootPickupPopup :pile="lootPile" @close="lootPile = null" />
   </div>
 </template>
 
@@ -101,10 +106,12 @@
   import GameRangeOverlay from '../components/GameRangeOverlay.vue'
   import GameFog from '../components/GameFog.vue'
   import GameTokens from '../components/GameTokens.vue'
+  import GameGroundLoot from '../components/GameGroundLoot.vue'
   import GameMenu from '../components/GameMenu.vue'
   import GameCombatTracker from '../components/GameCombatTracker.vue'
   import GameSavePopup from '../components/GameSavePopup.vue'
   import GameCombatPopup from '../components/GameCombatPopup.vue'
+  import GameLootPickupPopup from '../components/GameLootPickupPopup.vue'
   import GameSessionSummaryPopup from '../components/GameSessionSummaryPopup.vue'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import { useTokenContextMenu } from '../composables/useTokenContextMenu'
@@ -128,7 +135,7 @@
     canvasRef
   )
 
-  const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
+  const { onDragOver, onDragLeave, onDrop } = useTokenDrop(offsetX, offsetY)
   const { close: closeContextMenu } = useTokenContextMenu()
   const { playHover, playClick, playNext } = useSound()
 
@@ -246,9 +253,21 @@
     viewRef,
     offsetX,
     offsetY,
+    // Когда герой входит в дверь «выход в глоб. карту» — пока просто логируем.
+    // В будущем здесь переключение на глобальную карту.
+    onGlobalMapExit: (payload) => {
+      console.info('[GlobalMapExit]', payload)
+    },
   })
 
   const { onMapReady } = useMapReadyHandler({ canvasRef, mapSize, mapRef })
+
+  // ─── Ground loot popup ────────────────────────────────────────────────────
+  const lootPile = ref(null)
+
+  function onOpenLoot(pile) {
+    lootPile.value = pile
+  }
 </script>
 
 <style scoped lang="scss">

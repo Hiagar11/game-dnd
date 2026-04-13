@@ -25,9 +25,7 @@ export function useTokenUiInteraction({
   function onContextMenu(placed) {
     if (wasDragged.value) return
 
-    if (store.selectedPlacedUid !== placed.uid) {
-      store.selectPlacedToken(placed.uid)
-    }
+    store.selectPlacedToken(null)
 
     if (ctxState.value.visible && ctxState.value.uid === placed.uid) {
       closeContextMenu()

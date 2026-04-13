@@ -46,12 +46,27 @@ export const useCampaignsStore = defineStore('campaigns', () => {
   // ─── Получение смежных scenarioId ─────────────────────────────────────────
   // Возвращает массив строковых id карт, соединённых с данной в рамках кампании.
   // Связи двунаправленные: дверь из A в B и из B в A — одно ребро.
+  // Рёбра с to === null (глобальная карта) пропускаются.
   function getConnectedIds(campaign, scenarioId) {
     if (!campaign) return []
     const sid = String(scenarioId)
     return campaign.edges
-      .filter((e) => String(e.from) === sid || String(e.to) === sid)
+      .filter((e) => e.to != null && (String(e.from) === sid || String(e.to) === sid))
       .map((e) => (String(e.from) === sid ? String(e.to) : String(e.from)))
+  }
+
+  // Проверяет, есть ли у сценария ребро к глобальной карте (to === null, stopUid задан)
+  function hasGlobalMapEdge(campaign, scenarioId) {
+    if (!campaign) return false
+    const sid = String(scenarioId)
+    return campaign.edges.some((e) => String(e.from) === sid && e.to == null && e.stopUid)
+  }
+
+  // Общее количество связей сценария (локальные + глобальная карта)
+  function hasAnyEdge(campaign, scenarioId) {
+    if (!campaign) return false
+    const sid = String(scenarioId)
+    return campaign.edges.some((e) => String(e.from) === sid || String(e.to) === sid)
   }
 
   return {
@@ -62,5 +77,7 @@ export const useCampaignsStore = defineStore('campaigns', () => {
     updateCampaign,
     deleteCampaign,
     getConnectedIds,
+    hasGlobalMapEdge,
+    hasAnyEdge,
   }
 })

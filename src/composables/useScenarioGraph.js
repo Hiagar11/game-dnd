@@ -10,6 +10,9 @@ const GRID_GAP = 52
 // Драг активируется только при движении курсора больше этого порога (пикс.)
 const DRAG_THRESHOLD = 5
 
+// Виртуальный id узла глобальной карты в графе
+const GLOBAL_MAP_NODE_ID = '__globalMap__'
+
 export function useScenarioGraph() {
   const scenariosStore = useScenariosStore()
 
@@ -18,6 +21,9 @@ export function useScenarioGraph() {
   // nodePos[scenarioId] = { x, y } — позиция левого верхнего угла карточки
   const nodePos = reactive({})
   const edges = ref([])
+
+  // Данные глобальной карты (устанавливаются снаружи)
+  const globalMapData = ref(null)
 
   // Состояние перетаскивания узла
   const draggingNodeId = ref(null)
@@ -30,6 +36,13 @@ export function useScenarioGraph() {
   const connectingStart = ref({ x: 0, y: 0 })
   const connectingEnd = ref({ x: 0, y: 0 })
   const hoveredNodeId = ref(null)
+
+  // Колбэк — вызывается, когда ребро тянут К глобальной карте.
+  // EditorScenarioSection подставит сюда функцию открытия попапа.
+  let onConnectToGlobalMap = null
+  function setOnConnectToGlobalMap(fn) {
+    onConnectToGlobalMap = fn
+  }
 
   // ─── Уровни (заполненные сценарии) ───────────────────────────────────────────
   const levels = computed(() => scenariosStore.scenarios.filter((s) => s.tokensCount > 0))
@@ -53,20 +66,55 @@ export function useScenarioGraph() {
     })
   )
 
+  // Узел глобальной карты (если она задана)
+  const globalMapNode = computed(() => {
+    if (!globalMapData.value) return null
+    const pos = nodePos[GLOBAL_MAP_NODE_ID]
+    // Позиция по умолчанию — правее всех карточек сценариев
+    const defaultGX = (levels.value.length % GRID_COLS) * (NODE_W + GRID_GAP) + GRID_GAP
+    const defaultGY = Math.floor(levels.value.length / GRID_COLS) * (NODE_H + GRID_GAP) + GRID_GAP
+    return {
+      scenarioId: GLOBAL_MAP_NODE_ID,
+      globalMap: globalMapData.value,
+      x: pos?.x ?? defaultGX,
+      y: pos?.y ?? defaultGY,
+    }
+  })
+
+  // Все узлы: сценарии + глобальная карта (для расчёта рёбер)
+  const allNodes = computed(() => {
+    const arr = [...levelsWithNodes.value]
+    if (globalMapNode.value) arr.push(globalMapNode.value)
+    return arr
+  })
+
   const displayEdges = computed(() =>
     edges.value.flatMap((edge) => {
-      const fn = levelsWithNodes.value.find((n) => n.scenarioId === edge.from)
-      const tn = levelsWithNodes.value.find((n) => n.scenarioId === edge.to)
+      const fromId = edge.from
+      // Если edge.to === null и есть stopUid — ребро к глобальной карте
+      const toId = edge.to ?? GLOBAL_MAP_NODE_ID
+      const fn = allNodes.value.find((n) => n.scenarioId === fromId)
+      const tn = allNodes.value.find((n) => n.scenarioId === toId)
       if (!fn || !tn) return []
+
+      // Для рёбер к глобальной карте — название остановки
+      let stopLabel = null
+      if (edge.to === null && edge.stopUid && globalMapData.value) {
+        const stop = globalMapData.value.stops?.find((s) => s.uid === edge.stopUid)
+        stopLabel = stop?.label || null
+      }
+
       return [
         {
-          key: `${edge.from}__${edge.to}`,
+          key: `${fromId}__${toId}__${edge.stopUid || ''}`,
           x1: fn.x + NODE_W / 2,
           y1: fn.y + NODE_H / 2,
           x2: tn.x + NODE_W / 2,
           y2: tn.y + NODE_H / 2,
           from: edge.from,
           to: edge.to,
+          stopUid: edge.stopUid || null,
+          stopLabel,
         },
       ]
     })
@@ -131,7 +179,13 @@ export function useScenarioGraph() {
       hoveredNodeId.value &&
       hoveredNodeId.value !== connectingFromId.value
     ) {
-      addEdge(connectingFromId.value, hoveredNodeId.value)
+      // Если тянем К глобальной карте — вызываем колбэк для попапа выбора остановки
+      if (hoveredNodeId.value === GLOBAL_MAP_NODE_ID && onConnectToGlobalMap) {
+        onConnectToGlobalMap(connectingFromId.value)
+      } else if (connectingFromId.value !== GLOBAL_MAP_NODE_ID) {
+        // Обычная связь между двумя сценариями
+        addEdge(connectingFromId.value, hoveredNodeId.value)
+      }
     }
     connecting.value = false
     connectingFromId.value = null
@@ -140,18 +194,28 @@ export function useScenarioGraph() {
   }
 
   // ─── Управление рёбрами ──────────────────────────────────────────────────────
-  function addEdge(fromId, toId) {
-    const exists = edges.value.some(
-      (e) => (e.from === fromId && e.to === toId) || (e.from === toId && e.to === fromId)
-    )
-    if (!exists) edges.value.push({ from: fromId, to: toId })
+  // stopUid передаётся для рёбер «сценарий → глобальная карта»
+  function addEdge(fromId, toId, stopUid = null) {
+    const isGlobalTarget = toId === GLOBAL_MAP_NODE_ID
+    const targetTo = isGlobalTarget ? null : toId
+    const exists = edges.value.some((e) => {
+      if (isGlobalTarget) return e.from === fromId && e.to === null && e.stopUid === stopUid
+      return (e.from === fromId && e.to === targetTo) || (e.from === targetTo && e.to === fromId)
+    })
+    if (!exists) edges.value.push({ from: fromId, to: targetTo, stopUid: stopUid || null })
   }
 
   function removeEdge(edge) {
-    edges.value = edges.value.filter(
-      (e) =>
-        !((e.from === edge.from && e.to === edge.to) || (e.from === edge.to && e.to === edge.from))
-    )
+    edges.value = edges.value.filter((e) => {
+      // Ребро к глобальной карте: совпадение по from + stopUid
+      if (edge.to === null && edge.stopUid) {
+        return !(e.from === edge.from && e.to === null && e.stopUid === edge.stopUid)
+      }
+      return !(
+        (e.from === edge.from && e.to === edge.to) ||
+        (e.from === edge.to && e.to === edge.from)
+      )
+    })
   }
 
   // ─── Восстановление из кампании ──────────────────────────────────────────────
@@ -160,7 +224,15 @@ export function useScenarioGraph() {
     for (const node of campaign.nodes) {
       nodePos[String(node.scenarioId)] = { x: node.x, y: node.y }
     }
-    edges.value = campaign.edges.map((e) => ({ from: String(e.from), to: String(e.to) }))
+    // Восстанавливаем позицию карточки глобальной карты
+    if (campaign.globalMapNodeX != null && campaign.globalMapNodeY != null) {
+      nodePos[GLOBAL_MAP_NODE_ID] = { x: campaign.globalMapNodeX, y: campaign.globalMapNodeY }
+    }
+    edges.value = campaign.edges.map((e) => ({
+      from: String(e.from),
+      to: e.to ? String(e.to) : null,
+      stopUid: e.stopUid || null,
+    }))
   }
 
   function resetGraph() {
@@ -174,6 +246,7 @@ export function useScenarioGraph() {
     edges,
     NODE_W,
     NODE_H,
+    GLOBAL_MAP_NODE_ID,
     draggingNodeId,
     connecting,
     connectingFromId,
@@ -182,6 +255,9 @@ export function useScenarioGraph() {
     hoveredNodeId,
     levels,
     levelsWithNodes,
+    globalMapData,
+    globalMapNode,
+    allNodes,
     displayEdges,
     startNodeDrag,
     startConnect,
@@ -191,5 +267,6 @@ export function useScenarioGraph() {
     removeEdge,
     loadGraphFromCampaign,
     resetGraph,
+    setOnConnectToGlobalMap,
   }
 }

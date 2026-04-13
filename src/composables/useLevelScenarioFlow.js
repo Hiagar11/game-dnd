@@ -16,6 +16,7 @@ export function useLevelScenarioFlow({ scenariosStore, gameStore, tokensStore, p
       await tokensStore.fetchTokens()
       const full = await scenariosStore.fetchScenario(scenario.id)
       gameStore.setCellSize(full.cellSize ?? 60)
+      gameStore.setGridOffset(full.gridOffsetX ?? 0, full.gridOffsetY ?? 0)
       gameStore.initPlacedTokens(full.placedTokens ?? [])
       gameStore.initWalls(full.walls ?? [])
       gameStore.currentScenario = full
@@ -28,7 +29,38 @@ export function useLevelScenarioFlow({ scenariosStore, gameStore, tokensStore, p
     }
   }
 
-  const selectScenario = (scenario) => loadScenarioData(scenario, false)
+  // Выбор карты из библиотеки (Map) → создаёт «пустой» сценарий для расстановки
+  async function selectMap(map) {
+    loadingId.value = map.id
+    loadError.value = ''
+    try {
+      await tokensStore.fetchTokens()
+      const scenarioShell = {
+        id: null,
+        name: map.name,
+        mapImageUrl: map.imageUrl,
+        mapImagePath: map.imagePath,
+        cellSize: map.cellSize ?? 60,
+        gridOffsetX: map.gridOffsetX ?? 0,
+        gridOffsetY: map.gridOffsetY ?? 0,
+        placedTokens: [],
+        walls: [],
+        locationDescription: '',
+      }
+      gameStore.setCellSize(scenarioShell.cellSize)
+      gameStore.setGridOffset(scenarioShell.gridOffsetX, scenarioShell.gridOffsetY)
+      gameStore.initPlacedTokens([])
+      gameStore.initWalls([])
+      gameStore.currentScenario = scenarioShell
+      selectedScenario.value = scenarioShell
+      isEditingLevel.value = false
+    } catch (error) {
+      loadError.value = error.message || 'Не удалось загрузить карту'
+    } finally {
+      loadingId.value = null
+    }
+  }
+
   const editLevel = (scenario) => loadScenarioData(scenario, true)
 
   async function onDeleteLevel(scenario) {
@@ -59,7 +91,7 @@ export function useLevelScenarioFlow({ scenariosStore, gameStore, tokensStore, p
     isEditingLevel,
     deletingId,
     deleteError,
-    selectScenario,
+    selectMap,
     editLevel,
     onDeleteLevel,
   }

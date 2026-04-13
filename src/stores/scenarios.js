@@ -46,16 +46,6 @@ export const useScenariosStore = defineStore('scenarios', () => {
     if (idx !== -1) scenarios.value.splice(idx, 1)
   }
 
-  // ─── Загрузка изображения карты ───────────────────────────────────────────
-  // Отдельный шаг перед созданием/обновлением сценария.
-  // Возвращает { mapImageUrl, mapImagePath } — путь нужен для сохранения в БД,
-  // URL — для предпросмотра прямо в браузере.
-  async function uploadMapImage(file) {
-    const fd = new FormData()
-    fd.append('map', file)
-    return api.post('/api/scenarios/upload-map', fd)
-  }
-
   // ─── Получение одного сценария с полными данными ───────────────────────────
   // Возвращает сценарий со всеми полями, включая placedTokens.
   async function fetchScenario(id) {
@@ -95,7 +85,6 @@ export const useScenariosStore = defineStore('scenarios', () => {
     createScenario,
     updateScenario,
     deleteScenario,
-    uploadMapImage,
     fetchScenario,
     saveLevelTokens,
     resetScenario,

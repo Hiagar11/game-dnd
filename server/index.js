@@ -9,6 +9,8 @@ import { connectDB } from './config/db.js'
 import { setupSocket } from './socket/index.js'
 import authRoutes from './routes/auth.js'
 import tokenRoutes from './routes/tokens.js'
+import mapRoutes from './routes/maps.js'
+import globalMapRoutes from './routes/globalMaps.js'
 import scenarioRoutes from './routes/scenarios.js'
 import campaignRoutes from './routes/campaigns.js'
 import gameSessionRoutes from './routes/gameSessions.js'
@@ -42,6 +44,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 // ─── API-роуты ────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes)
 app.use('/api/tokens', tokenRoutes)
+app.use('/api/maps', mapRoutes)
+app.use('/api/global-maps', globalMapRoutes)
 app.use('/api/scenarios', scenarioRoutes)
 app.use('/api/campaigns', campaignRoutes)
 app.use('/api/game-sessions', gameSessionRoutes)

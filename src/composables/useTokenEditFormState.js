@@ -19,6 +19,7 @@ export function useTokenEditFormState({
     dispositionType: 'neutral',
     personality: '',
     contextNotes: '',
+    secretKnowledge: '',
     ...defaultStats,
   })
 
@@ -47,6 +48,7 @@ export function useTokenEditFormState({
       dispositionType: token.dispositionType ?? 'neutral',
       personality: personality ?? '',
       contextNotes: contextNotes ?? '',
+      secretKnowledge: token.secretKnowledge ?? '',
       strength,
       agility,
       intellect,
@@ -77,6 +79,7 @@ export function useTokenEditFormState({
       dispositionType: 'neutral',
       personality: '',
       contextNotes: '',
+      secretKnowledge: '',
       ...defaultStats,
     }
     previewSrc.value = null

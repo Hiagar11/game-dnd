@@ -1,9 +1,8 @@
 export const TRAIT_CATEGORIES = [
-  { value: 'passive', label: '🔵 Пассивное' },
-  { value: 'active', label: '⚡ Активное' },
-  { value: 'status', label: '☠️ Статус-эффект' },
-  { value: 'racial', label: '🧝 Расовое' },
-  { value: 'class', label: '⚔️ Классовое' },
+  { value: 'fire', label: '🔥 Огонь' },
+  { value: 'earth', label: '⛰️ Земля' },
+  { value: 'water', label: '💧 Вода' },
+  { value: 'air', label: '🌬️ Воздух' },
 ]
 
 export const TRAIT_STATS = [
@@ -23,7 +22,7 @@ export const TRAIT_STATS = [
 
 export const DEFAULT_TRAIT_FORM = {
   name: '',
-  category: 'passive',
+  category: 'fire',
   icon: '',
   mods: [{ stat: '', value: 0 }],
 }

@@ -5,8 +5,21 @@ export function useDoorTransition({
   viewRef,
   offsetX,
   offsetY,
+  onGlobalMapExit,
 }) {
-  async function onDoorTransition({ targetScenarioId, sourceScenarioId, buffer, initiatorUid }) {
+  async function onDoorTransition({
+    targetScenarioId,
+    globalMapExit,
+    sourceScenarioId,
+    buffer,
+    initiatorUid,
+  }) {
+    // Выход на глобальную карту — вызываем внешний колбэк
+    if (globalMapExit) {
+      onGlobalMapExit?.({ sourceScenarioId, buffer, initiatorUid })
+      return
+    }
+
     const target = scenariosStore.scenarios.find((s) => String(s.id) === String(targetScenarioId))
     if (!target) return
 
@@ -78,9 +91,9 @@ export function useDoorTransition({
   }
 
   function centerOnToken(placed) {
-    const cell = gameStore.cellSize
-    const tokenX = placed.col * cell + cell / 2
-    const tokenY = placed.row * cell + cell / 2
+    const hc = gameStore.halfCell
+    const tokenX = placed.col * hc + gameStore.gridNormOX + hc
+    const tokenY = placed.row * hc + gameStore.gridNormOY + hc
     const viewW = viewRef.value?.offsetWidth ?? window.innerWidth
     const viewH = viewRef.value?.offsetHeight ?? window.innerHeight
     offsetX.value = viewW / 2 - tokenX

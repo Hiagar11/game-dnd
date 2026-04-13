@@ -69,6 +69,10 @@
   &--panning {
     cursor: grabbing;
   }
+
+  &--dragging {
+    cursor: move;
+  }
 }
 
 .maps-canvas {

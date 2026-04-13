@@ -44,18 +44,21 @@ function getScoreBehavior(score) {
  * @param {string}   params.npcName             — Имя НПС
  * @param {string}   params.personality         — Описание личности (Token.personality)
  * @param {string}   params.contextNotes        — Память о прошлых сессиях (Token.contextNotes)
+ * @param {string}   params.secretKnowledge     — Секреты, раскрываемые при убеждении (Token.secretKnowledge)
  * @param {string}   params.locationDescription — Описание локации (Scenario.locationDescription)
  * @param {number}   params.currentScore        — Текущий счёт отношения (-100..+100)
  * @param {Array}    params.history             — [{role:'user'|'assistant', content}]
  * @param {string}   params.playerMessage       — Реплика игрока
  * @param {string[]} params.behaviorNotes       — Накопленные впечатления о поведении игрока
- * @returns {Promise<{ reply: string, attitudeDelta: number, traitNote: string|null }>}
+ * @returns {Promise<{ reply: string, attitudeDelta: number, traitNote: string|null, persuasionCheck: { dc: number, successReply: string, failReply: string }|null }>}
  *   attitudeDelta: -3..+3   traitNote: краткое наблюдение или null
+ *   persuasionCheck: если ИИ считает, что игрок пытается убедить НПС — объект с DC и вариантами ответа
  */
 export async function askNpc({
   npcName,
   personality,
   contextNotes,
+  secretKnowledge,
   locationDescription,
   currentScore,
   history,
@@ -79,6 +82,13 @@ export async function askNpc({
     systemParts.push(`Твои воспоминания о прошлых встречах с игроком: ${contextNotes}`)
   }
 
+  if (secretKnowledge) {
+    systemParts.push(
+      `У тебя есть секретные знания: ${secretKnowledge}`,
+      'Ты НЕ расскажешь это добровольно. Если игрок пытается выведать, уговорить, убедить тебя раскрыть секрет — требуй проверку убеждения (persuasionCheck).'
+    )
+  }
+
   // Накопленные впечатления о поведении игрока в текущей сессии
   if (behaviorNotes.length > 0) {
     systemParts.push(`Твои впечатления от этого игрока за сессию: ${behaviorNotes.join(' ')}`)
@@ -92,7 +102,12 @@ export async function askNpc({
     '-3 — грубая угроза/оскорбление; -1 — лёгкое недоверие; 0 — нейтрально;',
     '+1 — вежливость/интерес; +3 — искренняя помощь или убедительный аргумент.',
     'Если поведение игрока в этой реплике примечательно (что-то новое о его намерениях или манере), запиши наблюдение в traitNote (до 10 слов). Иначе null.',
-    'Отвечай ТОЛЬКО JSON: { "reply": "текст", "attitudeDelta": <число от -3 до 3>, "traitNote": "наблюдение или null" }'
+    'ПРОВЕРКА УБЕЖДЕНИЯ: если игрок явно пытается уговорить, убедить, выпросить информацию, снизить цену, попросить помощь или обмануть — добавь persuasionCheck.',
+    'persuasionCheck — объект { "dc": число 8-20, "successReply": "текст при успехе", "failReply": "текст при провале" }.',
+    'dc зависит от сложности просьбы и твоего расположения: dc 8-10 — простая просьба при хорошем расположении; dc 14-16 — секретная информация; dc 18-20 — предательство своих интересов.',
+    'Если реплика — обычный разговор без попытки убеждения, persuasionCheck = null.',
+    'Когда persuasionCheck не null, поле reply должно содержать нейтральную реакцию (задумался, помедлил), а не финальный ответ.',
+    'Отвечай ТОЛЬКО JSON: { "reply": "текст", "attitudeDelta": <число от -3 до 3>, "traitNote": "наблюдение или null", "persuasionCheck": <объект или null> }'
   )
 
   const systemPrompt = systemParts.join(' ')
@@ -122,9 +137,25 @@ export async function askNpc({
       typeof parsed.traitNote === 'string' && parsed.traitNote.trim() && parsed.traitNote !== 'null'
         ? parsed.traitNote.trim().slice(0, 120)
         : null
-    return { reply, attitudeDelta, traitNote }
+    const persuasionCheck =
+      parsed.persuasionCheck &&
+      typeof parsed.persuasionCheck === 'object' &&
+      Number.isFinite(parsed.persuasionCheck.dc)
+        ? {
+            dc: Math.max(5, Math.min(25, Math.round(parsed.persuasionCheck.dc))),
+            successReply:
+              typeof parsed.persuasionCheck.successReply === 'string'
+                ? parsed.persuasionCheck.successReply.trim().slice(0, 300)
+                : '',
+            failReply:
+              typeof parsed.persuasionCheck.failReply === 'string'
+                ? parsed.persuasionCheck.failReply.trim().slice(0, 300)
+                : '',
+          }
+        : null
+    return { reply, attitudeDelta, traitNote, persuasionCheck }
   } catch {
-    return { reply: raw || 'Hmm...', attitudeDelta: 0, traitNote: null }
+    return { reply: raw || 'Hmm...', attitudeDelta: 0, traitNote: null, persuasionCheck: null }
   }
 }
 

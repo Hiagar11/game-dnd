@@ -41,7 +41,7 @@ export function useGameTokenPresentation({
       'game-tokens__token--cursor-door':
         !props.viewerMode &&
         placed.systemToken === 'door' &&
-        !!placed.targetScenarioId &&
+        !!(placed.targetScenarioId || placed.globalMapExit) &&
         isNonSystemSelected.value,
       'game-tokens__token--flash-hit': flashMap.value.get(placed.uid) === 'hit',
       'game-tokens__token--flash-miss': flashMap.value.get(placed.uid) === 'miss',
@@ -50,12 +50,16 @@ export function useGameTokenPresentation({
   }
 
   function tokenStyle(placed) {
+    const hc = store.halfCell
+    const cs = store.cellSize
+    const ox = store.gridNormOX
+    const oy = store.gridNormOY
     return {
-      left: `${placed.col * store.cellSize}px`,
-      top: `${placed.row * store.cellSize}px`,
-      width: `${store.cellSize}px`,
-      height: `${store.cellSize}px`,
-      '--cell': `${store.cellSize}px`,
+      left: `${placed.col * hc + ox}px`,
+      top: `${placed.row * hc + oy}px`,
+      width: `${cs}px`,
+      height: `${cs}px`,
+      '--cell': `${cs}px`,
     }
   }
 

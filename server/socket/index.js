@@ -296,6 +296,8 @@ export function setupSocket(io) {
             name: scenario.name,
             mapImagePath: scenario.mapImagePath,
             cellSize: scenario.cellSize,
+            gridOffsetX: scenario.gridOffsetX ?? 0,
+            gridOffsetY: scenario.gridOffsetY ?? 0,
             placedTokens,
             revealedCells: scenario.revealedCells,
           },
@@ -516,21 +518,31 @@ export function setupSocket(io) {
     })
 
     // ─── Диалог с НПС через ИИ ────────────────────────────────────────────────
-    // Событие: npc:talk { npcUid, tokenId, scenarioId, placedAttitude, placedName, playerMessage }
+    // Событие: npc:talk { npcUid, tokenId, scenarioId, placedAttitude, placedName, playerMessage, heroPersuasion }
     // Сервер запрашивает OpenAI, накапливает счёт отношения и бродкастит token:attitude при смене.
+    // Если ИИ определяет попытку убеждения — бросает d20 + heroPersuasion vs DC.
     socket.on(
       'npc:talk',
-      async ({ npcUid, tokenId, scenarioId, placedAttitude, placedName, playerMessage }) => {
+      async ({
+        npcUid,
+        tokenId,
+        scenarioId,
+        placedAttitude,
+        placedName,
+        playerMessage,
+        heroPersuasion,
+      }) => {
         try {
           const tokenDoc = tokenId
             ? await Token.findById(tokenId)
-                .select('name npcName personality contextNotes dispositionType')
+                .select('name npcName personality contextNotes secretKnowledge dispositionType')
                 .lean()
             : null
 
           const npcName = tokenDoc?.npcName?.trim() || tokenDoc?.name || placedName || 'Незнакомец'
           const personality = tokenDoc?.personality ?? ''
           const contextNotes = tokenDoc?.contextNotes ?? ''
+          const secretKnowledge = tokenDoc?.secretKnowledge ?? ''
           const dispositionType = tokenDoc?.dispositionType ?? 'neutral'
           const disposition = getDispositionConfig(dispositionType)
           const message =
@@ -576,10 +588,12 @@ export function setupSocket(io) {
             reply,
             attitudeDelta: rawDelta,
             traitNote,
+            persuasionCheck,
           } = await askNpc({
             npcName,
             personality,
             contextNotes,
+            secretKnowledge,
             locationDescription,
             currentScore,
             history,
@@ -587,8 +601,22 @@ export function setupSocket(io) {
             behaviorNotes: behaviorNotesMap.get(npcUid) ?? [],
           })
 
+          // ── Проверка убеждения (d20 + модификатор героя vs DC) ──
+          let diceRoll = null
+          let finalReply = reply
+          if (persuasionCheck) {
+            const mod = Number.isFinite(heroPersuasion) ? Math.max(0, heroPersuasion) : 0
+            const d20 = Math.floor(Math.random() * 20) + 1
+            const total = d20 + mod
+            const success = total >= persuasionCheck.dc
+            diceRoll = { d20, mod, total, dc: persuasionCheck.dc, success }
+            finalReply = success
+              ? persuasionCheck.successReply || reply
+              : persuasionCheck.failReply || reply
+          }
+
           history.push({ role: 'user', content: message })
-          history.push({ role: 'assistant', content: reply })
+          history.push({ role: 'assistant', content: finalReply })
 
           // Кулдаун: если положительный рост запрещён, игнорируем delta
           let cd = cooldowns.get(npcUid)
@@ -638,7 +666,7 @@ export function setupSocket(io) {
 
           socket.emit('npc:reply', {
             npcUid,
-            text: reply,
+            text: finalReply,
             attitudeDelta,
             // rawDelta — реальное мнение ИИ (не зануляется кулдауном), нужно клиенту для стрелок
             displayDelta: rawDelta,
@@ -647,6 +675,8 @@ export function setupSocket(io) {
             cooldownLeft: cooldowns.get(npcUid),
             // traitNote — наблюдение ИИ о поведении игрока (для отображения в UI)
             traitNote: traitNote ?? null,
+            // diceRoll — результат проверки убеждения (null если проверки не было)
+            diceRoll,
           })
         } catch (err) {
           console.error('[npc:talk] ошибка:', err.message)

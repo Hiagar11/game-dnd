@@ -53,6 +53,7 @@ export function useScenarioSelectionFlow({
       await tokensStore.fetchTokens()
       const full = await scenariosStore.fetchScenario(scenario.id)
       gameStore.setCellSize(full.cellSize ?? 60)
+      gameStore.setGridOffset(full.gridOffsetX ?? 0, full.gridOffsetY ?? 0)
       gameStore.initPlacedTokens(full.placedTokens ?? [])
       gameStore.initWalls(full.walls ?? [])
       sessionChanged.value = false

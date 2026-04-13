@@ -1,4 +1,4 @@
-import { ref, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { useItemsStore } from '../stores/items'
 import { useTraitsStore } from '../stores/traits'
 import { normalizeInventorySnapshot } from '../utils/inventoryState'
@@ -10,6 +10,30 @@ import {
   pickWeightedTraitIds,
 } from '../utils/lootGenerator'
 import { translateSlot, buildTooltipRows } from '../utils/itemTooltip'
+
+const ICON_BASE = 'https://api.iconify.design/game-icons/'
+
+/** Реактивный Set загруженных slug-ов (общий на все экземпляры панели). */
+const loadedIcons = reactive(new Set())
+
+/** Нереактивный Set — предотвращает повторные запросы по одному slug. */
+const pendingIcons = new Set()
+
+/**
+ * Проверяет, загружена ли иконка. Если нет — запускает предзагрузку.
+ * Возвращает true когда SVG уже в кэше браузера.
+ */
+function isIconLoaded(slug) {
+  if (!slug) return false
+  if (loadedIcons.has(slug)) return true
+  if (!pendingIcons.has(slug)) {
+    pendingIcons.add(slug)
+    const img = new Image()
+    img.onload = () => loadedIcons.add(slug)
+    img.src = `${ICON_BASE}${slug}.svg`
+  }
+  return false
+}
 
 export function useInventoryPanel(props, emit) {
   const itemsStore = useItemsStore()
@@ -65,7 +89,7 @@ export function useInventoryPanel(props, emit) {
   }))
 
   function gameIconUrl(slug) {
-    return `https://api.iconify.design/game-icons/${slug}.svg`
+    return `${ICON_BASE}${slug}.svg`
   }
 
   function iconMaskStyle(cell) {
@@ -112,17 +136,55 @@ export function useInventoryPanel(props, emit) {
       return
     }
 
-    const relevant = traits.filter((t) =>
-      (t.mods ?? []).some((m) => Number(m.value) > 0 && (slotWeights[m.stat] ?? 0) > 0)
-    )
-    const positive = positiveTraitsPool(traits)
-    const poolTraits = relevant.length >= 4 ? relevant : positive.length ? positive : traits
+    const pool = positiveTraitsPool(traits)
+    if (!pool.length) {
+      cells.value[cellIdx] = { ...item, traitIds: [], rarityColor: RARITY_COLORS[0] ?? '#c8a04a' }
+      return
+    }
 
-    const maxTraits = Math.min(4, poolTraits.length)
+    const maxTraits = Math.min(4, pool.length)
     const count = maxTraits > 0 ? rollRarityCount(item.slot, maxTraits) : 0
-    const selectedIds =
-      count > 0 ? pickWeightedTraitIds(poolTraits, count, item.slot, props.ownerStats) : []
 
+    if (count === 0) {
+      cells.value[cellIdx] = { ...item, traitIds: [], rarityColor: RARITY_COLORS[0] ?? '#c8a04a' }
+      return
+    }
+
+    // Бордовый (count === 4): 3 положительных + 1 удвоенный + 1 отрицательный
+    if (count === 4) {
+      const selectedIds = pickWeightedTraitIds(pool, 4, item.slot, props.ownerStats)
+      const overrides = {}
+
+      // Один из первых 3 — удваиваем моды
+      const doubleIdx = Math.floor(Math.random() * 3)
+      const doubledTrait = traits.find((t) => t.id === selectedIds[doubleIdx])
+      if (doubledTrait) {
+        overrides[doubledTrait.id] = doubledTrait.mods.map((m) => ({
+          stat: m.stat,
+          value: m.value * 2,
+        }))
+      }
+
+      // 4-й — инвертируем моды (становится отрицательным)
+      const negatedTrait = traits.find((t) => t.id === selectedIds[3])
+      if (negatedTrait) {
+        overrides[negatedTrait.id] = negatedTrait.mods.map((m) => ({
+          stat: m.stat,
+          value: -Math.abs(m.value),
+        }))
+      }
+
+      cells.value[cellIdx] = {
+        ...item,
+        traitIds: selectedIds,
+        traitOverrides: overrides,
+        rarityColor: RARITY_COLORS[4],
+      }
+      return
+    }
+
+    // Белый (1) / Синий (2) / Золотой (3) — только положительные
+    const selectedIds = pickWeightedTraitIds(pool, count, item.slot, props.ownerStats)
     cells.value[cellIdx] = {
       ...item,
       traitIds: selectedIds,
@@ -162,10 +224,26 @@ export function useInventoryPanel(props, emit) {
     event.dataTransfer.effectAllowed = 'move'
   }
 
+  // Флаг: drop произошёл внутри панели (сумка / слот экипировки).
+  // Если после dragend флаг false — предмет брошен за пределы попапа → выброс на землю.
+  let droppedInside = false
+
   function onDragEnd() {
+    const d = drag.value
+    if (d && !droppedInside) {
+      if (d.source === 'bag') cells.value[d.bagIdx] = null
+      else equipped.value[d.slotKey] = null
+      emit('drop-item', d.item)
+    }
     drag.value = null
     dragOverSlot.value = null
     dragOverBag.value = null
+    droppedInside = false
+  }
+
+  /** Drop на пустом фоне панели — поглощаем, чтобы не считалось выбросом на землю. */
+  function onPanelDrop() {
+    droppedInside = true
   }
 
   function onEquipDragOver(event, slotKey) {
@@ -180,6 +258,7 @@ export function useInventoryPanel(props, emit) {
   }
 
   function onEquipDrop(event, slotKey) {
+    droppedInside = true
     dragOverSlot.value = null
     if (!drag.value || !canDropOnSlot(slotKey)) return
     const incoming = drag.value.item
@@ -219,6 +298,7 @@ export function useInventoryPanel(props, emit) {
   }
 
   function onBagDrop(event, idx) {
+    droppedInside = true
     dragOverBag.value = null
     if (!drag.value) return
     const incoming = drag.value.item
@@ -305,7 +385,9 @@ export function useInventoryPanel(props, emit) {
       const normalized = normalizeInventorySnapshot(value)
       cells.value = normalized.cells
       equipped.value = normalized.equipped
-      syncingFromParent.value = false
+      nextTick(() => {
+        syncingFromParent.value = false
+      })
     },
     { immediate: true, deep: true }
   )
@@ -322,6 +404,13 @@ export function useInventoryPanel(props, emit) {
     { deep: true }
   )
 
+  function clearAll() {
+    cells.value = cells.value.map(() => null)
+    for (const key of Object.keys(equipped.value)) {
+      equipped.value[key] = null
+    }
+  }
+
   return {
     cells,
     equipped,
@@ -335,6 +424,7 @@ export function useInventoryPanel(props, emit) {
     tooltipRows,
     iconMaskStyle,
     iconMaskStyleGhost,
+    isIconLoaded,
     equipDragClass,
     onEquipDragStart,
     onDragEnd,
@@ -348,5 +438,7 @@ export function useInventoryPanel(props, emit) {
     onBagDrop,
     showTooltipForItem,
     hideTooltip,
+    clearAll,
+    onPanelDrop,
   }
 }

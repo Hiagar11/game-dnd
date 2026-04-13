@@ -91,6 +91,8 @@ router.post('/', upload.single('image'), async (req, res) => {
       personality: typeof personality === 'string' ? personality.slice(0, 500) : '',
       npcName: typeof npcName === 'string' ? npcName.trim().slice(0, 40) : '',
       contextNotes: typeof contextNotes === 'string' ? contextNotes.slice(0, 800) : '',
+      secretKnowledge:
+        typeof req.body.secretKnowledge === 'string' ? req.body.secretKnowledge.slice(0, 500) : '',
       stats: {
         strength: Number(strength) || 0,
         agility: Number(agility) || 0,
@@ -166,6 +168,9 @@ router.put('/:id', async (req, res) => {
     }
     if (req.body.contextNotes !== undefined) {
       token.contextNotes = String(req.body.contextNotes).slice(0, 800)
+    }
+    if (req.body.secretKnowledge !== undefined) {
+      token.secretKnowledge = String(req.body.secretKnowledge).slice(0, 500)
     }
     if (req.body.dispositionType !== undefined) {
       const DISPOSITION_TYPES = ['friendly', 'sociable', 'neutral', 'guarded', 'hostile']
@@ -269,6 +274,7 @@ function formatToken(token, req) {
     dispositionType: token.dispositionType ?? 'neutral',
     personality: token.personality ?? '',
     contextNotes: token.contextNotes ?? '',
+    secretKnowledge: token.secretKnowledge ?? '',
     imageUrl: `${req.protocol}://${req.get('host')}/${token.imagePath}`,
     stats: token.stats,
     xp: token.xp ?? 0,

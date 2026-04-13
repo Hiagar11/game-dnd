@@ -78,11 +78,17 @@
     </div>
 
     <!-- Панель: Инвентарь -->
-    <div v-if="activeTab === 'inventory'" class="token-edit-popup__panel-inventory">
+    <div
+      v-if="activeTab === 'inventory'"
+      class="token-edit-popup__panel-inventory"
+      @dragover.prevent
+      @drop.prevent
+    >
       <GameInventoryPanel
         v-model="inventoryModel"
         :generation-level="itemGenerationLevel"
         :owner-stats="ownerStatsForInventory"
+        @drop-item="onDropItemToGround"
       />
     </div>
 
@@ -144,6 +150,25 @@
             maxlength="500"
           />
           <p class="token-edit-popup__personality-counter">{{ form.personality.length }} / 500</p>
+
+          <label class="token-edit-popup__label token-edit-popup__label--notes">
+            <span class="token-edit-popup__notes-heading">
+              <PhLockKey :size="13" weight="duotone" />
+              Секретные знания
+              <span class="token-edit-popup__notes-hint"
+                >(раскрываются при проверке убеждения)</span
+              >
+            </span>
+            <textarea
+              v-model="form.secretKnowledge"
+              class="token-edit-popup__textarea token-edit-popup__textarea--notes"
+              placeholder="Знает, что в подвале таверны спрятан артефакт..."
+              maxlength="500"
+            />
+            <p class="token-edit-popup__personality-counter">
+              {{ form.secretKnowledge.length }} / 500
+            </p>
+          </label>
 
           <label class="token-edit-popup__label token-edit-popup__label--notes">
             <span class="token-edit-popup__notes-heading">
@@ -244,6 +269,7 @@
     PhRobot,
     PhArrowsClockwise,
     PhNotebook,
+    PhLockKey,
   } from '@phosphor-icons/vue'
   import { useTokenEditDeps } from '../composables/useTokenEditDeps'
   import { usePlacedInventorySync } from '../composables/usePlacedInventorySync'
@@ -257,6 +283,7 @@
   import { useTokenInventoryMeta } from '../composables/useTokenInventoryMeta'
   import { useTokenEditPreview } from '../composables/useTokenEditPreview'
   import { useDispositionHint } from '../composables/useDispositionHint'
+  import { findDropCell } from '../utils/findDropCell'
   import { DISPOSITION_OPTIONS } from '../constants/dispositionConfig'
   import { ATTITUDE_OPTIONS } from '../constants/attitudeOptions'
   import { PERSONALITY_TAGS } from '../constants/personalityTags'
@@ -357,6 +384,14 @@
     fileRef,
     emit,
   })
+
+  function onDropItemToGround(item) {
+    const token = store.placedTokens.find((t) => t.uid === props.placedUid)
+    if (!token) return
+    const existing = store.groundItems.map((g) => ({ col: g.col, row: g.row }))
+    const cell = findDropCell(token.col, token.row, existing)
+    store.addGroundLoot(cell.col, cell.row, item)
+  }
 </script>
 
 <style scoped lang="scss" src="../assets/styles/components/gameTokenEditPopup.scss"></style>

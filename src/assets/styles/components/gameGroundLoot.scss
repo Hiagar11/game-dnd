@@ -1,0 +1,53 @@
+// ─── GameGroundLoot ─────────────────────────────────────────────────────────────
+// Кучки лута на земле — светящиеся блики (Diablo 2 стиль).
+
+.game-ground-loot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: var(--z-tokens); // рядом с токенами
+  pointer-events: none;
+}
+
+.game-ground-loot__pile {
+  position: absolute;
+  pointer-events: auto;
+  cursor:
+    url('/systemImage/loot-bag.svg') 12 12,
+    grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// ─── Sparkle — мерцающий блик ───────────────────────────────────────
+.game-ground-loot__sparkle {
+  display: block;
+  width: 60%;
+  height: 60%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgb(255 255 200 / 95%) 0%,
+    rgb(255 215 0 / 60%) 35%,
+    rgb(255 180 0 / 25%) 60%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 6px 2px rgb(255 215 0 / 70%),
+    0 0 14px 4px rgb(255 200 0 / 35%);
+  animation: ground-loot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes ground-loot-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.85);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}

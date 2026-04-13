@@ -19,6 +19,8 @@ const placedTokenSchema = new mongoose.Schema(
       ref: 'Scenario',
       default: null,
     },
+    // true — дверь ведёт на глобальную карту (вместо targetScenarioId)
+    globalMapExit: { type: Boolean, default: false },
     col: { type: Number, required: true },
     row: { type: Number, required: true },
     // hidden: true — токен виден только DM (используется для врагов в тумане войны)
@@ -68,6 +70,15 @@ const scenarioSchema = new mongoose.Schema(
     cellSize: {
       type: Number,
       default: 60,
+    },
+    // Смещение сетки относительно края карты (наследуется из Map при создании уровня)
+    gridOffsetX: {
+      type: Number,
+      default: 0,
+    },
+    gridOffsetY: {
+      type: Number,
+      default: 0,
     },
     // Текущая расстановка токенов (изменяется во время игры)
     placedTokens: {

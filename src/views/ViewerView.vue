@@ -89,8 +89,8 @@
     const placed = gameStore.placedTokens.find((t) => t.uid === activeUid && heroIds.has(t.tokenId))
     if (!placed) return { x: null, y: null }
 
-    const col = Math.floor(cursorMapX.value / gameStore.cellSize)
-    const row = Math.floor(cursorMapY.value / gameStore.cellSize)
+    const col = Math.floor((cursorMapX.value - gameStore.gridNormOX) / gameStore.halfCell)
+    const row = Math.floor((cursorMapY.value - gameStore.gridNormOY) / gameStore.halfCell)
     const reachable = buildReachableCells(placed, gameStore.walls)
 
     if (!reachable.has(`${col},${row}`)) return { x: null, y: null }
@@ -164,6 +164,7 @@
     try {
       const full = await scenariosStore.fetchScenario(scenarioId)
       gameStore.setCellSize(full.cellSize ?? 60)
+      gameStore.setGridOffset(full.gridOffsetX ?? 0, full.gridOffsetY ?? 0)
       gameStore.initWalls(full.walls ?? [])
       gameStore.initPlacedTokens(full.placedTokens ?? [])
       gameStore.currentScenario = full

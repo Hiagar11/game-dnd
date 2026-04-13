@@ -60,10 +60,10 @@
         <rect
           v-for="key in visitedNotCurrentList"
           :key="key"
-          :x="getCol(key) * gameStore.cellSize"
-          :y="getRow(key) * gameStore.cellSize"
-          :width="gameStore.cellSize"
-          :height="gameStore.cellSize"
+          :x="getCol(key) * gameStore.halfCell + gameStore.gridNormOX"
+          :y="getRow(key) * gameStore.halfCell + gameStore.gridNormOY"
+          :width="gameStore.halfCell"
+          :height="gameStore.halfCell"
           fill="white"
         />
       </mask>
@@ -135,7 +135,9 @@
   // Для каждой клетки в currentCells проверяем четыре соседа:
   //   если сосед не в currentCells — рисуем ту сторону клетки как границу.
   const boundaryPath = computed(() => {
-    const cell = gameStore.cellSize
+    const hc = gameStore.halfCell
+    const ox = gameStore.gridNormOX
+    const oy = gameStore.gridNormOY
     const cells = currentCells.value
     if (cells.size === 0) return ''
 
@@ -144,17 +146,17 @@
     for (const key of cells) {
       const col = getCol(key)
       const row = getRow(key)
-      const x = col * cell
-      const y = row * cell
+      const x = col * hc + ox
+      const y = row * hc + oy
 
       // Верх — если клетки нет выше
-      if (!cells.has(`${col}:${row - 1}`)) d += `M${x},${y}H${x + cell}`
+      if (!cells.has(`${col}:${row - 1}`)) d += `M${x},${y}H${x + hc}`
       // Низ — если клетки нет ниже
-      if (!cells.has(`${col}:${row + 1}`)) d += `M${x},${y + cell}H${x + cell}`
+      if (!cells.has(`${col}:${row + 1}`)) d += `M${x},${y + hc}H${x + hc}`
       // Лево — если клетки нет слева
-      if (!cells.has(`${col - 1}:${row}`)) d += `M${x},${y}V${y + cell}`
+      if (!cells.has(`${col - 1}:${row}`)) d += `M${x},${y}V${y + hc}`
       // Право — если клетки нет справа
-      if (!cells.has(`${col + 1}:${row}`)) d += `M${x + cell},${y}V${y + cell}`
+      if (!cells.has(`${col + 1}:${row}`)) d += `M${x + hc},${y}V${y + hc}`
     }
 
     return d

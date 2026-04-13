@@ -10,11 +10,15 @@ const nodeSchema = new mongoose.Schema(
   { _id: false }
 )
 
-// Ребро графа — двунаправленная связь между двумя картами
+// Ребро графа — двунаправленная связь между двумя картами.
+// Если ребро ведёт к глобальной карте, from — scenarioId, to — null,
+// а stopUid указывает на конкретную остановку.
 const edgeSchema = new mongoose.Schema(
   {
     from: { type: mongoose.Schema.Types.ObjectId, ref: 'Scenario', required: true },
-    to: { type: mongoose.Schema.Types.ObjectId, ref: 'Scenario', required: true },
+    to: { type: mongoose.Schema.Types.ObjectId, ref: 'Scenario', default: null },
+    // uid остановки на глобальной карте (только для связей «сценарий → глобальная карта»)
+    stopUid: { type: String, default: null },
   },
   { _id: false }
 )
@@ -45,6 +49,15 @@ const campaignSchema = new mongoose.Schema(
       ref: 'Scenario',
       default: null,
     },
+    // Привязанная глобальная карта (одна на кампанию)
+    globalMapId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'GlobalMap',
+      default: null,
+    },
+    // Позиция карточки глобальной карты на холсте редактора
+    globalMapNodeX: { type: Number, default: null },
+    globalMapNodeY: { type: Number, default: null },
   },
   { timestamps: true }
 )

@@ -1,6 +1,11 @@
 <template>
   <button class="level-card" :disabled="isLoading" @mouseenter="playHover" @click="onClick">
-    <img v-if="scenario.mapImageUrl" :src="scenario.mapImageUrl" class="level-card__img" alt="" />
+    <img
+      v-if="scenario.mapImageUrl || scenario.imageUrl"
+      :src="scenario.mapImageUrl || scenario.imageUrl"
+      class="level-card__img"
+      alt=""
+    />
     <div v-else class="level-card__no-img">Нет карты</div>
     <p class="level-card__name">{{ scenario.name || 'Без названия' }}</p>
     <span v-if="isLoading" class="level-card__loading">Загрузка…</span>

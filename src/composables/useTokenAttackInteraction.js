@@ -1,4 +1,4 @@
-import { getSelectedToken } from '../utils/tokenFilters'
+﻿import { getSelectedToken } from '../utils/tokenFilters'
 import { TOKEN_MOVE_STEP_DELAY_MS } from '../constants/timing'
 import { sleep } from '../utils/async'
 import { getCurrentScenarioId } from '../utils/scenario'
@@ -6,8 +6,6 @@ import { getCurrentScenarioId } from '../utils/scenario'
 export function useTokenAttackInteraction({
   store,
   dirs,
-  heroReachable,
-  npcReachable,
   findPath,
   getSocket,
   closeContextMenu,
@@ -31,25 +29,26 @@ export function useTokenAttackInteraction({
       return
     }
 
-    const adjacent = dirs
-      .map(([dc, dr]) => ({ col: npc.col + dc, row: npc.row + dr }))
-      .filter((cell) => heroReachable.value.has(`${cell.col},${cell.row}`))
-    if (!adjacent.length) return
-
-    const target = adjacent.reduce((best, cell) => {
-      const d = Math.abs(cell.col - hero.col) + Math.abs(cell.row - hero.row)
-      const bd = Math.abs(best.col - hero.col) + Math.abs(best.row - hero.row)
-      return d < bd ? cell : best
-    })
-
-    const path = findPath(
-      hero,
-      target,
-      store.walls,
-      hero.actionPoints ?? 0,
-      new Set(store.placedTokens.filter((t) => t.uid !== hero.uid).map((t) => `${t.col},${t.row}`))
+    const occupied = new Set(
+      store.placedTokens.filter((t) => t.uid !== heroUid).map((t) => `${t.col},${t.row}`)
     )
-    if (path === null) return
+
+    // Ближайшая свободная клетка рядом с НПС — без фильтрации по AP-зоне
+    const target = dirs
+      .map(([dc, dr]) => ({ col: npc.col + dc, row: npc.row + dr }))
+      .filter((cell) => !occupied.has(`${cell.col},${cell.row}`))
+      .reduce((best, cell) => {
+        if (!best) return cell
+        const d = Math.abs(cell.col - hero.col) + Math.abs(cell.row - hero.row)
+        const bd = Math.abs(best.col - hero.col) + Math.abs(best.row - hero.row)
+        return d < bd ? cell : best
+      }, null)
+
+    if (!target) return // НПС полностью окружён другими токенами
+
+    // Строим полный путь без ограничения AP и идём сколько хватит очков действий
+    const path = findPath(hero, target, store.walls, 999, occupied)
+    if (!path || path.length === 0) return
 
     const scenarioId = getCurrentScenarioId(store)
     store.selectPlacedToken(null)
@@ -86,25 +85,26 @@ export function useTokenAttackInteraction({
       return
     }
 
-    const adjacent = dirs
-      .map(([dc, dr]) => ({ col: hero.col + dc, row: hero.row + dr }))
-      .filter((cell) => npcReachable.value.has(`${cell.col},${cell.row}`))
-    if (!adjacent.length) return
-
-    const target = adjacent.reduce((best, cell) => {
-      const d = Math.abs(cell.col - npc.col) + Math.abs(cell.row - npc.row)
-      const bd = Math.abs(best.col - npc.col) + Math.abs(best.row - npc.row)
-      return d < bd ? cell : best
-    })
-
-    const path = findPath(
-      npc,
-      target,
-      store.walls,
-      npc.actionPoints ?? 0,
-      new Set(store.placedTokens.filter((t) => t.uid !== npc.uid).map((t) => `${t.col},${t.row}`))
+    const occupied = new Set(
+      store.placedTokens.filter((t) => t.uid !== npcUid).map((t) => `${t.col},${t.row}`)
     )
-    if (path === null) return
+
+    // Ближайшая свободная клетка рядом с героем — без фильтрации по AP-зоне
+    const target = dirs
+      .map(([dc, dr]) => ({ col: hero.col + dc, row: hero.row + dr }))
+      .filter((cell) => !occupied.has(`${cell.col},${cell.row}`))
+      .reduce((best, cell) => {
+        if (!best) return cell
+        const d = Math.abs(cell.col - npc.col) + Math.abs(cell.row - npc.row)
+        const bd = Math.abs(best.col - npc.col) + Math.abs(best.row - npc.row)
+        return d < bd ? cell : best
+      }, null)
+
+    if (!target) return // Герой полностью окружён другими токенами
+
+    // Строим полный путь без ограничения AP и идём сколько хватит очков действий
+    const path = findPath(npc, target, store.walls, 999, occupied)
+    if (!path || path.length === 0) return
 
     const scenarioId = getCurrentScenarioId(store)
     store.selectPlacedToken(null)

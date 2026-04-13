@@ -1,12 +1,9 @@
-// Composable для управления canvas в редакторе сценариев.
-// Инкапсулирует: рисование карты + сетки, зум (Ctrl + колесо), пан (ПКМ).
+// Composable для управления canvas в редакторе карт.
+// Инкапсулирует: рисование карты + сетки (с sub-grid 2×2), зум (Ctrl + колесо),
+// пан камеры (ПКМ), перемещение сетки по карте (ЛКМ drag).
 //
-// Использование:
-//   const { previewCanvasRef, canvasWrapRef, ... } = useEditorCanvas()
-//
-// drawPreview(cellSize) — перерисовывает текущее изображение с новым размером ячейки.
-// loadImageAndDraw(url, cellSize) — загружает изображение, рисует, вписывает в экран.
-// clearImage() — сбрасывает текущее изображение (при смене сценария).
+// gridOffsetX/gridOffsetY — смещение сетки в пикселях относительно начала карты.
+// Позволяет точно наложить сетку на рисунок карты.
 
 import { ref, computed } from 'vue'
 
@@ -15,25 +12,29 @@ export function useEditorCanvas() {
   const previewCanvasRef = ref(null)
   const canvasWrapRef = ref(null)
 
-  // Кешируем загруженный HTMLImageElement — чтобы не перезагружать при каждой
-  // перерисовке сетки (только при смене URL).
+  // Кешируем загруженный HTMLImageElement
   let previewImage = null
 
-  // ─── Зум ─────────────────────────────────────────────────────────────────────
+  // ─── Зум и пан камеры ────────────────────────────────────────────────────────
   const zoom = ref(1)
   const panX = ref(0)
   const panY = ref(0)
 
-  // transform-origin: 0 0 — смещение под курсором считаем вручную (см. onWheel).
   const canvasTransformStyle = computed(() => ({
     transform: `translate(${panX.value}px, ${panY.value}px) scale(${zoom.value})`,
     transformOrigin: '0 0',
   }))
 
-  /**
-   * Вписывает карту в контейнер как object-fit: contain.
-   * Вызывается сразу после первой загрузки изображения.
-   */
+  // ─── Смещение сетки (drag по ЛКМ) ───────────────────────────────────────────
+  // Хранится в форме (Map.gridOffsetX/Y), передаётся извне через setGridOffset.
+  const gridOffsetX = ref(0)
+  const gridOffsetY = ref(0)
+
+  function setGridOffset(x, y) {
+    gridOffsetX.value = x
+    gridOffsetY.value = y
+  }
+
   function fitToViewport() {
     if (!previewImage || !canvasWrapRef.value) return
     const { clientWidth: vw, clientHeight: vh } = canvasWrapRef.value
@@ -44,11 +45,7 @@ export function useEditorCanvas() {
     panY.value = (vh - ih * scale) / 2
   }
 
-  /**
-   * Ctrl + колёсико мыши — зум под курсором.
-   * Точка под мышью остаётся на месте: вычитаем лишнее смещение.
-   * @param {WheelEvent} e
-   */
+  // ─── Ctrl + колёсико → зум ───────────────────────────────────────────────────
   function onWheel(e) {
     if (!e.ctrlKey) return
     const oldZoom = zoom.value
@@ -61,14 +58,12 @@ export function useEditorCanvas() {
     const mx = e.clientX - rect.left
     const my = e.clientY - rect.top
 
-    // mx = panX + canvasX * zoom  →  canvasX = (mx - panX) / zoom
-    // После смены зума: newPanX = mx - canvasX * newZoom
     panX.value = mx - (mx - panX.value) * (newZoom / oldZoom)
     panY.value = my - (my - panY.value) * (newZoom / oldZoom)
     zoom.value = newZoom
   }
 
-  // ─── Пан по правой кнопке мыши ──────────────────────────────────────────────
+  // ─── Пан камеры (ПКМ) ───────────────────────────────────────────────────────
   const isPanning = ref(false)
   let panStartX = 0
   let panStartY = 0
@@ -84,19 +79,58 @@ export function useEditorCanvas() {
   }
 
   function onPanMove(e) {
-    if (!isPanning.value) return
-    panX.value = panOriginX + (e.clientX - panStartX)
-    panY.value = panOriginY + (e.clientY - panStartY)
+    // Пан камеры (ПКМ)
+    if (isPanning.value) {
+      panX.value = panOriginX + (e.clientX - panStartX)
+      panY.value = panOriginY + (e.clientY - panStartY)
+    }
+    // Drag сетки (ЛКМ)
+    if (isDraggingGrid.value) {
+      gridOffsetX.value = gridDragOriginX + (e.clientX - gridDragStartX) / zoom.value
+      gridOffsetY.value = gridDragOriginY + (e.clientY - gridDragStartY) / zoom.value
+    }
   }
 
   function onPanEnd() {
     isPanning.value = false
   }
 
+  // ─── Drag сетки (ЛКМ) ───────────────────────────────────────────────────────
+  const isDraggingGrid = ref(false)
+  let gridDragStartX = 0
+  let gridDragStartY = 0
+  let gridDragOriginX = 0
+  let gridDragOriginY = 0
+
+  function onGridDragStart(e) {
+    // Только ЛКМ (button === 0) и без Ctrl (Ctrl+wheel = зум)
+    if (e.button !== 0) return
+    isDraggingGrid.value = true
+    gridDragStartX = e.clientX
+    gridDragStartY = e.clientY
+    gridDragOriginX = gridOffsetX.value
+    gridDragOriginY = gridOffsetY.value
+  }
+
+  // ─── onChangeComplete: вызывается при mouse-up ЛКМ ──────────────────────────
+  // Родительский компонент может подписаться, чтобы синхронизировать form.gridOffsetX/Y.
+  let _onGridOffsetChange = null
+
+  function onGridOffsetChange(cb) {
+    _onGridOffsetChange = cb
+  }
+
+  function onGridDragEndWithCallback() {
+    if (isDraggingGrid.value) {
+      isDraggingGrid.value = false
+      _onGridOffsetChange?.(gridOffsetX.value, gridOffsetY.value)
+    }
+  }
+
   // ─── Рисование ───────────────────────────────────────────────────────────────
   /**
-   * Перерисовывает текущую карту + сетку.
-   * Вызывается при изменении cellSize (без повторной загрузки изображения).
+   * Рисует карту + сетку с sub-grid (2×2 внутри каждой ячейки).
+   * Основная сетка — жирные линии, sub-grid — тонкие пунктирные.
    * @param {number} cellSize — размер ячейки в пикселях
    */
   function drawPreview(cellSize) {
@@ -107,34 +141,51 @@ export function useEditorCanvas() {
     canvas.height = previewImage.naturalHeight
 
     const ctx = canvas.getContext('2d')
+    const w = canvas.width
+    const h = canvas.height
+    // Нормализуем offset в диапазон [0, cellSize) чтобы сетка визуально «зацикливалась»
+    const ox = ((gridOffsetX.value % cellSize) + cellSize) % cellSize
+    const oy = ((gridOffsetY.value % cellSize) + cellSize) % cellSize
 
     // 1. Карта
     ctx.drawImage(previewImage, 0, 0)
 
-    // 2. Сетка поверх. Линии чуть толще — при масштабировании canvas
-    //    вниз они выглядели бы размытыми/тонкими.
+    // 2. Sub-grid (тонкие пунктирные линии — делят ячейку на 2×2)
+    const half = cellSize / 2
+    ctx.beginPath()
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 4])
+
+    // Вертикальные суб-линии (между основными)
+    for (let x = ox + half; x < w; x += cellSize) {
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, h)
+    }
+    // Горизонтальные суб-линии (между основными)
+    for (let y = oy + half; y < h; y += cellSize) {
+      ctx.moveTo(0, y)
+      ctx.lineTo(w, y)
+    }
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // 3. Основная сетка (жирные линии)
     ctx.beginPath()
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)'
     ctx.lineWidth = 2
 
-    for (let x = 0; x <= canvas.width; x += cellSize) {
+    for (let x = ox; x <= w; x += cellSize) {
       ctx.moveTo(x, 0)
-      ctx.lineTo(x, canvas.height)
+      ctx.lineTo(x, h)
     }
-    for (let y = 0; y <= canvas.height; y += cellSize) {
+    for (let y = oy; y <= h; y += cellSize) {
       ctx.moveTo(0, y)
-      ctx.lineTo(canvas.width, y)
+      ctx.lineTo(w, y)
     }
-
     ctx.stroke()
   }
 
-  /**
-   * Загружает изображение по URL, рисует карту + сетку, вписывает в экран.
-   * crossOrigin нужен при загрузке с другого порта (сервер :3000, фронт :5173).
-   * @param {string} url
-   * @param {number} cellSize
-   */
   function loadImageAndDraw(url, cellSize) {
     const img = new Image()
     img.crossOrigin = 'anonymous'
@@ -146,7 +197,6 @@ export function useEditorCanvas() {
     }
   }
 
-  /** Сбрасывает текущее изображение. Вызывается при смене сценария. */
   function clearImage() {
     previewImage = null
   }
@@ -156,6 +206,10 @@ export function useEditorCanvas() {
     canvasWrapRef,
     canvasTransformStyle,
     isPanning,
+    isDraggingGrid,
+    gridOffsetX,
+    gridOffsetY,
+    setGridOffset,
     loadImageAndDraw,
     drawPreview,
     clearImage,
@@ -163,5 +217,8 @@ export function useEditorCanvas() {
     onPanStart,
     onPanMove,
     onPanEnd,
+    onGridDragStart,
+    onGridDragEnd: onGridDragEndWithCallback,
+    onGridOffsetChange,
   }
 }

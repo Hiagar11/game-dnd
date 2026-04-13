@@ -18,9 +18,13 @@ function format(campaign) {
     })),
     edges: campaign.edges.map((e) => ({
       from: String(e.from),
-      to: String(e.to),
+      to: e.to ? String(e.to) : null,
+      stopUid: e.stopUid || null,
     })),
     startScenarioId: campaign.startScenarioId ? String(campaign.startScenarioId) : null,
+    globalMapId: campaign.globalMapId ? String(campaign.globalMapId) : null,
+    globalMapNodeX: campaign.globalMapNodeX,
+    globalMapNodeY: campaign.globalMapNodeY,
     updatedAt: campaign.updatedAt,
   }
 }
@@ -38,9 +42,10 @@ function normalizeNodes(nodes) {
 }
 
 function normalizeEdges(edges) {
-  return (edges ?? []).map(({ from, to }) => ({
+  return (edges ?? []).map(({ from, to, stopUid }) => ({
     from: toObjectId(from),
-    to: toObjectId(to),
+    to: to ? toObjectId(to) : null,
+    stopUid: stopUid || null,
   }))
 }
 
@@ -58,7 +63,8 @@ router.get('/', async (req, res) => {
 
 // ─── POST /api/campaigns ────────────────────────────────────────────────────
 router.post('/', requireAdmin, async (req, res) => {
-  const { name, nodes, edges, startScenarioId } = req.body
+  const { name, nodes, edges, startScenarioId, globalMapId, globalMapNodeX, globalMapNodeY } =
+    req.body
   if (!name?.trim()) return res.status(400).json({ error: 'Название обязательно' })
   try {
     const campaign = await Campaign.create({
@@ -67,6 +73,9 @@ router.post('/', requireAdmin, async (req, res) => {
       nodes: normalizeNodes(nodes),
       edges: normalizeEdges(edges),
       startScenarioId: startScenarioId ? toObjectId(startScenarioId) : null,
+      globalMapId: globalMapId ? toObjectId(globalMapId) : null,
+      globalMapNodeX: globalMapNodeX ?? null,
+      globalMapNodeY: globalMapNodeY ?? null,
     })
     res.status(201).json(format(campaign))
   } catch (err) {
@@ -78,7 +87,8 @@ router.post('/', requireAdmin, async (req, res) => {
 router.put('/:id', requireAdmin, async (req, res) => {
   if (!mongoose.Types.ObjectId.isValid(req.params.id))
     return res.status(400).json({ error: 'Некорректный id' })
-  const { name, nodes, edges, startScenarioId } = req.body
+  const { name, nodes, edges, startScenarioId, globalMapId, globalMapNodeX, globalMapNodeY } =
+    req.body
   try {
     const campaign = await Campaign.findById(req.params.id)
     if (!campaign) return res.status(404).json({ error: 'Сценарий не найден' })
@@ -90,6 +100,10 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (edges !== undefined) campaign.edges = normalizeEdges(edges)
     if (startScenarioId !== undefined)
       campaign.startScenarioId = startScenarioId ? toObjectId(startScenarioId) : null
+    if (globalMapId !== undefined)
+      campaign.globalMapId = globalMapId ? toObjectId(globalMapId) : null
+    if (globalMapNodeX !== undefined) campaign.globalMapNodeX = globalMapNodeX
+    if (globalMapNodeY !== undefined) campaign.globalMapNodeY = globalMapNodeY
 
     await campaign.save()
     res.json(format(campaign))

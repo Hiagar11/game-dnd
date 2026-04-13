@@ -15,8 +15,6 @@ export function useTokenClickInteraction({
   onAttackClick,
   onNpcAttackClick,
   onTalkClick,
-  heroReachable,
-  npcReachable,
   isNpcReachable,
   isHeroReachableByNpc,
   getVisibleKeys,
@@ -26,7 +24,7 @@ export function useTokenClickInteraction({
   function onTokenClick(placed, event) {
     const selected = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
 
-    if (placed.systemToken === 'door' && placed.targetScenarioId) {
+    if (placed.systemToken === 'door' && (placed.targetScenarioId || placed.globalMapExit)) {
       if (isNonSystemToken(selected)) {
         onDoorWalk(selected, placed)
         return
@@ -70,19 +68,11 @@ export function useTokenClickInteraction({
     clickTimer.value = setTimeout(() => {
       clickTimer.value = null
 
-      if (heroReachable.value.size > 0 && isHostileNpcToken(placed) && isNpcReachable(placed)) {
+      if (isHostileNpcToken(placed) && isNpcReachable(placed)) {
         onAttackClick(placed)
-      } else if (
-        npcReachable.value.size > 0 &&
-        isHeroToken(placed) &&
-        isHeroReachableByNpc(placed)
-      ) {
+      } else if (isHeroToken(placed) && isHeroReachableByNpc(placed)) {
         onNpcAttackClick(placed)
-      } else if (
-        heroReachable.value.size > 0 &&
-        isTalkableNpcToken(placed) &&
-        isNpcReachable(placed)
-      ) {
+      } else if (isTalkableNpcToken(placed) && isNpcReachable(placed)) {
         onTalkClick(placed)
       }
     }, dblClickDelay)

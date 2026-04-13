@@ -32,6 +32,7 @@ export function useTokenEditActions({
           dispositionType: form.value.dispositionType,
           personality: form.value.personality,
           contextNotes: form.value.contextNotes,
+          secretKnowledge: form.value.secretKnowledge,
           strength,
           agility,
           intellect,
@@ -52,6 +53,7 @@ export function useTokenEditActions({
           dispositionType: form.value.dispositionType,
           personality: form.value.personality,
           contextNotes: form.value.contextNotes,
+          secretKnowledge: form.value.secretKnowledge,
           strength,
           agility,
           intellect,
@@ -67,6 +69,7 @@ export function useTokenEditActions({
         fd.append('dispositionType', form.value.dispositionType)
         fd.append('personality', form.value.personality)
         fd.append('contextNotes', form.value.contextNotes)
+        fd.append('secretKnowledge', form.value.secretKnowledge)
         fd.append('strength', strength)
         fd.append('agility', agility)
         fd.append('intellect', intellect)

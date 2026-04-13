@@ -1,6 +1,7 @@
 import { isHostileNpcToken, isTalkableNpcToken } from '../utils/tokenFilters'
 
-export const RANGE_RADIUS = 4
+// Радиус = 8 sub-cell шагов (= 4 основные ячейки)
+export const RANGE_RADIUS = 8
 
 const DIRS = [
   [-1, 0],
@@ -9,18 +10,54 @@ const DIRS = [
   [0, 1],
 ]
 
-export function isInRange(token, col, row) {
-  const centerCol = token.col + 0.5
-  const centerRow = token.row + 0.5
+// ─── Утилиты для 2×2 токенов на sub-grid ────────────────────────────────────
 
-  const dx = Math.max(Math.abs(col - centerCol), Math.abs(col + 1 - centerCol))
-  const dy = Math.max(Math.abs(row - centerRow), Math.abs(row + 1 - centerRow))
+/** Проверяет, пересекает ли позиция 2×2-токена стену */
+function isWallBlocked(col, row, wallSet) {
+  for (let dc = 0; dc < 2; dc++) {
+    for (let dr = 0; dr < 2; dr++) {
+      if (wallSet.has(`${col + dc},${row + dr}`)) return true
+    }
+  }
+  return false
+}
+
+/**
+ * Раскладывает позиции других токенов (2×2) в set запрещённых top-left координат.
+ * Два 2×2-блока пересекаются если |c1-c2| < 2 && |r1-r2| < 2.
+ * Поэтому для каждого occupied (oc, or) блокируем позиции (oc-1..oc+1, or-1..or+1).
+ */
+function expandOccupied2x2(occupiedKeys) {
+  const blocked = new Set()
+  for (const key of occupiedKeys) {
+    const [c, r] = key.split(',').map(Number)
+    for (let dc = -1; dc <= 1; dc++) {
+      for (let dr = -1; dr <= 1; dr++) {
+        blocked.add(`${c + dc},${r + dr}`)
+      }
+    }
+  }
+  return blocked
+}
+
+// ─── Проверка дальности ──────────────────────────────────────────────────────
+
+export function isInRange(token, col, row) {
+  // token и target в sub-cell координатах; токен занимает 2×2
+  const centerCol = token.col + 1 // центр 2×2 = +1 sub-cell
+  const centerRow = token.row + 1
+
+  const dx = Math.max(Math.abs(col - centerCol), Math.abs(col + 2 - centerCol))
+  const dy = Math.max(Math.abs(row - centerRow), Math.abs(row + 2 - centerRow))
 
   return Math.sqrt(dx * dx + dy * dy) <= RANGE_RADIUS
 }
 
+// ─── Достижимые клетки (BFS) ─────────────────────────────────────────────────
+
 export function buildReachableCells(token, walls, radius = RANGE_RADIUS, occupiedKeys = new Set()) {
   const wallSet = new Set(walls.map((w) => `${w.col},${w.row}`))
+  const blockedByOthers = expandOccupied2x2(occupiedKeys)
 
   const reachable = new Set()
 
@@ -41,8 +78,9 @@ export function buildReachableCells(token, walls, radius = RANGE_RADIUS, occupie
       const nr = row + dr
       const key = `${nc},${nr}`
 
-      if (visited.has(key) || wallSet.has(key) || occupiedKeys.has(key) || nc < 0 || nr < 0)
-        continue
+      if (visited.has(key) || nc < 0 || nr < 0) continue
+      if (isWallBlocked(nc, nr, wallSet)) continue
+      if (blockedByOthers.has(key)) continue
 
       visited.add(key)
       queue.push([nc, nr, steps - 1])
@@ -52,8 +90,11 @@ export function buildReachableCells(token, walls, radius = RANGE_RADIUS, occupie
   return reachable
 }
 
+// ─── Поиск пути (BFS) ────────────────────────────────────────────────────────
+
 export function findPath(token, target, walls, radius = RANGE_RADIUS, occupiedKeys = new Set()) {
   const wallSet = new Set(walls.map((w) => `${w.col},${w.row}`))
+  const blockedByOthers = expandOccupied2x2(occupiedKeys)
   const startKey = `${token.col},${token.row}`
   const goalKey = `${target.col},${target.row}`
 
@@ -75,8 +116,9 @@ export function findPath(token, target, walls, radius = RANGE_RADIUS, occupiedKe
       const nr = row + dr
       const nkey = `${nc},${nr}`
 
-      if (parent.has(nkey) || wallSet.has(nkey) || occupiedKeys.has(nkey) || nc < 0 || nr < 0)
-        continue
+      if (parent.has(nkey) || nc < 0 || nr < 0) continue
+      if (isWallBlocked(nc, nr, wallSet)) continue
+      if (blockedByOthers.has(nkey)) continue
 
       parent.set(nkey, key)
       stepCount.set(nkey, nextSteps)
@@ -99,6 +141,27 @@ export function findPath(token, target, walls, radius = RANGE_RADIUS, occupiedKe
   return path
 }
 
+// ─── Соседние позиции для 2×2 токенов ──────────────────────────────────────
+
+/**
+ * Позиции (top-left sub-cell), из которых 2×2-герой кардинально касается 2×2-врага.
+ * Два 2×2 блока «рядом», когда один индекс совпадает ±1 а другой = ±2.
+ */
+const ADJACENT_2x2 = [
+  [-2, -1],
+  [-2, 0],
+  [-2, 1],
+  [2, -1],
+  [2, 0],
+  [2, 1],
+  [-1, -2],
+  [0, -2],
+  [1, -2],
+  [-1, 2],
+  [0, 2],
+  [1, 2],
+]
+
 export function buildAttackCells(token, placedTokens, walls) {
   if (token.tokenType !== 'hero') return new Set()
 
@@ -110,7 +173,7 @@ export function buildAttackCells(token, placedTokens, walls) {
   const attackCells = new Set()
 
   for (const enemy of hostiles) {
-    for (const [dc, dr] of DIRS) {
+    for (const [dc, dr] of ADJACENT_2x2) {
       const key = `${enemy.col + dc},${enemy.row + dr}`
       if (reachable.has(key)) attackCells.add(key)
     }
@@ -130,7 +193,7 @@ export function buildTalkCells(token, placedTokens, walls) {
   const talkCells = new Set()
 
   for (const npc of friendly) {
-    for (const [dc, dr] of DIRS) {
+    for (const [dc, dr] of ADJACENT_2x2) {
       const key = `${npc.col + dc},${npc.row + dr}`
       if (reachable.has(key)) talkCells.add(key)
     }

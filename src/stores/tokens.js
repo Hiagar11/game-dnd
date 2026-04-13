@@ -35,6 +35,7 @@ export const useTokensStore = defineStore('tokens', () => {
     attitude,
     personality,
     contextNotes,
+    secretKnowledge,
   }) {
     return {
       id,
@@ -44,6 +45,7 @@ export const useTokensStore = defineStore('tokens', () => {
       attitude: getNpcAttitude(attitude),
       personality: personality ?? '',
       contextNotes: contextNotes ?? '',
+      secretKnowledge: secretKnowledge ?? '',
       src: imageUrl,
       ...stats,
     }

@@ -10,7 +10,7 @@
       :load-error="loadError"
       :deleting-id="deletingId"
       :delete-error="deleteError"
-      @select-map="selectScenario"
+      @select-map="selectMap"
       @edit-level="editLevel"
       @delete-level="onDeleteLevel"
     />
@@ -23,6 +23,7 @@
         @mousemove="onMouseMove"
         @contextmenu="onContextMenu"
         @dragover="onDragOver"
+        @dragleave="onDragLeave"
         @drop="onDrop"
       >
         <div
@@ -92,6 +93,7 @@
   import { useGameStore } from '../stores/game'
   import { useTokensStore } from '../stores/tokens'
   import { useScenariosStore } from '../stores/scenarios'
+  import { useMapsStore } from '../stores/maps'
   import GameMap from './GameMap.vue'
   import GameGrid from './GameGrid.vue'
   import GameRangeOverlay from './GameRangeOverlay.vue'
@@ -109,6 +111,7 @@
   const emit = defineEmits(['back-to-scenario'])
 
   const store = useScenariosStore()
+  const mapsStore = useMapsStore()
   const gameStore = useGameStore()
   const tokensStore = useTokensStore()
   const { playHover, playClick } = useSound()
@@ -123,7 +126,7 @@
     props.autoLoadScenario ? goBack() : exitGame()
   }
 
-  const maps = computed(() => store.scenarios.filter((s) => !s.tokensCount))
+  const maps = computed(() => mapsStore.maps)
   const levels = computed(() => store.scenarios.filter((s) => s.tokensCount > 0))
 
   const {
@@ -134,7 +137,7 @@
     isEditingLevel,
     deletingId,
     deleteError,
-    selectScenario,
+    selectMap,
     editLevel,
     onDeleteLevel,
   } = useLevelScenarioFlow({
@@ -153,7 +156,7 @@
     viewRef,
     canvasRef
   )
-  const { onDragOver, onDrop } = useTokenDrop(offsetX, offsetY)
+  const { onDragOver, onDragLeave, onDrop } = useTokenDrop(offsetX, offsetY)
   const { close: closeContextMenu } = useTokenContextMenu()
 
   // GameRangeOverlay и useTokenDrop инжектируют offsetX/offsetY через provide/inject
@@ -198,6 +201,7 @@
 
   useLevelLifecycle({
     scenariosStore: store,
+    mapsStore,
     selectedScenario,
     onLevelBack,
     autoLoadScenario: autoLoadRef,

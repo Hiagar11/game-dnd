@@ -2,6 +2,7 @@ import { onMounted, onUnmounted, watch } from 'vue'
 
 export function useLevelLifecycle({
   scenariosStore,
+  mapsStore,
   selectedScenario,
   onLevelBack,
   autoLoadScenario,
@@ -17,6 +18,7 @@ export function useLevelLifecycle({
 
   onMounted(() => {
     scenariosStore.fetchScenarios()
+    mapsStore?.fetchMaps()
     window.addEventListener('keydown', onKeyDown, { capture: true })
   })
 

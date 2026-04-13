@@ -1,0 +1,117 @@
+// ─── GameLootPickupPopup ──────────────────────────────────────────────────────
+// Двойной инвентарь: предметы на земле + сумка героя.
+
+.loot-popup__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-family: var(--font-fantasy);
+  color: var(--color-primary);
+  text-align: center;
+}
+
+.loot-popup__body {
+  display: flex;
+  gap: var(--space-6);
+  min-height: 260px;
+}
+
+.loot-popup__ground,
+.loot-popup__hero {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.loot-popup__section-title {
+  margin: 0;
+  font-size: 0.75rem;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+}
+
+.loot-popup__grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.loot-popup__cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 40%);
+  border: 1px solid rgb(200 154 74 / 20%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+
+  &:hover {
+    border-color: var(--color-primary);
+    background: rgb(200 154 74 / 8%);
+  }
+}
+
+.loot-popup__cell-icon {
+  display: block;
+  width: 60%;
+  height: 60%;
+  mask-size: contain;
+  mask-position: center;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.loot-popup__cell-name {
+  font-size: 7px;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  text-align: center;
+  line-height: 1.2;
+  padding: 2px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  letter-spacing: 0.04em;
+}
+
+.loot-popup__cell-loader {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgb(200 160 74 / 25%);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: loot-spin 0.7s linear infinite;
+}
+
+@keyframes loot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loot-popup__empty {
+  margin: auto 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+// Tooltip transition
+.loot-tt-enter-active,
+.loot-tt-leave-active {
+  transition:
+    opacity 200ms ease,
+    transform 200ms ease;
+}
+
+.loot-tt-enter-from,
+.loot-tt-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}

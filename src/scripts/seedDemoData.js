@@ -1,4 +1,4 @@
-﻿const SEED_VERSION = '7'
+﻿const SEED_VERSION = '9'
 
 export function seedDemoData() {
   const now = Date.now()
@@ -6,764 +6,449 @@ export function seedDemoData() {
   const tid = () => `trait_seed_${now}_${counter++}`
   const iid = () => `item_seed_${now}_${counter++}`
 
+  // ── Все свойства чисто положительные, категории — 4 стихии ────────────
   const traits = [
-    // ── passive ──────────────────────────────────────────────────────────────
+    // ── fire (Огонь) — урон, шанс удара ──────────────────────────────────
     {
       id: tid(),
-      name: 'Железная кожа',
-      category: 'passive',
-      icon: 'shield',
-      mods: [
-        { stat: 'defense', value: 3 },
-        { stat: 'initiative', value: -1 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Боевая выучка',
-      category: 'passive',
+      name: 'Пламенный клинок',
+      category: 'fire',
       icon: 'broadsword',
-      mods: [
-        { stat: 'hit_chance', value: 2 },
-        { stat: 'dodge', value: -1 },
-      ],
+      mods: [{ stat: 'damage', value: 3 }],
     },
     {
       id: tid(),
-      name: 'Убийственный инстинкт',
-      category: 'passive',
-      icon: 'stiletto',
+      name: 'Жар битвы',
+      category: 'fire',
+      icon: 'fire',
       mods: [
-        { stat: 'damage', value: 3 },
-        { stat: 'defense', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Мистическое чутьё',
-      category: 'passive',
-      icon: 'magic-swirl',
-      mods: [
-        { stat: 'magic_power', value: 3 },
-        { stat: 'hit_chance', value: -1 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Чародейский доспех',
-      category: 'passive',
-      icon: 'crystal-ball',
-      mods: [
-        { stat: 'resistance', value: 3 },
-        { stat: 'damage', value: -1 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Кошачья ловкость',
-      category: 'passive',
-      icon: 'boot-stomp',
-      mods: [
-        { stat: 'dodge', value: 4 },
-        { stat: 'defense', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Острый язык',
-      category: 'passive',
-      icon: 'scroll-quill',
-      mods: [
-        { stat: 'persuasion', value: 3 },
-        { stat: 'damage', value: -1 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Молниеносная реакция',
-      category: 'passive',
-      icon: 'arrow-cluster',
-      mods: [
-        { stat: 'initiative', value: 4 },
-        { stat: 'defense', value: -2 },
-        { stat: 'resistance', value: -1 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Тяжёлая броня',
-      category: 'passive',
-      icon: 'chest-armor',
-      mods: [
-        { stat: 'defense', value: 5 },
-        { stat: 'resistance', value: 2 },
-        { stat: 'initiative', value: -3 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Берсерк',
-      category: 'passive',
-      icon: 'battle-axe',
-      mods: [
-        { stat: 'damage', value: 5 },
-        { stat: 'hit_chance', value: 2 },
-        { stat: 'defense', value: -3 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Скрытность',
-      category: 'passive',
-      icon: 'ghost',
-      mods: [
-        { stat: 'dodge', value: 3 },
-        { stat: 'initiative', value: 2 },
-        { stat: 'damage', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Магическое превосходство',
-      category: 'passive',
-      icon: 'star-prominences',
-      mods: [
-        { stat: 'magic_power', value: 5 },
-        { stat: 'resistance', value: 2 },
-        { stat: 'defense', value: -3 },
-        { stat: 'hit_chance', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Дипломат',
-      category: 'passive',
-      icon: 'crown',
-      mods: [
-        { stat: 'persuasion', value: 4 },
-        { stat: 'damage', value: -2 },
-        { stat: 'hit_chance', value: -1 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Стойкость духа',
-      category: 'passive',
-      icon: 'rune-stone',
-      mods: [
-        { stat: 'resistance', value: 4 },
-        { stat: 'defense', value: 2 },
-        { stat: 'initiative', value: -2 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Неуловимый',
-      category: 'passive',
-      icon: 'stiletto',
-      mods: [
-        { stat: 'dodge', value: 5 },
-        { stat: 'initiative', value: 3 },
-        { stat: 'damage', value: -3 },
-        { stat: 'defense', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Убеждающий взгляд',
-      category: 'passive',
-      icon: 'all-seeing-eye',
-      mods: [
-        { stat: 'persuasion', value: 3 },
-        { stat: 'hit_chance', value: 1 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Доспех зачарователя',
-      category: 'passive',
-      icon: 'magic-swirl',
-      mods: [
-        { stat: 'magic_power', value: 3 },
-        { stat: 'resistance', value: 3 },
-        { stat: 'damage', value: -2 },
-        { stat: 'hit_chance', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Ветеран боёв',
-      category: 'passive',
-      icon: 'chest-armor',
-      mods: [
-        { stat: 'hit_chance', value: 3 },
         { stat: 'damage', value: 2 },
-        { stat: 'dodge', value: -2 },
-        { stat: 'persuasion', value: -1 },
+        { stat: 'hit_chance', value: 1 },
       ],
     },
-
-    // ── active ───────────────────────────────────────────────────────────────
     {
       id: tid(),
-      name: 'Боевой клич',
-      category: 'active',
+      name: 'Испепеление',
+      category: 'fire',
+      icon: 'battle-axe',
+      mods: [{ stat: 'damage', value: 4 }],
+    },
+    {
+      id: tid(),
+      name: 'Точность огня',
+      category: 'fire',
+      icon: 'arrow-cluster',
+      mods: [{ stat: 'hit_chance', value: 3 }],
+    },
+    {
+      id: tid(),
+      name: 'Огненная ярость',
+      category: 'fire',
       icon: 'swords-power',
       mods: [
-        { stat: 'damage', value: 4 },
+        { stat: 'damage', value: 3 },
         { stat: 'hit_chance', value: 2 },
-        { stat: 'defense', value: -3 },
       ],
     },
     {
       id: tid(),
-      name: 'Магический залп',
-      category: 'active',
-      icon: 'fire',
-      mods: [
-        { stat: 'magic_power', value: 5 },
-        { stat: 'resistance', value: -2 },
-        { stat: 'defense', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Уклонение',
-      category: 'active',
-      icon: 'boot-stomp',
-      mods: [
-        { stat: 'dodge', value: 5 },
-        { stat: 'initiative', value: 2 },
-        { stat: 'damage', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Щит разума',
-      category: 'active',
-      icon: 'shield',
-      mods: [
-        { stat: 'resistance', value: 5 },
-        { stat: 'defense', value: 3 },
-        { stat: 'initiative', value: -3 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Смертельный удар',
-      category: 'active',
-      icon: 'broadsword',
-      mods: [
-        { stat: 'damage', value: 6 },
-        { stat: 'hit_chance', value: -2 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Переговоры',
-      category: 'active',
-      icon: 'scroll-quill',
-      mods: [
-        { stat: 'persuasion', value: 5 },
-        { stat: 'initiative', value: -2 },
-        { stat: 'damage', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Ледяная стрела',
-      category: 'active',
-      icon: 'ice-bolt',
-      mods: [
-        { stat: 'magic_power', value: 4 },
-        { stat: 'hit_chance', value: 2 },
-        { stat: 'defense', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Засада',
-      category: 'active',
-      icon: 'arrow-cluster',
-      mods: [
-        { stat: 'damage', value: 4 },
-        { stat: 'initiative', value: 3 },
-        { stat: 'defense', value: -3 },
-        { stat: 'resistance', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Стремительная атака',
-      category: 'active',
+      name: 'Обжигающий удар',
+      category: 'fire',
       icon: 'stiletto',
       mods: [
-        { stat: 'hit_chance', value: 4 },
-        { stat: 'initiative', value: 3 },
-        { stat: 'defense', value: -3 },
-        { stat: 'resistance', value: -2 },
+        { stat: 'damage', value: 2 },
+        { stat: 'initiative', value: 1 },
       ],
     },
     {
       id: tid(),
-      name: 'Прорыв защиты',
-      category: 'active',
+      name: 'Пылающая мощь',
+      category: 'fire',
       icon: 'warhammer',
-      mods: [
-        { stat: 'damage', value: 5 },
-        { stat: 'dodge', value: -3 },
-        { stat: 'defense', value: -2 },
-      ],
+      mods: [{ stat: 'damage', value: 5 }],
     },
     {
       id: tid(),
-      name: 'Навязать волю',
-      category: 'active',
-      icon: 'bear-head',
-      mods: [
-        { stat: 'persuasion', value: 4 },
-        { stat: 'magic_power', value: 2 },
-        { stat: 'damage', value: -2 },
-        { stat: 'hit_chance', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Призрачный шаг',
-      category: 'active',
-      icon: 'ghost',
-      mods: [
-        { stat: 'dodge', value: 4 },
-        { stat: 'initiative', value: 4 },
-        { stat: 'damage', value: -2 },
-        { stat: 'defense', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Огненный шар',
-      category: 'active',
-      icon: 'fire',
-      mods: [
-        { stat: 'magic_power', value: 6 },
-        { stat: 'resistance', value: -3 },
-        { stat: 'defense', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Тотем волка',
-      category: 'active',
-      icon: 'wolf-head',
-      mods: [
-        { stat: 'damage', value: 3 },
-        { stat: 'hit_chance', value: 3 },
-        { stat: 'persuasion', value: -3 },
-      ],
-    },
-
-    // ── status ───────────────────────────────────────────────────────────────
-    {
-      id: tid(),
-      name: 'Отравление',
-      category: 'status',
-      icon: 'poison',
-      mods: [
-        { stat: 'hit_chance', value: -3 },
-        { stat: 'initiative', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Страх',
-      category: 'status',
-      icon: 'ghost',
-      mods: [
-        { stat: 'damage', value: -3 },
-        { stat: 'hit_chance', value: -2 },
-        { stat: 'persuasion', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Замедление',
-      category: 'status',
-      icon: 'ice-bolt',
-      mods: [
-        { stat: 'initiative', value: -4 },
-        { stat: 'dodge', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Ослабление',
-      category: 'status',
-      icon: 'death-skull',
-      mods: [
-        { stat: 'damage', value: -4 },
-        { stat: 'hit_chance', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Проклятие',
-      category: 'status',
-      icon: 'cursed-star',
-      mods: [
-        { stat: 'resistance', value: -4 },
-        { stat: 'magic_power', value: -3 },
-        { stat: 'persuasion', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Оглушение',
-      category: 'status',
-      icon: 'warhammer',
-      mods: [
-        { stat: 'initiative', value: -5 },
-        { stat: 'dodge', value: -3 },
-        { stat: 'hit_chance', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Ярость безумца',
-      category: 'status',
-      icon: 'battle-axe',
-      mods: [
-        { stat: 'damage', value: 4 },
-        { stat: 'hit_chance', value: -3 },
-        { stat: 'defense', value: -3 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Паралич',
-      category: 'status',
-      icon: 'dinosaur-bones',
-      mods: [
-        { stat: 'initiative', value: -6 },
-        { stat: 'dodge', value: -4 },
-        { stat: 'defense', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Мистическое слияние',
-      category: 'status',
-      icon: 'magic-swirl',
-      mods: [
-        { stat: 'magic_power', value: 4 },
-        { stat: 'resistance', value: 3 },
-        { stat: 'damage', value: -4 },
-        { stat: 'hit_chance', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Слепота',
-      category: 'status',
-      icon: 'all-seeing-eye',
-      mods: [
-        { stat: 'hit_chance', value: -5 },
-        { stat: 'dodge', value: -3 },
-      ],
-    },
-
-    // ── racial ───────────────────────────────────────────────────────────────
-    {
-      id: tid(),
-      name: 'Гномья крепость',
-      category: 'racial',
-      icon: 'shield',
-      mods: [
-        { stat: 'defense', value: 3 },
-        { stat: 'resistance', value: 2 },
-        { stat: 'initiative', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Эльфийские чувства',
-      category: 'racial',
-      icon: 'arrow-cluster',
-      mods: [
-        { stat: 'hit_chance', value: 3 },
-        { stat: 'initiative', value: 2 },
-        { stat: 'defense', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Орочья ярость',
-      category: 'racial',
+      name: 'Искры меткости',
+      category: 'fire',
       icon: 'hatchet',
       mods: [
-        { stat: 'damage', value: 4 },
         { stat: 'hit_chance', value: 2 },
-        { stat: 'persuasion', value: -3 },
+        { stat: 'damage', value: 2 },
       ],
     },
     {
       id: tid(),
-      name: 'Хоббитская удача',
-      category: 'racial',
-      icon: 'heart-organ',
-      mods: [
-        { stat: 'dodge', value: 3 },
-        { stat: 'persuasion', value: 2 },
-        { stat: 'damage', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Драконья кровь',
-      category: 'racial',
+      name: 'Вспышка',
+      category: 'fire',
       icon: 'fire',
       mods: [
-        { stat: 'magic_power', value: 3 },
-        { stat: 'resistance', value: 3 },
-        { stat: 'dodge', value: -3 },
+        { stat: 'hit_chance', value: 4 },
+        { stat: 'initiative', value: 1 },
       ],
     },
     {
       id: tid(),
-      name: 'Тёмный эльф',
-      category: 'racial',
-      icon: 'death-skull',
+      name: 'Раскалённая сталь',
+      category: 'fire',
+      icon: 'pointy-sword',
       mods: [
         { stat: 'damage', value: 3 },
-        { stat: 'initiative', value: 3 },
-        { stat: 'persuasion', value: -3 },
+        { stat: 'magic_power', value: 1 },
       ],
     },
     {
       id: tid(),
-      name: 'Полурослик',
-      category: 'racial',
-      icon: 'star-prominences',
+      name: 'Жаровня войны',
+      category: 'fire',
+      icon: 'chest-armor',
       mods: [
-        { stat: 'dodge', value: 3 },
-        { stat: 'persuasion', value: 2 },
-        { stat: 'damage', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Каменный тролль',
-      category: 'racial',
-      icon: 'dinosaur-bones',
-      mods: [
-        { stat: 'defense', value: 5 },
-        { stat: 'resistance', value: 3 },
-        { stat: 'initiative', value: -4 },
-        { stat: 'dodge', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Лесной дух',
-      category: 'racial',
-      icon: 'rune-stone',
-      mods: [
-        { stat: 'magic_power', value: 2 },
-        { stat: 'resistance', value: 2 },
+        { stat: 'damage', value: 1 },
         { stat: 'hit_chance', value: 1 },
-        { stat: 'damage', value: -2 },
+        { stat: 'initiative', value: 1 },
       ],
     },
     {
       id: tid(),
-      name: 'Морской народ',
-      category: 'racial',
-      icon: 'crystal-ball',
+      name: 'Огненный взор',
+      category: 'fire',
+      icon: 'all-seeing-eye',
       mods: [
-        { stat: 'initiative', value: 2 },
-        { stat: 'dodge', value: 2 },
-        { stat: 'defense', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Оборотень',
-      category: 'racial',
-      icon: 'wolf-head',
-      mods: [
-        { stat: 'damage', value: 4 },
-        { stat: 'initiative', value: 3 },
-        { stat: 'persuasion', value: -4 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Демоническая кровь',
-      category: 'racial',
-      icon: 'cursed-star',
-      mods: [
-        { stat: 'magic_power', value: 3 },
-        { stat: 'damage', value: 2 },
-        { stat: 'persuasion', value: -3 },
-        { stat: 'resistance', value: -1 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Ангельское происхождение',
-      category: 'racial',
-      icon: 'star-prominences',
-      mods: [
-        { stat: 'resistance', value: 3 },
-        { stat: 'persuasion', value: 3 },
-        { stat: 'damage', value: -3 },
+        { stat: 'hit_chance', value: 3 },
+        { stat: 'persuasion', value: 1 },
       ],
     },
 
-    // ── class ────────────────────────────────────────────────────────────────
+    // ── earth (Земля) — защита, сопротивление ────────────────────────────
     {
       id: tid(),
-      name: 'Воинская дисциплина',
-      category: 'class',
+      name: 'Каменная кожа',
+      category: 'earth',
+      icon: 'shield',
+      mods: [{ stat: 'defense', value: 3 }],
+    },
+    {
+      id: tid(),
+      name: 'Твердыня',
+      category: 'earth',
       icon: 'chest-armor',
       mods: [
-        { stat: 'hit_chance', value: 3 },
         { stat: 'defense', value: 2 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Воровское мастерство',
-      category: 'class',
-      icon: 'stiletto',
-      mods: [
-        { stat: 'dodge', value: 4 },
-        { stat: 'initiative', value: 3 },
-        { stat: 'defense', value: -3 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Магическое обучение',
-      category: 'class',
-      icon: 'magic-swirl',
-      mods: [
-        { stat: 'magic_power', value: 4 },
         { stat: 'resistance', value: 2 },
-        { stat: 'damage', value: -2 },
-        { stat: 'hit_chance', value: -2 },
       ],
     },
     {
       id: tid(),
-      name: 'Клерикальная мудрость',
-      category: 'class',
-      icon: 'scroll-quill',
-      mods: [
-        { stat: 'resistance', value: 4 },
-        { stat: 'persuasion', value: 3 },
-        { stat: 'damage', value: -3 },
-      ],
+      name: 'Горная стойкость',
+      category: 'earth',
+      icon: 'rune-stone',
+      mods: [{ stat: 'resistance', value: 4 }],
     },
     {
       id: tid(),
-      name: 'Рейнджерская выучка',
-      category: 'class',
-      icon: 'arrow-cluster',
-      mods: [
-        { stat: 'hit_chance', value: 4 },
-        { stat: 'initiative', value: 2 },
-        { stat: 'defense', value: -2 },
-        { stat: 'resistance', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Паладинское благословение',
-      category: 'class',
+      name: 'Щит титана',
+      category: 'earth',
       icon: 'shield',
+      mods: [{ stat: 'defense', value: 5 }],
+    },
+    {
+      id: tid(),
+      name: 'Песчаный барьер',
+      category: 'earth',
+      icon: 'helmet',
       mods: [
         { stat: 'defense', value: 3 },
+        { stat: 'resistance', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Земляной панцирь',
+      category: 'earth',
+      icon: 'chest-armor',
+      mods: [
+        { stat: 'defense', value: 4 },
+        { stat: 'resistance', value: 2 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Корни древних',
+      category: 'earth',
+      icon: 'rune-stone',
+      mods: [
         { stat: 'resistance', value: 3 },
-        { stat: 'persuasion', value: 1 },
-        { stat: 'dodge', value: -3 },
+        { stat: 'defense', value: 1 },
       ],
     },
     {
       id: tid(),
-      name: 'Некромантский ритуал',
-      category: 'class',
-      icon: 'death-skull',
+      name: 'Гранитная воля',
+      category: 'earth',
+      icon: 'dinosaur-bones',
+      mods: [{ stat: 'resistance', value: 3 }],
+    },
+    {
+      id: tid(),
+      name: 'Оплот земли',
+      category: 'earth',
+      icon: 'shield',
       mods: [
-        { stat: 'magic_power', value: 5 },
+        { stat: 'defense', value: 2 },
+        { stat: 'resistance', value: 1 },
+        { stat: 'dodge', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Несокрушимость',
+      category: 'earth',
+      icon: 'gauntlet',
+      mods: [
+        { stat: 'defense', value: 3 },
+        { stat: 'hit_chance', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Каменный оплот',
+      category: 'earth',
+      icon: 'helmet',
+      mods: [
+        { stat: 'defense', value: 1 },
+        { stat: 'resistance', value: 3 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Землетрясение',
+      category: 'earth',
+      icon: 'warhammer',
+      mods: [
+        { stat: 'defense', value: 2 },
         { stat: 'damage', value: 2 },
-        { stat: 'persuasion', value: -4 },
       ],
+    },
+
+    // ── water (Вода) — уклонение, инициатива ─────────────────────────────
+    {
+      id: tid(),
+      name: 'Водная гибкость',
+      category: 'water',
+      icon: 'boot-stomp',
+      mods: [{ stat: 'dodge', value: 3 }],
     },
     {
       id: tid(),
-      name: 'Варварская сила',
-      category: 'class',
-      icon: 'battle-axe',
+      name: 'Поток',
+      category: 'water',
+      icon: 'ghost',
       mods: [
-        { stat: 'damage', value: 5 },
-        { stat: 'hit_chance', value: 2 },
-        { stat: 'defense', value: -3 },
-        { stat: 'dodge', value: -2 },
-      ],
-    },
-    {
-      id: tid(),
-      name: 'Бардовское обаяние',
-      category: 'class',
-      icon: 'scroll-quill',
-      mods: [
-        { stat: 'persuasion', value: 5 },
+        { stat: 'dodge', value: 2 },
         { stat: 'initiative', value: 2 },
-        { stat: 'damage', value: -3 },
       ],
     },
     {
       id: tid(),
-      name: 'Монашеская техника',
-      category: 'class',
+      name: 'Речная скорость',
+      category: 'water',
+      icon: 'boot-stomp',
+      mods: [{ stat: 'initiative', value: 4 }],
+    },
+    {
+      id: tid(),
+      name: 'Туманный шаг',
+      category: 'water',
+      icon: 'ghost',
+      mods: [
+        { stat: 'dodge', value: 4 },
+        { stat: 'initiative', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Приливная волна',
+      category: 'water',
+      icon: 'crystal-ball',
+      mods: [
+        { stat: 'initiative', value: 3 },
+        { stat: 'dodge', value: 2 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Скользящий удар',
+      category: 'water',
+      icon: 'stiletto',
+      mods: [
+        { stat: 'dodge', value: 2 },
+        { stat: 'hit_chance', value: 2 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Ледяное спокойствие',
+      category: 'water',
+      icon: 'ice-bolt',
+      mods: [
+        { stat: 'initiative', value: 2 },
+        { stat: 'resistance', value: 2 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Морской ветер',
+      category: 'water',
+      icon: 'hood',
+      mods: [{ stat: 'dodge', value: 5 }],
+    },
+    {
+      id: tid(),
+      name: 'Водоворот',
+      category: 'water',
+      icon: 'crystal-ball',
+      mods: [
+        { stat: 'initiative', value: 3 },
+        { stat: 'defense', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Текучесть',
+      category: 'water',
       icon: 'boot-stomp',
       mods: [
         { stat: 'dodge', value: 3 },
-        { stat: 'hit_chance', value: 3 },
-        { stat: 'defense', value: -2 },
-        { stat: 'resistance', value: -2 },
+        { stat: 'damage', value: 1 },
       ],
     },
     {
       id: tid(),
-      name: 'Шаманский зов',
-      category: 'class',
-      icon: 'rune-stone',
+      name: 'Отлив',
+      category: 'water',
+      icon: 'ghost',
+      mods: [
+        { stat: 'dodge', value: 1 },
+        { stat: 'initiative', value: 1 },
+        { stat: 'persuasion', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Штормовая реакция',
+      category: 'water',
+      icon: 'arrow-cluster',
+      mods: [{ stat: 'initiative', value: 5 }],
+    },
+
+    // ── air (Воздух) — магия, убеждение ──────────────────────────────────
+    {
+      id: tid(),
+      name: 'Ветер мудрости',
+      category: 'air',
+      icon: 'magic-swirl',
+      mods: [{ stat: 'magic_power', value: 3 }],
+    },
+    {
+      id: tid(),
+      name: 'Небесный голос',
+      category: 'air',
+      icon: 'scroll-quill',
+      mods: [{ stat: 'persuasion', value: 3 }],
+    },
+    {
+      id: tid(),
+      name: 'Буря разума',
+      category: 'air',
+      icon: 'star-prominences',
       mods: [
         { stat: 'magic_power', value: 3 },
+        { stat: 'persuasion', value: 2 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Эфирная сила',
+      category: 'air',
+      icon: 'crystal-ball',
+      mods: [{ stat: 'magic_power', value: 5 }],
+    },
+    {
+      id: tid(),
+      name: 'Шёпот ветра',
+      category: 'air',
+      icon: 'scroll-quill',
+      mods: [
+        { stat: 'persuasion', value: 4 },
+        { stat: 'initiative', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Воздушный щит',
+      category: 'air',
+      icon: 'magic-swirl',
+      mods: [
+        { stat: 'magic_power', value: 2 },
         { stat: 'resistance', value: 2 },
-        { stat: 'hit_chance', value: -2 },
-        { stat: 'damage', value: -1 },
       ],
     },
     {
       id: tid(),
-      name: 'Боевой маг',
-      category: 'class',
-      icon: 'swords-power',
+      name: 'Грозовой разряд',
+      category: 'air',
+      icon: 'lightning-arc',
+      mods: [
+        { stat: 'magic_power', value: 4 },
+        { stat: 'damage', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Вихрь красноречия',
+      category: 'air',
+      icon: 'crown',
+      mods: [{ stat: 'persuasion', value: 5 }],
+    },
+    {
+      id: tid(),
+      name: 'Попутный ветер',
+      category: 'air',
+      icon: 'hood',
+      mods: [
+        { stat: 'initiative', value: 2 },
+        { stat: 'magic_power', value: 2 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Чистый эфир',
+      category: 'air',
+      icon: 'star-prominences',
+      mods: [
+        { stat: 'magic_power', value: 2 },
+        { stat: 'persuasion', value: 1 },
+        { stat: 'resistance', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Небесная длань',
+      category: 'air',
+      icon: 'magic-swirl',
       mods: [
         { stat: 'magic_power', value: 3 },
-        { stat: 'damage', value: 3 },
-        { stat: 'defense', value: -2 },
-        { stat: 'dodge', value: -2 },
+        { stat: 'hit_chance', value: 1 },
+      ],
+    },
+    {
+      id: tid(),
+      name: 'Гром небесный',
+      category: 'air',
+      icon: 'lightning-arc',
+      mods: [
+        { stat: 'magic_power', value: 2 },
+        { stat: 'damage', value: 2 },
       ],
     },
   ]
@@ -829,7 +514,7 @@ export function seedDemoData() {
     {
       slot: 'two_handed',
       category: 'melee',
-      icon: 'greatsword',
+      icon: 'pointy-sword',
       names: ['Двуручный меч бастиона', 'Клеймор рассвета', 'Меч великаноборца'],
     },
     {
@@ -967,10 +652,10 @@ export function seedDemoData() {
       slot: 'potion',
       category: 'potion',
       icon: 'ice-bolt',
-      names: ['Ледяное зелье', 'Эликсир инея', 'Настой зимы'],
+      names: ['Водяное зелье', 'Эликсир прилива', 'Настой глубин'],
       effectBuilder: (tier) => ({
         kind: 'elemental_buff',
-        element: 'ice',
+        element: 'water',
         resistance: tier.elemResist,
         bonusDamage: tier.elemDamage,
         turns: tier.turns,
@@ -980,10 +665,10 @@ export function seedDemoData() {
       slot: 'potion',
       category: 'potion',
       icon: 'lightning-arc',
-      names: ['Грозовое зелье', 'Эликсир молнии', 'Настой разряда'],
+      names: ['Воздушное зелье', 'Эликсир бури', 'Настой ветра'],
       effectBuilder: (tier) => ({
         kind: 'elemental_buff',
-        element: 'lightning',
+        element: 'air',
         resistance: tier.elemResist,
         bonusDamage: tier.elemDamage,
         turns: tier.turns,
@@ -997,19 +682,6 @@ export function seedDemoData() {
       effectBuilder: (tier) => ({
         kind: 'elemental_buff',
         element: 'earth',
-        resistance: tier.elemResist,
-        bonusDamage: tier.elemDamage,
-        turns: tier.turns,
-      }),
-    },
-    {
-      slot: 'potion',
-      category: 'potion',
-      icon: 'magic-swirl',
-      names: ['Арканное зелье', 'Эликсир эфира', 'Настой потока'],
-      effectBuilder: (tier) => ({
-        kind: 'elemental_buff',
-        element: 'arcane',
         resistance: tier.elemResist,
         bonusDamage: tier.elemDamage,
         turns: tier.turns,
@@ -1068,9 +740,9 @@ export function seedDemoData() {
     }
   }
 
-  // 16 (снаряжение) * 3 имени + 9 (зелья) * 4 тира = 48 + 36 = 84
-  if (items.length !== 84) {
-    throw new Error(`Seed items count mismatch: expected 84, got ${items.length}`)
+  // 16 (снаряжение) * 3 имени + 8 (зелья) * 4 тира = 48 + 32 = 80
+  if (items.length !== 80) {
+    throw new Error(`Seed items count mismatch: expected 80, got ${items.length}`)
   }
 
   localStorage.setItem('game-dnd:traits', JSON.stringify(traits))
@@ -1078,7 +750,7 @@ export function seedDemoData() {
   localStorage.setItem('game-dnd:seed-version', SEED_VERSION)
 
   console.log(
-    `✅ Seed v7 готов: ${traits.length} свойств, ${items.length} предметов (gear — шаблоны без редкости, зелья — с эффектами)`
+    `✅ Seed v8 готов: ${traits.length} свойств, ${items.length} предметов (стихии: огонь/земля/вода/воздух)`
   )
   console.log('Перезагрузи страницу чтобы Pinia подхватила новые данные.')
   return items

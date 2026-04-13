@@ -139,6 +139,12 @@
   height: 470px;
 }
 
+.inv-panel__bag-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
 .inv-panel__bag-title {
   margin: 0;
   font-size: 10px;
@@ -147,6 +153,25 @@
   text-transform: uppercase;
   letter-spacing: 0.18em;
   font-weight: 600;
+}
+
+.inv-panel__clear-btn {
+  padding: 2px 8px;
+  font-size: 9px;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  background: rgb(255 60 60 / 12%);
+  border: 1px solid rgb(255 80 80 / 30%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.inv-panel__clear-btn:hover {
+  background: rgb(255 60 60 / 25%);
+  color: var(--color-text);
 }
 
 .inv-panel__grid {
@@ -356,4 +381,32 @@
 /* Двуручное/лук — занимает 2 колонки */
 .inv-panel__cell--wide {
   grid-column: span 2;
+}
+
+/* ── Лоадер пока иконка грузится с Iconify ─────────────────────── */
+
+.inv-panel__cell-loader,
+.inv-panel__slot-loader {
+  display: block;
+  border: 2px solid rgb(200 154 74 / 20%);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: inv-spin 0.6s linear infinite;
+  pointer-events: none;
+}
+
+.inv-panel__cell-loader {
+  width: 40%;
+  height: 40%;
+}
+
+.inv-panel__slot-loader {
+  width: 45%;
+  height: 45%;
+}
+
+@keyframes inv-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

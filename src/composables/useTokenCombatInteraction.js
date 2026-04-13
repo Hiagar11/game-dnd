@@ -38,9 +38,9 @@ export function useTokenCombatInteraction({ store, damageFloatRef }) {
       }
       playFist()
 
-      const cell = store.cellSize
-      const x = defenderToken.col * cell + cell / 2
-      const y = defenderToken.row * cell + cell / 2
+      const hc = store.halfCell
+      const x = defenderToken.col * hc + store.gridNormOX + hc
+      const y = defenderToken.row * hc + store.gridNormOY + hc
       damageFloatRef.value?.spawn(defenderToken.uid, `-${dmgTotal}`, x, y)
     } else {
       flashToken(defenderToken.uid, 'miss')

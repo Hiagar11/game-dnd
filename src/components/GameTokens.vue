@@ -24,6 +24,7 @@
         :messages="dialogBubbles.get(placed.uid).messages"
         :loading="dialogBubbles.get(placed.uid).loading"
         :npc-src="placed.src"
+        :npc-name="placed.npcName || placed.name"
         :player-src="dialogBubbles.get(placed.uid).heroSrc ?? null"
         :npc-score="npcScoreForDialog(dialogBubbles.get(placed.uid), placed)"
         @send="onDialogSend(placed.uid, $event)"
@@ -81,7 +82,7 @@
 </template>
 
 <script setup>
-  import { ref, computed, watch } from 'vue'
+  import { ref, computed, watch, inject } from 'vue'
   import { useGameStore } from '../stores/game'
   import { useHeroesStore } from '../stores/heroes'
   import { useFogVisibility } from '../composables/useFogVisibility'
@@ -128,6 +129,7 @@
     attitudeArrows,
     openBubble,
     addNpcMessage,
+    addDiceRollMessage,
     addPlayerMessage,
     triggerAttitudeArrow,
   } = useNpcDialog(store)
@@ -149,8 +151,7 @@
     return !!getSelectedNonSystemToken(store.placedTokens, store.selectedPlacedUid)
   })
 
-  const { heroReachable, npcReachable, isNpcReachable, isHeroReachableByNpc } =
-    useTokenReachability(store)
+  const { isNpcReachable, isHeroReachableByNpc } = useTokenReachability(store)
 
   const { moveTowardTarget, onDoorWalk } = useTokenMovementInteraction({
     store,
@@ -163,23 +164,22 @@
 
   const { onTalkClick, onDialogSend } = useTokenDialogInteraction({
     store,
-    heroReachable,
     getSocket,
     closeContextMenu,
     dirs: DIRS,
     findPath,
     openBubble,
     addNpcMessage,
+    addDiceRollMessage,
     addPlayerMessage,
     triggerAttitudeArrow,
     damageFloatRef,
+    dialogBubbles,
   })
 
   const { onAttackClick, onNpcAttackClick } = useTokenAttackInteraction({
     store,
     dirs: DIRS,
-    heroReachable,
-    npcReachable,
     findPath,
     getSocket,
     closeContextMenu,
@@ -221,14 +221,19 @@
     onAttackClick,
     onNpcAttackClick,
     onTalkClick,
-    heroReachable,
-    npcReachable,
     isNpcReachable,
     isHeroReachableByNpc,
     getVisibleKeys,
     clickTimer,
     dblClickDelay: DBLCLICK_DELAY,
   })
+
+  // Регистрируем обработчики для вызова из GameRangeOverlay
+  const overlayTokenClick = inject('overlayTokenClick', ref(null))
+  overlayTokenClick.value = (placed) => onTokenClick(placed, null)
+
+  const overlayTokenContextMenu = inject('overlayTokenContextMenu', ref(null))
+  overlayTokenContextMenu.value = (placed) => onContextMenu(placed)
 
   const { tokenClasses, tokenStyle, npcScoreForDialog } = useGameTokenPresentation({
     props,
@@ -276,8 +281,8 @@
     const npc = store.placedTokens.find((t) => t.uid === store.combatPair.npcUid)
     if (!hero || !npc) return null
     return {
-      x: ((hero.col + npc.col) / 2 + 0.5) * store.cellSize,
-      y: ((hero.row + npc.row) / 2 + 0.5) * store.cellSize,
+      x: ((hero.col + npc.col) / 2 + 1) * store.halfCell + store.gridNormOX,
+      y: ((hero.row + npc.row) / 2 + 1) * store.halfCell + store.gridNormOY,
     }
   })
 </script>

@@ -27,6 +27,12 @@ export function useGridDraw(props) {
     const ctx = canvas.getContext('2d')
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
+    // ─── Смещение сетки (нормализовано в [0, cellSize)) ────────────────────────
+    const cs = store.cellSize
+    const hc = cs / 2
+    const ox = store.gridNormOX
+    const oy = store.gridNormOY
+
     // ─── Зона радиуса выбранного токена ──────────────────────────────────────
     if (props.viewerMode) {
       // Режим зрителя: рисуем зону хода для выбранного героя.
@@ -43,7 +49,7 @@ export function useGridDraw(props) {
       ctx.fillStyle = 'rgba(74, 222, 128, 0.25)'
       for (const key of reachable) {
         const [c, r] = key.split(',').map(Number)
-        ctx.fillRect(c * store.cellSize, r * store.cellSize, store.cellSize, store.cellSize)
+        ctx.fillRect(c * hc + ox, r * hc + oy, hc, hc)
       }
     } else {
       // Режим админа: зона только для выбранного токена.
@@ -56,35 +62,27 @@ export function useGridDraw(props) {
         ctx.fillStyle = 'rgba(74, 222, 128, 0.25)'
         for (const key of reachable) {
           const [c, r] = key.split(',').map(Number)
-          ctx.fillRect(c * store.cellSize, r * store.cellSize, store.cellSize, store.cellSize)
+          ctx.fillRect(c * hc + ox, r * hc + oy, hc, hc)
         }
 
         // ── Фантомный путь при ховере ─────────────────────────────────────────
         const hcell = store.hoveredCell
         if (hcell) {
           ctx.fillStyle = 'rgba(250, 204, 21, 0.20)'
-          ctx.fillRect(
-            hcell.col * store.cellSize,
-            hcell.row * store.cellSize,
-            store.cellSize,
-            store.cellSize
-          )
+          ctx.fillRect(hcell.col * hc + ox, hcell.row * hc + oy, cs, cs)
         }
 
         const path = store.hoveredPath
         if (path && path.length > 0) {
-          const cs = store.cellSize
-          const half = cs / 2
-
-          // Начальная точка — сам токен
-          const startX = selected.col * cs + half
-          const startY = selected.row * cs + half
+          // Начальная точка — центр 2×2 токена
+          const startX = selected.col * hc + ox + hc
+          const startY = selected.row * hc + oy + hc
 
           // Линия пути
           ctx.beginPath()
           ctx.moveTo(startX, startY)
           for (const step of path) {
-            ctx.lineTo(step.col * cs + half, step.row * cs + half)
+            ctx.lineTo(step.col * hc + ox + hc, step.row * hc + oy + hc)
           }
           ctx.strokeStyle = 'rgba(250, 204, 21, 0.75)'
           ctx.lineWidth = 2
@@ -99,7 +97,7 @@ export function useGridDraw(props) {
           for (let i = 0; i < path.length - 1; i++) {
             const step = path[i]
             ctx.beginPath()
-            ctx.arc(step.col * cs + half, step.row * cs + half, 3, 0, Math.PI * 2)
+            ctx.arc(step.col * hc + ox + hc, step.row * hc + oy + hc, 3, 0, Math.PI * 2)
             ctx.fill()
           }
 
@@ -107,7 +105,7 @@ export function useGridDraw(props) {
           const last = path[path.length - 1]
           ctx.fillStyle = 'rgba(250, 204, 21, 1)'
           ctx.beginPath()
-          ctx.arc(last.col * cs + half, last.row * cs + half, 5, 0, Math.PI * 2)
+          ctx.arc(last.col * hc + ox + hc, last.row * hc + oy + hc, 5, 0, Math.PI * 2)
           ctx.fill()
         }
       }
@@ -119,23 +117,49 @@ export function useGridDraw(props) {
     if (props.editorMode && store.walls.length) {
       ctx.fillStyle = 'rgba(220, 38, 38, 0.55)'
       for (const w of store.walls) {
-        ctx.fillRect(w.col * store.cellSize, w.row * store.cellSize, store.cellSize, store.cellSize)
+        ctx.fillRect(w.col * hc + ox, w.row * hc + oy, hc, hc)
       }
     }
 
-    // ─── Линии сетки (поверх заливки) ────────────────────────────────────────
+    // ─── Превью зоны дропа (2×2 sub-cell = 1 полная ячейка) ────────────────
+    const dropCell = store.dropPreviewCell
+    if (dropCell) {
+      ctx.fillStyle = 'rgba(96, 165, 250, 0.35)'
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)'
+      ctx.lineWidth = 2
+      const dx = dropCell.col * hc + ox
+      const dy = dropCell.row * hc + oy
+      ctx.fillRect(dx, dy, cs, cs)
+      ctx.strokeRect(dx, dy, cs, cs)
+    }
+
+    // ─── Sub-grid (тонкие пунктирные линии — делят ячейку на 2×2) ─────────
+    ctx.beginPath()
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)'
+    ctx.lineWidth = 1
+    ctx.setLineDash([4, 4])
+
+    for (let x = ox + hc; x < canvas.width; x += cs) {
+      ctx.moveTo(x, 0)
+      ctx.lineTo(x, canvas.height)
+    }
+    for (let y = oy + hc; y < canvas.height; y += cs) {
+      ctx.moveTo(0, y)
+      ctx.lineTo(canvas.width, y)
+    }
+    ctx.stroke()
+    ctx.setLineDash([])
+
+    // ─── Основная сетка (поверх sub-grid) ─────────────────────────────────────
     ctx.beginPath()
     ctx.strokeStyle = store.colorGrid
     ctx.lineWidth = 1
 
-    // Вертикальные линии
-    for (let x = 0; x <= canvas.width; x += store.cellSize) {
+    for (let x = ox; x <= canvas.width; x += cs) {
       ctx.moveTo(x, 0)
       ctx.lineTo(x, canvas.height)
     }
-
-    // Горизонтальные линии
-    for (let y = 0; y <= canvas.height; y += store.cellSize) {
+    for (let y = oy; y <= canvas.height; y += cs) {
       ctx.moveTo(0, y)
       ctx.lineTo(canvas.width, y)
     }
@@ -151,10 +175,13 @@ export function useGridDraw(props) {
       () => props.height,
       () => store.cellSize,
       () => store.colorGrid,
+      () => store.gridOffsetX,
+      () => store.gridOffsetY,
       () => store.selectedPlacedUid,
       () => store.placedTokens.map((t) => `${t.uid}:${t.col}:${t.row}:${t.attitude}`).join(','),
       () => store.hoveredPath.map((s) => `${s.col},${s.row}`).join(','),
       () => `${store.hoveredCell?.col},${store.hoveredCell?.row}`,
+      () => `${store.dropPreviewCell?.col},${store.dropPreviewCell?.row}`,
       () => store.walls.map((w) => `${w.col}:${w.row}`).join(','),
       // Зона героев на viewer-стороне обновляется при изменении списка героев или выбора
       () => heroesStore.heroes.map((h) => h.id).join(','),

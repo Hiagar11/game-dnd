@@ -16,12 +16,12 @@ export function useNpcDialog(store) {
     bubbleCleanups.delete(uid)
   }
 
-  function openBubble(uid, heroSrc = null) {
+  function openBubble(uid, heroSrc = null, heroUid = null) {
     closeBubble(uid)
     const next = new Map(dialogBubbles.value)
     const placed = store.placedTokens.find((t) => t.uid === uid)
     const initScore = getNpcAttitudeScore(placed)
-    next.set(uid, { messages: [], loading: true, heroSrc, npcScore: initScore })
+    next.set(uid, { messages: [], loading: true, heroSrc, heroUid, npcScore: initScore })
     dialogBubbles.value = next
     const timer = setTimeout(() => {
       function onOutsideClick(e) {
@@ -41,6 +41,17 @@ export function useNpcDialog(store) {
     const update = { ...b, messages: [...b.messages, { who: 'npc', text }], loading: false }
     if (npcScore !== undefined) update.npcScore = npcScore
     m.set(uid, update)
+    dialogBubbles.value = m
+  }
+
+  function addDiceRollMessage(uid, diceRoll) {
+    const m = new Map(dialogBubbles.value)
+    const b = m.get(uid)
+    if (!b) return
+    m.set(uid, {
+      ...b,
+      messages: [...b.messages, { who: 'dice', ...diceRoll }],
+    })
     dialogBubbles.value = m
   }
 
@@ -72,6 +83,7 @@ export function useNpcDialog(store) {
     closeBubble,
     openBubble,
     addNpcMessage,
+    addDiceRollMessage,
     addPlayerMessage,
     triggerAttitudeArrow,
   }

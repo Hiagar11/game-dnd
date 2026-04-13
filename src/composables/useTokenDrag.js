@@ -9,6 +9,7 @@ export function useTokenDrag() {
   function onDragStart(e, token) {
     e.dataTransfer.effectAllowed = 'copy'
     e.dataTransfer.setData('tokenId', String(token.id))
+    console.log('[drag] dragstart tokenId:', token.id, 'types:', [...e.dataTransfer.types])
   }
 
   return { onDragStart }

@@ -21,6 +21,8 @@
           <option v-for="level in otherLevels" :key="level.id" :value="level.id">
             {{ level.name || 'Без названия' }}
           </option>
+          <!-- Выход в глобальную карту (если есть ребро сценарий → глобальная карта) -->
+          <option v-if="hasGlobalExit" value="__globalMap__">🌍 Выход в глобальную карту</option>
         </select>
       </div>
     </div>
@@ -75,6 +77,13 @@
   // Название текущей локации
   const currentName = computed(() => gameStore.currentScenario?.name || 'Текущая локация')
 
+  // Есть ли у текущего сценария ребро к глобальной карте
+  const hasGlobalExit = computed(() => {
+    const currentId = getCurrentScenarioId(gameStore)
+    const campaign = gameStore.activeCampaign
+    return campaignsStore.hasGlobalMapEdge(campaign, currentId)
+  })
+
   // Доступные для перехода локации:
   // если активна кампания — показываем только связанные боком мапа;
   // иначе — все заполненные карты кроме текущей.
@@ -88,8 +97,9 @@
 
     if (campaign) {
       const connectedIds = campaignsStore.getConnectedIds(campaign, currentId)
-      // Если кампания есть но связей нет — отображаем все как запасной вариант
-      if (connectedIds.length) {
+      // Если есть хотя бы одна связь (локальная или глобальная) — показываем только связанные.
+      // Если единственная связь — глобальная карта, connectedIds будет пуст → список локаций пуст.
+      if (campaignsStore.hasAnyEdge(campaign, currentId)) {
         return all.filter((s) => connectedIds.includes(String(s.id)))
       }
     }
@@ -104,14 +114,22 @@
     (val) => {
       if (val) {
         const placed = gameStore.placedTokens.find((t) => t.uid === props.placedUid)
-        targetId.value = placed?.targetScenarioId ?? ''
+        // Если дверь ведёт на глобальную карту — показываем соответствующий пункт
+        targetId.value = placed?.globalMapExit ? '__globalMap__' : (placed?.targetScenarioId ?? '')
       }
     }
   )
 
   function onApply() {
     playClick()
-    gameStore.setDoorTarget(props.placedUid, targetId.value)
+    if (targetId.value === '__globalMap__') {
+      // Дверь ведёт на глобальную карту — устанавливаем флаг, сбрасываем targetScenarioId
+      gameStore.setDoorGlobalMapExit(props.placedUid, true)
+    } else {
+      // Обычная дверь — сбрасываем globalMapExit, устанавливаем targetScenarioId
+      gameStore.setDoorGlobalMapExit(props.placedUid, false)
+      gameStore.setDoorTarget(props.placedUid, targetId.value)
+    }
     emit('close')
   }
 </script>

@@ -105,6 +105,15 @@
   border-bottom-left-radius: 3px;
 }
 
+/* Имя НПС под его сообщением */
+.dialog-bubble__npc-name {
+  display: block;
+  font-size: 9px;
+  color: var(--color-text-muted);
+  margin-top: 1px;
+  padding-left: 2px;
+}
+
 /* Игрок -- справа */
 .dialog-bubble__msg--player {
   background: #4f46e5;
@@ -220,6 +229,79 @@
   }
 
   to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+
+/* -- Бросок кубика (проверка убеждения) -- */
+.dialog-bubble__msg-row--dice {
+  justify-content: center;
+}
+
+.dialog-bubble__dice {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  width: 100%;
+  animation: dice-pop 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dialog-bubble__dice--success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.dialog-bubble__dice--fail {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.dialog-bubble__dice-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.dialog-bubble__dice-label {
+  flex-shrink: 0;
+}
+
+.dialog-bubble__dice-roll {
+  flex: 1;
+  text-align: center;
+  font-family: var(--font-mono, monospace);
+}
+
+.dialog-bubble__dice-mod {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.dialog-bubble__dice-result {
+  flex-shrink: 0;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+}
+
+@keyframes dice-pop {
+  0% {
+    opacity: 0;
+    scale: 0.6;
+  }
+
+  60% {
+    scale: 1.08;
+  }
+
+  100% {
     opacity: 1;
     scale: 1;
   }

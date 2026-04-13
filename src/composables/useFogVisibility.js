@@ -184,13 +184,15 @@ export function useFogVisibility() {
 
     if (visitedCells.size === 0) return ''
 
-    const cell = gameStore.cellSize
+    const hc = gameStore.halfCell
+    const ox = gameStore.gridNormOX
+    const oy = gameStore.gridNormOY
     let d = ''
 
     for (const key of visitedCells) {
       const col = parseInt(key.split(':')[0], 10)
       const row = parseInt(key.split(':')[1], 10)
-      d += `M${col * cell},${row * cell}h${cell}v${cell}h${-cell}Z`
+      d += `M${col * hc + ox},${row * hc + oy}h${hc}v${hc}h${-hc}Z`
     }
 
     return d
