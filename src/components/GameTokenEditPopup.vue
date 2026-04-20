@@ -498,7 +498,10 @@
       if (!vis) return
       const token = currentPlaced.value
       localTreeIds.value = token?.treeActivatedIds ? [...token.treeActivatedIds] : []
-      localAbilities.value = token?.abilities ? [...token.abilities] : []
+      // Обновляем abilities из abilityTree — старые снапшоты могут не иметь новых полей
+      localAbilities.value = (token?.abilities ?? []).map((slot) =>
+        slot?.id ? (getAbilityTreeById(slot.id) ?? slot) : slot
+      )
       localPassives.value = token?.passiveAbilities ? [...token.passiveAbilities] : []
     },
     { immediate: true }

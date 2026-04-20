@@ -20,6 +20,7 @@ const levelUpSound = new Audio('/sounds/success.wav')
 let audioCtx = null
 let swordBuffer = null
 let whooshBuffer = null
+let shieldBashBuffer = null
 
 function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
@@ -45,9 +46,10 @@ function ensureCombatBuffers() {
   combatBuffersPromise = (async () => {
     const ctx = getAudioCtx()
     if (ctx.state === 'suspended') await ctx.resume()
-    ;[swordBuffer, whooshBuffer] = await Promise.all([
+    ;[swordBuffer, whooshBuffer, shieldBashBuffer] = await Promise.all([
       preloadBuffer('/sounds/sword.mp3'),
       preloadBuffer('/sounds/whoosh.wav'),
+      preloadBuffer('/sounds/shield-bash.mp3'),
     ])
   })()
   return combatBuffersPromise
@@ -237,6 +239,19 @@ export function playMiss() {
 export function playLevelUp() {
   levelUpSound.currentTime = 0
   levelUpSound.play().catch(() => {})
+}
+export function playShieldBash() {
+  if (shieldBashBuffer) {
+    playBuffer(shieldBashBuffer, 0.8)
+    return
+  }
+  if (combatBuffersPromise) {
+    combatBuffersPromise.then(() => {
+      if (shieldBashBuffer) playBuffer(shieldBashBuffer, 0.8)
+    })
+    return
+  }
+  ensureCombatBuffers()
 } // ── Музыка главного меню ─────────────────────────────────────────
 
 export function playMainMenuMusic() {

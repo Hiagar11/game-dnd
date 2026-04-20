@@ -12,6 +12,7 @@ import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
 import { calcMaxHp } from './combatFormulas'
 import { normalizeInventorySnapshot } from './inventoryState'
 import { getNpcAttitude } from './tokenFilters'
+import { getAbilityTreeById } from '../constants/abilityTree'
 
 const API = import.meta.env.VITE_API_URL ?? 'http://localhost:3000'
 
@@ -112,7 +113,22 @@ export function mapServerToken(serverToken, clientTokens) {
     inventory: normalizeInventorySnapshot(serverToken.inventory),
     // Дерево способностей и активные слоты
     treeActivatedIds: serverToken.treeActivatedIds ?? [],
-    abilities: serverToken.abilities ?? [],
+    abilities: refreshAbilities(serverToken.abilities ?? []),
     passiveAbilities: serverToken.passiveAbilities ?? [],
   }
+}
+
+/**
+ * Обновляет поля способностей из abilityTree.js.
+ * Сохранённые на токене объекты могут быть устаревшими —
+ * подтягиваем актуальные поля (areaType, requiresShield и др.)
+ * по id способности, сохраняя порядок слотов.
+ */
+function refreshAbilities(abilities) {
+  return abilities.map((slot) => {
+    if (!slot?.id) return slot
+    const fresh = getAbilityTreeById(slot.id)
+    if (!fresh) return slot
+    return { ...fresh }
+  })
 }

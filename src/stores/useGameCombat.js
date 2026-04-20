@@ -3,6 +3,7 @@
 
 import { ref } from 'vue'
 import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
+import { isStunned, getStunEffectName } from '../utils/stunMechanics'
 import {
   getHeroTokens,
   getHostileNpcTokens,
@@ -31,6 +32,10 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
   // Пара токенов в боевом контакте — показывает значок мечей между ними
   // { heroUid: string, npcUid: string, npcInitiated: boolean } | null
   const combatPair = ref(null)
+
+  // Информация о пропуске хода из-за оглушения — для UI-подсказки
+  // { uid, name, reason } | null
+  const stunSkipInfo = ref(null)
   function setCombatPair(heroUid, npcUid, npcInitiated = false) {
     combatPair.value = heroUid && npcUid ? { heroUid, npcUid, npcInitiated } : null
   }
@@ -267,10 +272,19 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     const nextToken = placedTokens.value.find((t) => t.uid === nextUid)
     if (nextToken) {
       // Оглушённые/захваченные пропускают ход
-      if (nextToken.stunned || nextToken.captured) {
+      if (isStunned(nextToken, DEFAULT_AP)) {
         nextToken.actionPoints = 0
         nextToken.movementPoints = 0
-        endTurn()
+        // Уведомляем UI о пропуске хода
+        const reason = getStunEffectName(nextToken) ?? 'Оглушён'
+        stunSkipInfo.value = { uid: nextUid, name: nextToken.name, reason }
+        // Тикаем эффекты (чтобы оглушение уменьшалось)
+        tickTokenEffects(nextToken)
+        // Задержка для показа подсказки, затем следующий ход
+        setTimeout(() => {
+          stunSkipInfo.value = null
+          endTurn()
+        }, 1200)
         return
       }
 
@@ -285,7 +299,8 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
 
   /**
    * Уменьшает remainingTurns для всех эффектов токена.
-   * Если remainingTurns <= 0 — снимает эффект и откатывает визуал.
+   * Обрабатывает эффекты по СВОЙСТВАМ (damagePerTurn, healPerTurn),
+   * а не по конкретным ID.
    */
   function tickTokenEffects(token) {
     if (!token.activeEffects?.length) return
@@ -295,9 +310,15 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     for (const effect of token.activeEffects) {
       if (effect.remainingTurns == null) continue
 
-      // Яд наносит урон каждый ход
-      if (effect.id === 'poison' && effect.damagePerTurn) {
+      // Урон каждый ход (яд, кровотечение и т.д.)
+      if (effect.damagePerTurn) {
         token.hp = Math.max(0, (token.hp ?? 0) - effect.damagePerTurn)
+      }
+
+      // Лечение каждый ход (регенерация и т.д.)
+      if (effect.healPerTurn) {
+        const maxHp = token.maxHp ?? token.hp ?? 0
+        token.hp = Math.min(maxHp, (token.hp ?? 0) + effect.healPerTurn)
       }
 
       effect.remainingTurns--
@@ -320,6 +341,7 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     combatRound,
     enemyHiddenTurns,
     combatPair,
+    stunSkipInfo,
     lastXpReport,
     setCombatPair,
     isTokenVisible,

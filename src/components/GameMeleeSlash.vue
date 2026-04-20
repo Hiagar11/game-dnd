@@ -1,7 +1,7 @@
 <template>
   <!--
     Эпичный разрез мечом — «рана» с тёмными краями, кровавой сердцевиной,
-    ударной волной и частицами пыли. Запускается через store.meleeSlash
+    ударной волной и частицами пыли. Запускается через store.abilityVfx { type: 'slash' }
   -->
   <div v-if="slash" class="melee-slash" :style="posStyle">
     <!-- Ударная волна (dust ring) -->
@@ -90,7 +90,10 @@
   import { playSword } from '../composables/useSound'
 
   const store = useGameStore()
-  const slash = computed(() => store.meleeSlash)
+  const slash = computed(() => {
+    const v = store.abilityVfx
+    return v?.type === 'slash' ? v : null
+  })
 
   const hc = computed(() => store.cellSize / 2)
   const ox = computed(() => store.gridNormOX)
@@ -115,7 +118,7 @@
     if (v) {
       playSword()
       setTimeout(() => {
-        store.meleeSlash = null
+        store.abilityVfx = null
       }, 750)
     }
   })

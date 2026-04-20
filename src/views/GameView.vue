@@ -54,6 +54,7 @@
         <GameAbilityProjectile />
         <GameAbilityImpact />
         <GameMeleeSlash />
+        <GameShieldBash />
       </div>
 
       <GameMenu @mouseenter="onMenuEnter" @mouseleave="onMenuLeave" />
@@ -138,6 +139,7 @@
   import GameAbilityProjectile from '../components/GameAbilityProjectile.vue'
   import GameAbilityImpact from '../components/GameAbilityImpact.vue'
   import GameMeleeSlash from '../components/GameMeleeSlash.vue'
+  import GameShieldBash from '../components/GameShieldBash.vue'
   import GameTokens from '../components/GameTokens.vue'
   import GameGroundLoot from '../components/GameGroundLoot.vue'
   import GameMenu from '../components/GameMenu.vue'

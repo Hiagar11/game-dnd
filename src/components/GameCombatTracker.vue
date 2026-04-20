@@ -38,6 +38,15 @@
           </div>
         </TransitionGroup>
       </div>
+
+      <!-- Подсказка: оглушённый пропускает ход -->
+      <Transition name="stun-hint">
+        <div v-if="store.stunSkipInfo" class="combat-tracker__stun-hint">
+          <span class="combat-tracker__stun-name">{{ store.stunSkipInfo.name }}</span>
+          <span class="combat-tracker__stun-reason">{{ store.stunSkipInfo.reason }}</span>
+          <span class="combat-tracker__stun-skip">Ход пропущен</span>
+        </div>
+      </Transition>
     </div>
   </Transition>
 </template>
@@ -247,5 +256,66 @@
   .entry-leave-to {
     opacity: 0;
     transform: scale(0.8) translateX(-10px);
+  }
+
+  /* ── Подсказка оглушения ─────────────────────────────────────── */
+  .combat-tracker__stun-hint {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, rgb(120 50 10 / 95%), rgb(80 30 5 / 95%));
+    border: 1px solid rgb(245 158 11 / 50%);
+    box-shadow:
+      0 0 12px rgb(245 158 11 / 30%),
+      0 4px 20px rgb(0 0 0 / 60%);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  .combat-tracker__stun-name {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    font-weight: 700;
+    color: rgb(255 230 160);
+  }
+
+  .combat-tracker__stun-reason {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 800;
+    color: rgb(245 158 11);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .combat-tracker__stun-skip {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    color: rgb(255 255 255 / 50%);
+  }
+
+  .stun-hint-enter-active {
+    transition:
+      opacity 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .stun-hint-leave-active {
+    transition:
+      opacity 0.15s ease,
+      transform 0.15s ease;
+  }
+
+  .stun-hint-enter-from,
+  .stun-hint-leave-to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(6px);
   }
 </style>

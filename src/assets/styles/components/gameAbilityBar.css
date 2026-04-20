@@ -89,6 +89,38 @@
   filter: drop-shadow(0 0 3px rgb(250 204 21 / 50%));
 }
 
+/* ── Оффхенд (щит) через слэш ────────────────────────────────── */
+.ability-bar__weapon-slash {
+  color: rgb(255 255 255 / 20%);
+  font-size: 16px;
+  font-weight: 300;
+  line-height: 1;
+  flex-shrink: 0;
+  margin: 0 2px;
+  user-select: none;
+}
+
+.ability-bar__offhand-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  opacity: 0.7;
+}
+
+.ability-bar__offhand-name {
+  font-size: 9px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: rgb(255 255 255 / 50%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50px;
+}
+
 /* ── Сетка ячеек (6 в ряд) ────────────────────────────────────── */
 .ability-bar__slots {
   display: grid;

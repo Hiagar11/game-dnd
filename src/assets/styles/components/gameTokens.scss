@@ -745,6 +745,45 @@
   }
 }
 
+/* Удар щитом — желтоватая вспышка + тряска (оглушение) */
+.game-tokens__token--flash-bash .game-tokens__img {
+  animation: token-flash-bash 0.7s ease;
+}
+
+@keyframes token-flash-bash {
+  0% {
+    filter: brightness(1);
+    transform: translateX(0) rotate(0) scale(1);
+  }
+
+  12% {
+    filter: brightness(3) sepia(1) saturate(6) hue-rotate(15deg);
+    transform: translateX(-8px) rotate(-5deg) scale(1.06);
+    box-shadow: 0 0 28px 10px rgb(245 158 11 / 85%);
+  }
+
+  28% {
+    filter: brightness(2.5) sepia(1) saturate(5) hue-rotate(10deg);
+    transform: translateX(8px) rotate(5deg) scale(0.96);
+    box-shadow: 0 0 18px 6px rgb(234 179 8 / 65%);
+  }
+
+  44% {
+    filter: brightness(2) sepia(0.8) saturate(4) hue-rotate(15deg);
+    transform: translateX(-5px) rotate(-3deg) scale(1.02);
+  }
+
+  60% {
+    filter: brightness(1.5) sepia(0.5) saturate(3);
+    transform: translateX(4px) rotate(2deg);
+  }
+
+  100% {
+    filter: brightness(1);
+    transform: translateX(0) rotate(0) scale(1);
+  }
+}
+
 .game-tokens__combat-icon {
   position: absolute;
   z-index: calc(var(--z-tokens) + 1);

@@ -158,6 +158,16 @@ export function getOffhandWeapon(token) {
 }
 
 /**
+ * Проверяет, есть ли щит в оффхенде.
+ * Щит — предмет в offhand, который НЕ является оружием (нет baseDamage, слот не в WEAPON_SLOTS).
+ */
+export function hasShield(token) {
+  const offhand = token?.inventory?.equipped?.offhand ?? null
+  if (!offhand) return false
+  return !WEAPON_SLOTS.has(offhand.slot)
+}
+
+/**
  * Проверяет, держит ли токен оружие в обеих руках (dual wield).
  */
 export function isDualWielding(token) {

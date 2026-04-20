@@ -25,6 +25,13 @@
           weight="fill"
           class="ability-bar__armed-badge"
         />
+
+        <!-- Оффхенд (щит) через слэш-разделитель -->
+        <template v-if="slotKey === activeWeaponSlot && offhand">
+          <span class="ability-bar__weapon-slash">/</span>
+          <div class="ability-bar__offhand-icon" :style="weaponIconStyle(offhand)" />
+          <span class="ability-bar__offhand-name">{{ offhand.name }}</span>
+        </template>
       </div>
     </div>
 
@@ -65,7 +72,8 @@
   import { useGameStore } from '../stores/game'
   import { useAbilityExecution } from '../composables/useAbilityExecution'
   import { getSelectedNonSystemToken } from '../utils/tokenFilters'
-  import { getActiveWeapon } from '../utils/combatFormulas'
+  import { getActiveWeapon, hasShield } from '../utils/combatFormulas'
+  import { getAbilityTreeById } from '../constants/abilityTree'
 
   // Слоты оружия ближнего боя
   const MELEE_SLOTS = new Set(['weapon', 'two_handed'])
@@ -85,6 +93,8 @@
     weapon: placed.value?.inventory?.equipped?.weapon ?? null,
     weapon2: placed.value?.inventory?.equipped?.weapon2 ?? null,
   }))
+
+  const offhand = computed(() => placed.value?.inventory?.equipped?.offhand ?? null)
 
   const activeWeaponSlot = computed(() => placed.value?.activeWeaponSlot ?? 'weapon')
 
@@ -115,7 +125,9 @@
     const raw = placed.value?.abilities ?? []
     const result = []
     for (let i = 0; i < SLOT_COUNT; i++) {
-      result.push(raw[i] ?? null)
+      const slot = raw[i] ?? null
+      // Подтягиваем актуальные поля из abilityTree (requiresShield, areaType и др.)
+      result.push(slot?.id ? (getAbilityTreeById(slot.id) ?? slot) : slot)
     }
     return result
   })
@@ -136,12 +148,16 @@
   })
 
   function canUse(ability) {
-    if (!placed.value || !store.combatMode) return true
+    if (!placed.value) return true
+    // Проверки снаряжения работают всегда (не только в бою)
     // Способности с requiresMelee требуют оружие ближнего боя
     if (ability.requiresMelee) {
       const weapon = getActiveWeapon(placed.value)
       if (!weapon || !MELEE_SLOTS.has(weapon.slot)) return false
     }
+    // Удар щитом требует щит в оффхенде
+    if (ability.requiresShield && !hasShield(placed.value)) return false
+    if (!store.combatMode) return true
     return (placed.value.actionPoints ?? 0) >= (ability.apCost ?? 1)
   }
 

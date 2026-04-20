@@ -115,8 +115,8 @@ export const useGameStore = defineStore('game', () => {
   // Активный летящий снаряд — { fromX, fromY, toX, toY, color, icon } | null
   const abilityProjectile = ref(null)
 
-  // SVG-дуга удара мечом — { col, row, color } | null
-  const meleeSlash = ref(null)
+  // Визуальный эффект способности — { type: 'slash'|'bash'|..., col, row, color } | null
+  const abilityVfx = ref(null)
 
   // ─── Сессия ───────────────────────────────────────────────────────────────────
   const currentScenario = ref(null)
@@ -331,7 +331,7 @@ export const useGameStore = defineStore('game', () => {
     abilityPreviewCells,
     abilityImpact,
     abilityProjectile,
-    meleeSlash,
+    abilityVfx,
     // Сессия
     currentScenario,
     activeCampaign,

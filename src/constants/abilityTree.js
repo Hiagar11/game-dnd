@@ -26,12 +26,15 @@ export const POWER_STRIKE = {
 export const SHIELD_BASH = {
   id: 'shield_bash',
   name: 'Удар щитом',
-  description: 'Оглушение цели на 1 ход.',
+  description: 'Оглушение цели на 1 ход. Требует щит в оффхенде.',
   icon: 'shield-bash',
-  color: '#ef4444',
-  apCost: 2,
+  color: '#f59e0b',
+  apCost: 1,
   type: 'active',
   tier: 1,
+  areaType: 'single',
+  requiresMelee: true,
+  requiresShield: true,
   requirements: { strength: 3, agility: 0, intellect: 0, charisma: 0 },
   requiredAbilities: [],
 }
