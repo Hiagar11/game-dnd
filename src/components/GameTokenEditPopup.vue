@@ -8,29 +8,92 @@
         v-for="tab in TABS"
         :key="tab.id"
         class="token-edit-popup__tab"
-        :class="{ 'token-edit-popup__tab--active': activeTab === tab.id }"
+        :class="{
+          'token-edit-popup__tab--active': activeTab === tab.id,
+          'token-edit-popup__tab--highlight': tab.id === 'tree' && hasNewAbilities,
+        }"
         @click="activeTab = tab.id"
       >
         <component :is="tab.icon" :size="13" weight="fill" />
         {{ tab.label }}
+        <span v-if="tab.id === 'tree' && hasNewAbilities" class="token-edit-popup__tab-dot" />
       </button>
     </div>
 
     <div v-show="activeTab === 'stats'" class="token-edit-popup__body">
-      <TokenPreviewPicker :src="previewSrc" :readonly="isEditMode" @file="onFile" />
+      <!-- Левая колонка: Карточка героя (1/4 ширины) -->
+      <aside class="token-edit-popup__hero-card">
+        <TokenPreviewPicker :src="previewSrc" :readonly="isEditMode" @file="onFile" />
 
+        <div class="token-edit-popup__hero-hp">
+          <div class="token-edit-popup__hero-hp-numbers">
+            <PhHeart :size="18" weight="fill" class="token-edit-popup__hero-hp-icon" />
+            <template v-if="isPlacedMode">
+              <span class="token-edit-popup__hero-hp-current">{{ placedHp }}</span>
+              <span class="token-edit-popup__hero-hp-sep">/</span>
+              <span class="token-edit-popup__hero-hp-max">{{ placedMaxHp }}</span>
+            </template>
+            <template v-else>
+              <span class="token-edit-popup__hero-hp-current">{{ formulaMaxHp }}</span>
+            </template>
+          </div>
+          <div class="token-edit-popup__hero-hp-bar">
+            <div
+              class="token-edit-popup__hero-hp-fill"
+              :style="{ width: isPlacedMode ? `${placedHpPercent}%` : '100%' }"
+            />
+          </div>
+        </div>
+
+        <div class="token-edit-popup__hero-level">
+          <span class="token-edit-popup__hero-level-badge">Ур. {{ form.level ?? 1 }}</span>
+          <span class="token-edit-popup__hero-xp">XP: {{ form.xp ?? 0 }}</span>
+          <span v-if="(form.statPoints ?? 0) > 0" class="token-edit-popup__hero-stat-points">
+            {{ form.statPoints }} очк.
+          </span>
+          <button
+            type="button"
+            class="token-edit-popup__level-up-btn"
+            title="Поднять уровень (+1)"
+            @click="onLevelUp"
+          >
+            ↑ Ур.
+          </button>
+        </div>
+
+        <div
+          class="token-edit-popup__hero-class"
+          :class="{ 'token-edit-popup__hero-class--synergy': heroClassInfo.synergy }"
+          :style="{ color: heroClassInfo.color }"
+        >
+          {{ heroClassInfo.name }}
+        </div>
+      </aside>
+
+      <!-- Правая колонка: Все поля (3/4 ширины) -->
       <div class="token-edit-popup__fields">
-        <label class="token-edit-popup__label">
-          Класс / Тип
-          <input
-            v-model.trim="form.name"
-            type="text"
-            class="token-edit-popup__input"
-            placeholder="Например: Goblin"
-            maxlength="40"
-            @keydown.esc="onCancel"
-          />
-        </label>
+        <!-- Имя + Раса — две колонки -->
+        <div class="token-edit-popup__name-row">
+          <label class="token-edit-popup__label">
+            Имя
+            <input
+              v-model.trim="form.npcName"
+              type="text"
+              class="token-edit-popup__input"
+              placeholder="Личное имя..."
+              maxlength="40"
+              @keydown.esc="onCancel"
+            />
+          </label>
+          <label class="token-edit-popup__label">
+            Раса
+            <select v-model="form.race" class="token-edit-popup__input">
+              <option value="">— нет —</option>
+              <option v-for="r in RACES" :key="r.id" :value="r.id">{{ r.label }}</option>
+            </select>
+            <span v-if="raceHint" class="token-edit-popup__rc-hint">{{ raceHint }}</span>
+          </label>
+        </div>
 
         <!-- Отношение — видно только для шаблонов НПС (не для placed-редактирования) -->
         <label v-if="showAttitude" class="token-edit-popup__label">
@@ -53,27 +116,37 @@
           </div>
         </label>
 
-        <TokenStatsGrid v-model="form" :inventory="inventoryModel" />
+        <!-- Авто-левелинг — только для NPC -->
+        <label v-if="isNpcType && isPlacedMode" class="token-edit-popup__checkbox-row">
+          <input v-model="form.autoLevel" type="checkbox" />
+          Авто-левелинг (NPC подстраивается под уровень группы)
+        </label>
 
-        <!-- Шкала здоровья -->
-        <div class="token-edit-popup__hp">
-          <div class="token-edit-popup__hp-header">
-            <PhHeart :size="14" weight="fill" class="token-edit-popup__hp-icon" />
-            <span class="token-edit-popup__hp-label">Здоровье</span>
-            <span class="token-edit-popup__hp-value">
-              <template v-if="isPlacedMode">
-                <b>{{ placedHp }}</b> / {{ placedMaxHp }}
-              </template>
-              <template v-else> {{ formulaMaxHp }} (макс.) </template>
-            </span>
+        <TokenStatsGrid
+          v-model="form"
+          :inventory="inventoryModel"
+          :stat-points="form.statPoints ?? 0"
+          @spend-point="onSpendPoint"
+        />
+
+        <!-- AI-подсказка после прокачки (одна загадка) -->
+        <Transition name="hints-fade">
+          <div
+            v-if="abilityHints.hints.value.length || abilityHints.loading.value"
+            class="token-edit-popup__hints"
+          >
+            <p v-if="abilityHints.loading.value" class="token-edit-popup__hints-loading">
+              Оракул шепчет…
+            </p>
+            <p
+              v-else-if="abilityHints.hints.value[0]"
+              class="token-edit-popup__hint"
+              @click="abilityHints.dismissHints()"
+            >
+              « {{ abilityHints.hints.value[0] }} »
+            </p>
           </div>
-          <div class="token-edit-popup__hp-bar">
-            <div
-              class="token-edit-popup__hp-fill"
-              :style="{ width: isPlacedMode ? `${placedHpPercent}%` : '100%' }"
-            />
-          </div>
-        </div>
+        </Transition>
       </div>
     </div>
 
@@ -92,12 +165,25 @@
       />
     </div>
 
+    <!-- Панель: Развитие (дерево способностей) -->
+    <GameAbilityTreePanel
+      v-if="activeTab === 'tree'"
+      :stats="treeStats"
+      :activated-ability-ids="treeActivatedIds"
+      :activation-points="treeActivationPoints"
+      @activate="onTreeActivate"
+      @deactivate="onTreeDeactivate"
+    />
+
     <!-- Панель: Способности -->
-    <div v-if="activeTab === 'abilities'" class="token-edit-popup__panel-empty">
-      <PhMagicWand :size="40" weight="duotone" class="token-edit-popup__panel-empty-icon" />
-      <p class="token-edit-popup__panel-empty-text">Способности пока не реализованы</p>
-      <p class="token-edit-popup__panel-empty-hint">Здесь будут активные и пассивные умения</p>
-    </div>
+    <GameAbilitiesPanel
+      v-if="activeTab === 'abilities'"
+      :abilities="placedAbilities"
+      :passives="placedPassives"
+      :unlocked-abilities="placedUnlocked"
+      @update:abilities="onAbilitiesUpdate"
+      @update:passives="onPassivesUpdate"
+    />
 
     <!-- Панель: Личность ИИ — только для НПС -->
     <div
@@ -107,36 +193,6 @@
       <div class="token-edit-popup__personality-header">
         <PhRobot :size="18" weight="duotone" class="token-edit-popup__personality-icon" />
         <span class="token-edit-popup__personality-title">Личность для ИИ-диалога</span>
-        <div class="token-edit-popup__personality-name">
-          <input
-            v-model.trim="form.npcName"
-            type="text"
-            class="token-edit-popup__input token-edit-popup__input--name"
-            placeholder="Личное имя НПС..."
-            maxlength="40"
-          />
-          <button
-            type="button"
-            class="token-edit-popup__random-btn"
-            title="Случайное имя"
-            @click="randomizeName"
-          >
-            <PhArrowsClockwise :size="14" weight="bold" />
-          </button>
-        </div>
-      </div>
-
-      <!-- Нрав: определяет пороги союзника/врага и скорость сближения -->
-      <div class="token-edit-popup__disposition-row">
-        <span class="token-edit-popup__disposition-label">Нрав</span>
-        <div class="token-edit-popup__disposition-select-wrap">
-          <select v-model="form.dispositionType" class="token-edit-popup__disposition-select">
-            <option v-for="opt in DISPOSITION_OPTIONS" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
-          <span class="token-edit-popup__disposition-hint">{{ dispositionHint }}</span>
-        </div>
       </div>
 
       <div class="token-edit-popup__personality-body">
@@ -237,7 +293,7 @@
         Отмена
       </button>
       <button
-        v-if="activeTab === 'stats' || activeTab === 'personality'"
+        v-if="activeTab === 'stats' || activeTab === 'personality' || isEditMode || !isPlacedMode"
         class="token-edit-popup__btn token-edit-popup__btn--save"
         :disabled="!canSave"
         @mouseenter="playHover"
@@ -255,19 +311,19 @@
 </template>
 
 <script setup>
-  import { ref, inject } from 'vue'
+  import { ref, inject, computed, watch } from 'vue'
   import PopupShell from './PopupShell.vue'
   import TokenPreviewPicker from './TokenPreviewPicker.vue'
   import TokenStatsGrid from './TokenStatsGrid.vue'
   import GameInventoryPanel from './GameInventoryPanel.vue'
+  import GameAbilitiesPanel from './GameAbilitiesPanel.vue'
+  import GameAbilityTreePanel from './GameAbilityTreePanel.vue'
   import {
     PhTrash,
     PhX,
     PhFloppyDisk,
     PhHeart,
-    PhMagicWand,
     PhRobot,
-    PhArrowsClockwise,
     PhNotebook,
     PhLockKey,
   } from '@phosphor-icons/vue'
@@ -282,11 +338,18 @@
   import { usePopupCursorBlock } from '../composables/usePopupCursorBlock'
   import { useTokenInventoryMeta } from '../composables/useTokenInventoryMeta'
   import { useTokenEditPreview } from '../composables/useTokenEditPreview'
-  import { useDispositionHint } from '../composables/useDispositionHint'
-  import { findDropCell } from '../utils/findDropCell'
-  import { DISPOSITION_OPTIONS } from '../constants/dispositionConfig'
+  import { useAbilityHints } from '../composables/useAbilityHints'
+  import { useAbilityTree } from '../composables/useAbilityTree'
   import { ATTITUDE_OPTIONS } from '../constants/attitudeOptions'
   import { PERSONALITY_TAGS } from '../constants/personalityTags'
+  import { RACES } from '../constants/races'
+  import { getRaceById } from '../constants/races'
+  import { getAbilityTreeById, ABILITY_TREE } from '../constants/abilityTree'
+  import { getHeroClass } from '../constants/heroClass'
+
+  // ── Дебаг-флаг: true = все способности открыты в каталоге ─────
+  const DEBUG_ALL_ABILITIES = true
+  import { xpForLevel } from '../utils/xpFormula'
 
   const props = defineProps({
     visible: { type: Boolean, required: true },
@@ -327,8 +390,7 @@
   })
   const { ownerStatsForInventory, itemGenerationLevel } = useTokenInventoryMeta(form)
 
-  const { personalityTextarea, randomizeName, isTagActive, toggleTag } =
-    useTokenPersonalityEditorUi(form)
+  const { personalityTextarea, isTagActive, toggleTag } = useTokenPersonalityEditorUi(form)
 
   const {
     isNpcType,
@@ -344,14 +406,12 @@
     form,
     previewSrc,
   })
-  const { dispositionHint } = useDispositionHint({ form, options: DISPOSITION_OPTIONS })
 
   usePlacedInventorySync({
     inventoryModel,
     props,
     isPlacedMode,
     store,
-    getSocket,
   })
 
   const { formulaMaxHp, placedHp, placedMaxHp, placedHpPercent } = useTokenHpPreview({
@@ -368,6 +428,11 @@
     emit,
   })
 
+  // Локальные копии ability-данных — объявляем до useTokenEditActions
+  const localTreeIds = ref([])
+  const localAbilities = ref([])
+  const localPassives = ref([])
+
   const { onSave, onDelete } = useTokenEditActions({
     canSave,
     playClick,
@@ -383,14 +448,149 @@
     tokensStore,
     fileRef,
     emit,
+    localTreeIds,
+    localAbilities,
+    localPassives,
   })
 
   function onDropItemToGround(item) {
     const token = store.placedTokens.find((t) => t.uid === props.placedUid)
     if (!token) return
-    const existing = store.groundItems.map((g) => ({ col: g.col, row: g.row }))
-    const cell = findDropCell(token.col, token.row, existing)
-    store.addGroundLoot(cell.col, cell.row, item)
+    store.addGroundBag(token.col, token.row, item)
+  }
+
+  function onSpendPoint(statKey) {
+    if ((form.value.statPoints ?? 0) <= 0) return
+    form.value = {
+      ...form.value,
+      [statKey]: (form.value[statKey] ?? 0) + 1,
+      statPoints: form.value.statPoints - 1,
+    }
+    // После распределения очка проверяем AI-подсказки
+    abilityHints.checkAndFetchHints()
+  }
+
+  function onLevelUp() {
+    const currentLevel = form.value.level ?? 1
+    const nextLevel = currentLevel + 1
+    form.value = {
+      ...form.value,
+      xp: xpForLevel(nextLevel),
+      level: nextLevel,
+      statPoints: (form.value.statPoints ?? 0) + 1,
+    }
+  }
+
+  const raceHint = computed(() => getRaceById(form.value.race)?.hint ?? '')
+
+  // Динамический класс персонажа на основе распределения характеристик
+  const heroClassInfo = computed(() => getHeroClass(form.value, localTreeIds.value))
+
+  // ── Ability tree tab data ────────────────────────────────────
+  const currentPlaced = computed(() =>
+    isPlacedMode.value ? store.placedTokens.find((t) => t.uid === props.placedUid) : null
+  )
+
+  // Инициализация локальных копий при открытии попапа
+  watch(
+    () => props.visible,
+    (vis) => {
+      if (!vis) return
+      const token = currentPlaced.value
+      localTreeIds.value = token?.treeActivatedIds ? [...token.treeActivatedIds] : []
+      localAbilities.value = token?.abilities ? [...token.abilities] : []
+      localPassives.value = token?.passiveAbilities ? [...token.passiveAbilities] : []
+    },
+    { immediate: true }
+  )
+
+  const treeStats = computed(() => ({
+    strength: form.value.strength ?? 1,
+    agility: form.value.agility ?? 1,
+    intellect: form.value.intellect ?? 1,
+    charisma: form.value.charisma ?? 1,
+  }))
+
+  const treeActivatedIds = computed(() => localTreeIds.value)
+
+  // AI-подсказки о почти открытых способностях
+  const abilityHints = useAbilityHints(treeStats, treeActivatedIds)
+
+  // Подсветка таба «Развитие», когда есть доступные способности
+  const { availableAbilities } = useAbilityTree(treeStats, treeActivatedIds)
+  // Зелёная подсветка гаснет при переходе на вкладку и появляется только при новых изменениях
+  const treeSeenIds = ref(null)
+  const hasNewAbilities = computed(() => {
+    const ids = availableAbilities.value.map((a) => a.id).sort()
+    if (treeSeenIds.value === null) return ids.length > 0
+    if (ids.length === 0) return false
+    return ids.join(',') !== treeSeenIds.value
+  })
+
+  watch(activeTab, (tab) => {
+    if (tab === 'tree') {
+      treeSeenIds.value = availableAbilities.value
+        .map((a) => a.id)
+        .sort()
+        .join(',')
+    }
+  })
+
+  // Очки активации = каждый нечётный уровень начиная с 3-го
+  const treeActivationPoints = computed(() => {
+    const lvl = form.value.level ?? 1
+    if (lvl < 3) return 0
+    return Math.floor((lvl - 1) / 2)
+  })
+
+  function onTreeActivate(abilityId) {
+    if (!localTreeIds.value.includes(abilityId)) {
+      localTreeIds.value = [...localTreeIds.value, abilityId]
+    }
+
+    // Автопереход на вкладку «Способности» после анимации покупки
+    setTimeout(() => {
+      activeTab.value = 'abilities'
+    }, 750)
+  }
+
+  function onTreeDeactivate(abilityId) {
+    // Каскадное снятие: удаляем способность и все синергии, которые от неё зависят
+    const toRemove = new Set([abilityId])
+    let changed = true
+    while (changed) {
+      changed = false
+      for (const id of localTreeIds.value) {
+        if (toRemove.has(id)) continue
+        const ability = getAbilityTreeById(id)
+        if (ability?.requiredAbilities.some((req) => toRemove.has(req))) {
+          toRemove.add(id)
+          changed = true
+        }
+      }
+    }
+    localTreeIds.value = localTreeIds.value.filter((id) => !toRemove.has(id))
+    // Убираем из слотов способности, которые были деактивированы
+    localAbilities.value = localAbilities.value.filter((a) => a && !toRemove.has(a.id))
+    localPassives.value = localPassives.value.filter((a) => a && !toRemove.has(a.id))
+  }
+
+  // ── Abilities tab data ───────────────────────────────────────
+  const placedAbilities = computed(() => localAbilities.value)
+  const placedPassives = computed(() => localPassives.value)
+  // Каталог способностей = все (дебаг) или только активированные в дереве
+  const placedUnlocked = computed(() =>
+    DEBUG_ALL_ABILITIES
+      ? ABILITY_TREE
+      : treeActivatedIds.value.map((id) => getAbilityTreeById(id)).filter(Boolean)
+  )
+
+  function onAbilitiesUpdate(next) {
+    localAbilities.value = next.filter(Boolean)
+  }
+
+  function onPassivesUpdate(next) {
+    localPassives.value = next.filter(Boolean)
   }
 </script>
 

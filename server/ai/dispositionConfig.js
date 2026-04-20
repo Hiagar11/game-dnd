@@ -1,29 +1,61 @@
-// Конфигурация типов нрава НПС.
+// Конфигурация порогов отношений NPC.
 //
-// Нрав определяет:
-//   ally             — минимальный счёт для перехода в 'friendly' (союзник)
-//   enemy            — максимальный счёт для перехода в 'hostile' (враг)
-//   positiveMultiplier — множитель для ПОЛОЖИТЕЛЬНЫХ дельт (насколько легко завоевать расположение)
+// Пороги определяются полем dispositionType токена — натурой НПС.
+// Пять типов натуры: от дружелюбного (легко стать другом) до враждебного (почти невозможно).
+// Множитель влияния рассчитывается динамически из heroPersuasion.
 //
-// Отрицательные дельты (гнев, обиды) всегда ×1 — нрав влияет только на скорость сближения.
-// Пороги врага компенсируют это: дружелюбный НПС труднее разозлить насовсем (threshold -80),
-// враждебный — легко (threshold -30).
-//
-// Диапазон очков: -100..+100.
+// Диапазон очков: -30..+60.
 
-export const DISPOSITION_CONFIG = {
-  friendly: { ally: 20, enemy: -80, positiveMultiplier: 2.0 },
-  sociable: { ally: 35, enemy: -65, positiveMultiplier: 1.5 },
-  neutral: { ally: 50, enemy: -50, positiveMultiplier: 1.0 },
-  guarded: { ally: 60, enemy: -40, positiveMultiplier: 0.75 },
-  hostile: { ally: 70, enemy: -30, positiveMultiplier: 0.5 },
+const ATTITUDE_THRESHOLDS = {
+  friendly: { ally: 15, enemy: -23 },
+  sociable: { ally: 21, enemy: -18 },
+  neutral: { ally: 30, enemy: -15 },
+  guarded: { ally: 39, enemy: -10 },
+  hostile: { ally: 45, enemy: -8 },
 }
 
 /**
- * Возвращает конфиг нрава. Если тип неизвестен — возвращает нейтральный.
- * @param {string} type
- * @returns {{ ally: number, enemy: number, positiveMultiplier: number }}
+ * Возвращает пороги по натуре НПС (dispositionType).
+ * @param {string} dispositionType — 'friendly' | 'sociable' | 'neutral' | 'guarded' | 'hostile'
+ * @returns {{ ally: number, enemy: number }}
  */
-export function getDispositionConfig(type) {
-  return DISPOSITION_CONFIG[type] ?? DISPOSITION_CONFIG.neutral
+export function getAttitudeThresholds(dispositionType) {
+  return ATTITUDE_THRESHOLDS[dispositionType] ?? ATTITUDE_THRESHOLDS.neutral
+}
+
+/**
+ * Речевой регистр — влияет на то КАК NPC говорит, независимо от текущего отношения.
+ * Это «натура» персонажа: осторожный NPC будет настороженным даже к другу.
+ */
+export const SPEECH_REGISTER = {
+  friendly:
+    'По натуре ты дружелюбен — открыт, доброжелателен, первым идёшь на контакт. Даже с незнакомцами стараешься найти общий язык.',
+  sociable:
+    'Ты общительный — любишь поболтать, легко находишь общий язык. Можешь заговорить первым, активно жестикулируешь.',
+  neutral: '',
+  guarded:
+    'Ты осторожен от природы — взвешиваешь слова, не торопишься доверять. Говоришь мало, наблюдаешь много.',
+  hostile:
+    'Ты от природы агрессивен и недоверчив — ищешь подвох в каждом слове. Провоцируешь, давишь, запугиваешь.',
+}
+
+/**
+ * Рассчитывает множитель положительного влияния из persuasion героя.
+ * persuasion 0 → ×0.8, persuasion 10 → ×1.4, persuasion 20 → ×2.0 (cap).
+ * @param {number} heroPersuasion
+ * @returns {number}
+ */
+export function getPersuasionMultiplier(heroPersuasion) {
+  const p = Number.isFinite(heroPersuasion) ? Math.max(0, heroPersuasion) : 0
+  return Math.min(2.0, 0.8 + p * 0.06)
+}
+
+/**
+ * Асимметричные весовые коэффициенты для дельты отношений.
+ * Негатив (угрозы, оскорбления) бьёт сильнее — стать врагом легко.
+ * Позитив (дружелюбие, помощь) даётся с трудом — заслужить доверие сложно.
+ */
+export const ATTITUDE_WEIGHTS = {
+  negative: 1.0, // AI даёт финальные очки напрямую (-15..-1)
+  positive: 0.6, // +5 от AI → итого +3 (до persuasionMult)
 }

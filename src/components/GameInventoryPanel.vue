@@ -44,6 +44,100 @@
         <ellipse cx="152" cy="350" rx="20" ry="8" />
       </svg>
 
+      <!-- ── Кошелёк (слева от шлема) ──────────────────────────────── -->
+      <div class="inv-panel__wallet">
+        <svg
+          class="inv-panel__wallet-icon"
+          viewBox="0 0 40 40"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <!-- Монетки, падающие сверху -->
+          <circle
+            cx="14"
+            cy="6"
+            r="3.5"
+            fill="#ffd700"
+            stroke="#b8960a"
+            stroke-width="0.6"
+            opacity="0.85"
+          >
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="0,0;0,2;0,0"
+              dur="2.5s"
+              repeatCount="indefinite"
+            />
+          </circle>
+          <circle
+            cx="24"
+            cy="4"
+            r="3"
+            fill="#c0c0c0"
+            stroke="#8a8a8a"
+            stroke-width="0.6"
+            opacity="0.7"
+          >
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="0,0;0,3;0,0"
+              dur="3s"
+              repeatCount="indefinite"
+            />
+          </circle>
+          <circle
+            cx="19"
+            cy="8"
+            r="2.5"
+            fill="#cd7f32"
+            stroke="#8b5a1e"
+            stroke-width="0.5"
+            opacity="0.65"
+          >
+            <animateTransform
+              attributeName="transform"
+              type="translate"
+              values="0,0;0,1.5;0,0"
+              dur="2s"
+              repeatCount="indefinite"
+            />
+          </circle>
+          <!-- Открытый кошелёк -->
+          <path
+            d="M8 18 Q6 16 10 14 L30 14 Q34 16 32 18"
+            fill="#6b4c2a"
+            stroke="#8b6a3e"
+            stroke-width="0.8"
+          />
+          <path
+            d="M8 18 Q6 22 8 30 Q10 36 20 36 Q30 36 32 30 Q34 22 32 18 Z"
+            fill="#5a3d1e"
+            stroke="#8b6a3e"
+            stroke-width="1"
+          />
+          <!-- Ремешок -->
+          <path d="M10 24 Q20 22 30 24" fill="none" stroke="#8b6a3e" stroke-width="0.8" />
+          <!-- Застёжка -->
+          <circle cx="20" cy="23" r="1.8" fill="#c8983c" stroke="#a07830" stroke-width="0.6" />
+        </svg>
+        <div class="inv-panel__wallet-row">
+          <span v-if="coinDisplay.gold" class="inv-panel__wallet-val inv-panel__wallet-val--gold">
+            {{ coinDisplay.gold }}
+          </span>
+          <span
+            v-if="coinDisplay.silver"
+            class="inv-panel__wallet-val inv-panel__wallet-val--silver"
+          >
+            {{ coinDisplay.silver }}
+          </span>
+          <span class="inv-panel__wallet-val inv-panel__wallet-val--copper">
+            {{ coinDisplay.copper || 0 }}
+          </span>
+        </div>
+      </div>
+
       <!-- ── Ячейки экипировки ──────────────────────────────────────── -->
       <div
         v-for="slot in EQUIP_SLOTS"
@@ -85,15 +179,83 @@
     <div class="inv-panel__bag">
       <div class="inv-panel__bag-header">
         <p class="inv-panel__bag-title">Сумка</p>
-        <button
-          v-if="isDev"
-          class="inv-panel__clear-btn"
-          title="Очистить весь инвентарь (DEV)"
-          @click="clearAll()"
-        >
-          ✕ Очистить
+        <button class="inv-panel__add-btn" title="Добавить предмет" @click="toggleItemPicker">
+          ＋
         </button>
+        <div v-if="isDev" class="inv-panel__dev-btns">
+          <button
+            class="inv-panel__dev-btn inv-panel__dev-btn--coin"
+            title="Добавить 100 медяков (DEV)"
+            @click="addCopper(100)"
+          >
+            +100 🪙
+          </button>
+          <button
+            class="inv-panel__clear-btn"
+            title="Очистить весь инвентарь (DEV)"
+            @click="clearAll()"
+          >
+            ✕ Очистить
+          </button>
+        </div>
       </div>
+
+      <!-- ── Встроенный пикер предметов ──────────────────────────── -->
+      <Transition name="inv-picker">
+        <div v-if="pickerOpen" class="inv-panel__picker">
+          <template v-if="pickerStage === 'slot'">
+            <div class="inv-panel__picker-tabs">
+              <button
+                class="inv-panel__picker-tab"
+                :class="{ 'inv-panel__picker-tab--active': pickerTab === 'slots' }"
+                @click="pickerTab = 'slots'"
+              >
+                Слоты
+              </button>
+              <button
+                class="inv-panel__picker-tab"
+                :class="{ 'inv-panel__picker-tab--active': pickerTab === 'system' }"
+                @click="pickerTab = 'system'"
+              >
+                Системные
+              </button>
+            </div>
+            <div class="inv-panel__picker-list">
+              <template v-if="pickerTab === 'slots'">
+                <button
+                  v-for="slot in ITEM_SLOTS"
+                  :key="slot"
+                  class="inv-panel__picker-row"
+                  @click="onPickSlot(slot)"
+                >
+                  {{ ITEM_SLOT_LABELS[slot] }}
+                </button>
+              </template>
+              <template v-else>
+                <button class="inv-panel__picker-row" @click="onPickSlot('random')">
+                  🎲 Случайный
+                </button>
+                <button class="inv-panel__picker-row" @click="onPickSystemKey">🔑 Ключ</button>
+              </template>
+            </div>
+          </template>
+          <template v-else>
+            <button class="inv-panel__picker-back" @click="pickerStage = 'slot'">← Назад</button>
+            <div class="inv-panel__picker-list">
+              <button
+                v-for="r in RARITIES"
+                :key="r"
+                class="inv-panel__picker-row"
+                @click="onPickRarity(r)"
+              >
+                <span class="inv-panel__picker-dot" :style="{ background: RARITY_COLORS[r] }" />
+                {{ RARITY_LABELS[r] }}
+              </button>
+            </div>
+          </template>
+        </div>
+      </Transition>
+
       <div class="inv-panel__grid">
         <div
           v-for="(cell, i) in cells"
@@ -128,23 +290,57 @@
     <!-- Тултип предмета при наведении -->
     <Teleport to="body">
       <Transition name="inv-tt">
-        <div v-show="tooltip.visible && tooltip.item" class="inv-tooltip" :style="tooltipStyle">
-          <template v-if="tooltip.item">
-            <div class="inv-tooltip__bar" :style="{ background: tooltip.item.rarityColor }" />
-            <p class="inv-tooltip__name" :style="{ color: tooltip.item.rarityColor }">
-              {{ tooltip.item.name }}
+        <div
+          v-show="tooltip.visible && tooltip.item"
+          class="inv-tooltip-wrap"
+          :style="tooltipStyle"
+        >
+          <div class="inv-tooltip">
+            <template v-if="tooltip.item">
+              <div class="inv-tooltip__bar" :style="{ background: tooltip.item.rarityColor }" />
+              <p class="inv-tooltip__name" :style="{ color: tooltip.item.rarityColor }">
+                {{ tooltip.item.name }}
+              </p>
+              <p class="inv-tooltip__slot">{{ translateSlot(tooltip.item.slot) }}</p>
+              <ul v-if="tooltipRows(tooltip.item).length" class="inv-tooltip__list">
+                <li
+                  v-for="(row, rowIndex) in tooltipRows(tooltip.item)"
+                  :key="row.key ?? rowIndex"
+                  class="inv-tooltip__item"
+                >
+                  <span class="inv-tooltip__trait-name">{{ row.name }}</span>
+                  <span
+                    v-for="(mod, mi) in row.mods"
+                    :key="`${row.key ?? rowIndex}_${mi}`"
+                    :class="[
+                      'inv-tooltip__mod',
+                      mod.positive ? 'inv-tooltip__mod--pos' : 'inv-tooltip__mod--neg',
+                    ]"
+                    >{{ mod.text }}</span
+                  >
+                </li>
+              </ul>
+              <p v-else class="inv-tooltip__empty">Нет свойств</p>
+            </template>
+          </div>
+
+          <div v-if="compareItem" class="inv-tooltip inv-tooltip--compare">
+            <p class="inv-tooltip__label">Снаряжено</p>
+            <div class="inv-tooltip__bar" :style="{ background: compareItem.rarityColor }" />
+            <p class="inv-tooltip__name" :style="{ color: compareItem.rarityColor }">
+              {{ compareItem.name }}
             </p>
-            <p class="inv-tooltip__slot">{{ translateSlot(tooltip.item.slot) }}</p>
-            <ul v-if="tooltipRows(tooltip.item).length" class="inv-tooltip__list">
+            <p class="inv-tooltip__slot">{{ translateSlot(compareItem.slot) }}</p>
+            <ul v-if="tooltipRows(compareItem).length" class="inv-tooltip__list">
               <li
-                v-for="(row, rowIndex) in tooltipRows(tooltip.item)"
-                :key="row.key ?? rowIndex"
+                v-for="(row, ri) in tooltipRows(compareItem)"
+                :key="row.key ?? ri"
                 class="inv-tooltip__item"
               >
                 <span class="inv-tooltip__trait-name">{{ row.name }}</span>
                 <span
                   v-for="(mod, mi) in row.mods"
-                  :key="`${row.key ?? rowIndex}_${mi}`"
+                  :key="`${row.key ?? ri}_${mi}`"
                   :class="[
                     'inv-tooltip__mod',
                     mod.positive ? 'inv-tooltip__mod--pos' : 'inv-tooltip__mod--neg',
@@ -153,8 +349,7 @@
                 >
               </li>
             </ul>
-            <p v-else class="inv-tooltip__empty">Нет свойств</p>
-          </template>
+          </div>
         </div>
       </Transition>
     </Teleport>
@@ -162,7 +357,10 @@
 </template>
 
 <script setup>
+  import { ref } from 'vue'
   import { useInventoryPanel } from '../composables/useInventoryPanel'
+  import { ITEM_SLOTS, ITEM_SLOT_LABELS } from '../constants/itemSlots'
+  import { RARITIES, RARITY_COLORS, RARITY_LABELS } from '../constants/lootRarity'
 
   const isDev = import.meta.env.DEV
 
@@ -186,10 +384,12 @@
   const {
     cells,
     equipped,
+    coinDisplay,
     drag,
     dragOverBag,
     tooltip,
     tooltipStyle,
+    compareItem,
     EQUIP_SLOTS,
     isTwoHanded,
     translateSlot,
@@ -211,8 +411,43 @@
     showTooltipForItem,
     hideTooltip,
     clearAll,
+    addCopper,
+    addItem,
     onPanelDrop,
   } = useInventoryPanel(props, emit)
+
+  // ── Пикер предметов ──────────────────────────────────────────────────────
+  const pickerOpen = ref(false)
+  const pickerStage = ref('slot')
+  const pickerTab = ref('slots')
+  const pickerSlot = ref(null)
+
+  function toggleItemPicker() {
+    pickerOpen.value = !pickerOpen.value
+    pickerStage.value = 'slot'
+    pickerTab.value = 'slots'
+    pickerSlot.value = null
+  }
+
+  function onPickSlot(slot) {
+    pickerSlot.value = slot
+    pickerStage.value = 'rarity'
+  }
+
+  function onPickRarity(rarity) {
+    addItem(pickerSlot.value, rarity)
+    pickerOpen.value = false
+    pickerStage.value = 'slot'
+    pickerSlot.value = null
+  }
+
+  /** Системный ключ — добавляется сразу, без выбора редкости */
+  function onPickSystemKey() {
+    addItem('key', null)
+    pickerOpen.value = false
+    pickerStage.value = 'slot'
+    pickerSlot.value = null
+  }
 </script>
 
 <style scoped src="../assets/styles/components/gameInventoryPanel.css"></style>

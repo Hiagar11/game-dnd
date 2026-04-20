@@ -81,7 +81,7 @@ export const useTokensStore = defineStore('tokens', () => {
     // Если сейчас открыт сценарий — убираем все размещённые экземпляры этого шаблона.
     // Сервер уже удалил их из БД; здесь синхронизируем локальное состояние.
     const gameStore = useGameStore()
-    gameStore.placedTokens = gameStore.placedTokens.filter((t) => t.tokenId !== id)
+    gameStore.removeTokensByTemplateId(id)
   }
 
   return { tokens, selectedToken, selectToken, fetchTokens, addToken, editToken, deleteToken }

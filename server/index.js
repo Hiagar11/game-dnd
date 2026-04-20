@@ -13,7 +13,8 @@ import mapRoutes from './routes/maps.js'
 import globalMapRoutes from './routes/globalMaps.js'
 import scenarioRoutes from './routes/scenarios.js'
 import campaignRoutes from './routes/campaigns.js'
-import gameSessionRoutes from './routes/gameSessions.js'
+import makeGameSessionRoutes from './routes/gameSessions.js'
+import aiRoutes from './routes/ai.js'
 
 // Загружаем .env из папки server/ — независимо от того, откуда запущен процесс.
 // process.env читается внутри функций (lazy), поэтому вызов здесь успевает до первого обращения.
@@ -48,7 +49,8 @@ app.use('/api/maps', mapRoutes)
 app.use('/api/global-maps', globalMapRoutes)
 app.use('/api/scenarios', scenarioRoutes)
 app.use('/api/campaigns', campaignRoutes)
-app.use('/api/game-sessions', gameSessionRoutes)
+app.use('/api/ai', aiRoutes)
+app.use('/api/game-sessions', makeGameSessionRoutes())
 
 // ─── Healthcheck ──────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))

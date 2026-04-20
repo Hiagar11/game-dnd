@@ -3,17 +3,52 @@ import { useGameStore } from '../stores/game'
 import { useScenariosStore } from '../stores/scenarios'
 
 function buildTokensPayload(placedTokens, includeHidden = false) {
-  return placedTokens.map(
-    ({ uid, tokenId, systemToken, targetScenarioId, col, row, hidden, inventory }) => ({
-      uid,
-      ...(systemToken ? { systemToken } : { tokenId }),
-      ...(targetScenarioId ? { targetScenarioId } : {}),
-      col,
-      row,
-      hidden: includeHidden ? (hidden ?? false) : false,
-      inventory: inventory ?? null,
-    })
-  )
+  return placedTokens.map((t) => ({
+    uid: t.uid,
+    ...(t.systemToken ? { systemToken: t.systemToken } : { tokenId: t.tokenId }),
+    ...(t.targetScenarioId ? { targetScenarioId: t.targetScenarioId } : {}),
+    ...(t.globalMapExit ? { globalMapExit: true } : {}),
+    col: t.col,
+    row: t.row,
+    hidden: includeHidden ? (t.hidden ?? false) : false,
+    inventory: t.inventory ?? null,
+    // Переопределяемые поля экземпляра (null → на сервере фолбэк к шаблону)
+    tokenType: t.tokenType ?? null,
+    name: t.name ?? null,
+    attitude: t.attitude ?? null,
+    npcName: t.npcName ?? null,
+    personality: t.personality ?? null,
+    contextNotes: t.contextNotes ?? null,
+    dispositionType: t.dispositionType ?? null,
+    strength: t.strength ?? null,
+    agility: t.agility ?? null,
+    intellect: t.intellect ?? null,
+    charisma: t.charisma ?? null,
+    hp: t.hp ?? null,
+    maxHp: t.maxHp ?? null,
+    // XP, уровень, очки характеристик, автолевел
+    xp: t.xp ?? 0,
+    level: t.level ?? 1,
+    statPoints: t.statPoints ?? 0,
+    autoLevel: !!t.autoLevel,
+    race: t.race ?? '',
+    armed: !!t.armed,
+    secretKnowledge: t.secretKnowledge ?? null,
+    // Дерево способностей и активные слоты
+    treeActivatedIds: t.treeActivatedIds ?? [],
+    abilities: t.abilities ?? [],
+    passiveAbilities: t.passiveAbilities ?? [],
+    // Боевые статусы
+    stunned: !!t.stunned,
+    captured: !!t.captured,
+    combatLog: t.combatLog ?? [],
+    // Контейнеры / визуал
+    items: t.items ?? undefined,
+    opened: !!t.opened,
+    locked: !!t.locked,
+    halfSize: !!t.halfSize,
+    quarterSize: !!t.quarterSize,
+  }))
 }
 
 function buildWallsPayload(walls) {
@@ -28,6 +63,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
   const levelName = ref('')
   const levelNameInputRef = ref(null)
   const locationDescription = ref('')
+  const mapContext = ref('')
   const saving = ref(false)
   const saveError = ref('')
   const saveSuccess = ref(false)
@@ -40,6 +76,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
     levelName.value = ''
     saveError.value = ''
     locationDescription.value = selectedScenario.value?.locationDescription ?? ''
+    mapContext.value = selectedScenario.value?.mapContext ?? ''
     showSavePopup.value = true
     nextTick(() => levelNameInputRef.value?.focus())
   }
@@ -96,6 +133,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
         gridOffsetX: selectedScenario.value.gridOffsetX ?? 0,
         gridOffsetY: selectedScenario.value.gridOffsetY ?? 0,
         locationDescription: locationDescription.value,
+        mapContext: mapContext.value,
         placedTokens: tokens,
         walls,
       })
@@ -117,6 +155,7 @@ export function useLevelSave(selectedScenario, isEditingLevel, autoLoadScenario,
     levelName,
     levelNameInputRef,
     locationDescription,
+    mapContext,
     saving,
     saveError,
     saveSuccess,

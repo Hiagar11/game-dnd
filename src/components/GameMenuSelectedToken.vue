@@ -1,11 +1,18 @@
 <template>
   <Transition name="token-info" appear>
     <div v-if="placed" class="token-info">
-      <!-- Строка 1: Имя | HP -->
+      <!-- Строка 1: Класс героя | HP -->
       <div class="token-info__row">
-        <span class="token-info__name">{{ placed.name }}</span>
+        <span
+          class="token-info__name"
+          :class="{ 'token-info__name--synergy': heroClassInfo.synergy }"
+          :style="{ color: heroClassInfo.color }"
+        >
+          {{ heroClassInfo.name }}
+        </span>
         <div class="token-info__hp">
           <PhHeart :size="15" weight="fill" class="token-info__hp-icon" />
+          <span v-if="raceName" class="token-info__race">{{ raceName }}</span>
           <span class="token-info__hp-text"
             >{{ placed.hp ?? placed.maxHp ?? 10 }}/{{ placed.maxHp ?? 10 }}</span
           >
@@ -26,11 +33,29 @@
         </div>
       </div>
 
-      <!-- Строка 3: Очки действия -->
+      <!-- Строка 3: Очки действия (AP) -->
       <div class="token-info__row">
         <PhLightning :size="11" weight="fill" class="token-info__ap-icon" />
         <TransitionGroup name="ap-dot" tag="div" class="token-info__ap">
-          <span v-for="i in placed.actionPoints ?? 4" :key="i" class="token-info__ap-dot" />
+          <span
+            v-for="i in DEFAULT_AP"
+            :key="'ap' + i"
+            class="token-info__ap-dot"
+            :class="{ 'token-info__ap-dot--used': i > (placed.actionPoints ?? DEFAULT_AP) }"
+          />
+        </TransitionGroup>
+      </div>
+
+      <!-- Строка 3b: Очки передвижения (MP) -->
+      <div class="token-info__row">
+        <PhSneakerMove :size="11" weight="fill" class="token-info__mp-icon" />
+        <TransitionGroup name="ap-dot" tag="div" class="token-info__ap">
+          <span
+            v-for="i in DEFAULT_MP"
+            :key="'mp' + i"
+            class="token-info__ap-dot token-info__ap-dot--mp"
+            :class="{ 'token-info__ap-dot--used': i > (placed.movementPoints ?? DEFAULT_MP) }"
+          />
         </TransitionGroup>
       </div>
     </div>
@@ -39,11 +64,14 @@
 
 <script setup>
   import { computed } from 'vue'
-  import { PhHeart, PhStar, PhLightning } from '@phosphor-icons/vue'
+  import { PhHeart, PhStar, PhLightning, PhSneakerMove } from '@phosphor-icons/vue'
   import { useGameStore } from '../stores/game'
+  import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
   import { hpPercentFromValues } from '../utils/hp'
   import { getSelectedNonSystemToken } from '../utils/tokenFilters'
   import { xpProgressPercent } from '../utils/xpFormula'
+  import { getRaceById } from '../constants/races'
+  import { getHeroClass } from '../constants/heroClass'
 
   const store = useGameStore()
 
@@ -54,6 +82,17 @@
 
   // Уровень и XP берём из placed-токена (маппятся с шаблона через mapServerToken)
   const level = computed(() => placed.value?.level ?? 1)
+
+  const raceName = computed(() => {
+    if (!placed.value?.race) return null
+    return getRaceById(placed.value.race)?.label ?? null
+  })
+
+  // Класс героя на основе статов и открытых синергий
+  const heroClassInfo = computed(() => {
+    if (!placed.value) return { name: '', color: '#6b7280', synergy: false }
+    return getHeroClass(placed.value, placed.value.treeActivatedIds ?? [])
+  })
 
   const xpPercent = computed(() => {
     if (!placed.value) return 0

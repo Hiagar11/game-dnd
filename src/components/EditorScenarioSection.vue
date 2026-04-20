@@ -41,6 +41,7 @@
               stroke-width="16"
               style="pointer-events: auto; cursor: pointer"
               @click="removeEdge(edge)"
+              @contextmenu.prevent="removeEdge(edge)"
             />
             <!-- Название остановки на рёбрах к глобальной карте -->
             <text

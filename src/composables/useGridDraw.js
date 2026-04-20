@@ -56,8 +56,8 @@ export function useGridDraw(props) {
       const selected = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
 
       if (isNonSystemToken(selected)) {
-        const ap = selected.actionPoints ?? 0
-        const reachable = ap > 0 ? buildReachableCells(selected, store.walls, ap) : new Set()
+        const mp = selected.movementPoints ?? 0
+        const reachable = mp > 0 ? buildReachableCells(selected, store.walls, mp) : new Set()
 
         ctx.fillStyle = 'rgba(74, 222, 128, 0.25)'
         for (const key of reachable) {
@@ -70,6 +70,22 @@ export function useGridDraw(props) {
         if (hcell) {
           ctx.fillStyle = 'rgba(250, 204, 21, 0.20)'
           ctx.fillRect(hcell.col * hc + ox, hcell.row * hc + oy, cs, cs)
+        }
+
+        // ── Превью зоны AoE-способности ───────────────────────────────────────
+        const aoeCells = store.abilityPreviewCells
+        if (aoeCells.length) {
+          const ability = store.pendingAbility
+          const abilityColor = ability?.color ?? '#f97316'
+          ctx.fillStyle = `${abilityColor}33` // ~20% opacity
+          ctx.strokeStyle = `${abilityColor}99` // ~60% opacity
+          ctx.lineWidth = 1.5
+          for (const cell of aoeCells) {
+            const cx = cell.col * hc + ox
+            const cy = cell.row * hc + oy
+            ctx.fillRect(cx, cy, hc, hc)
+            ctx.strokeRect(cx, cy, hc, hc)
+          }
         }
 
         const path = store.hoveredPath
@@ -121,7 +137,7 @@ export function useGridDraw(props) {
       }
     }
 
-    // ─── Превью зоны дропа (2×2 sub-cell = 1 полная ячейка) ────────────────
+    // ─── Превью зоны дропа ─────────────────────────────────────────────────
     const dropCell = store.dropPreviewCell
     if (dropCell) {
       ctx.fillStyle = 'rgba(96, 165, 250, 0.35)'
@@ -129,8 +145,10 @@ export function useGridDraw(props) {
       ctx.lineWidth = 2
       const dx = dropCell.col * hc + ox
       const dy = dropCell.row * hc + oy
-      ctx.fillRect(dx, dy, cs, cs)
-      ctx.strokeRect(dx, dy, cs, cs)
+      const dw = dropCell.quarterSize ? hc : dropCell.halfSize ? hc : cs
+      const dh = dropCell.quarterSize ? hc : cs
+      ctx.fillRect(dx, dy, dw, dh)
+      ctx.strokeRect(dx, dy, dw, dh)
     }
 
     // ─── Sub-grid (тонкие пунктирные линии — делят ячейку на 2×2) ─────────
@@ -181,8 +199,10 @@ export function useGridDraw(props) {
       () => store.placedTokens.map((t) => `${t.uid}:${t.col}:${t.row}:${t.attitude}`).join(','),
       () => store.hoveredPath.map((s) => `${s.col},${s.row}`).join(','),
       () => `${store.hoveredCell?.col},${store.hoveredCell?.row}`,
-      () => `${store.dropPreviewCell?.col},${store.dropPreviewCell?.row}`,
+      () =>
+        `${store.dropPreviewCell?.col},${store.dropPreviewCell?.row},${store.dropPreviewCell?.halfSize},${store.dropPreviewCell?.quarterSize}`,
       () => store.walls.map((w) => `${w.col}:${w.row}`).join(','),
+      () => store.abilityPreviewCells.map((c) => `${c.col}:${c.row}`).join(','),
       // Зона героев на viewer-стороне обновляется при изменении списка героев или выбора
       () => heroesStore.heroes.map((h) => h.id).join(','),
       () => heroesStore.selectedUid,

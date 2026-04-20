@@ -1,0 +1,195 @@
+/* Контекстное меню предмета: категории → редкость */
+.item-ctx-menu {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  min-width: 170px;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface, #1a1a2e);
+  border: 1px solid var(--color-primary, #a78bfa);
+  border-radius: 8px;
+  box-shadow:
+    0 6px 24px rgb(0 0 0 / 70%),
+    0 0 8px var(--color-primary-glow, rgb(167 139 250 / 30%));
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+/* ── Кнопка удаления (крестик в правом верхнем углу) ───────────────── */
+.item-ctx-menu__remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: rgb(248 113 113 / 80%);
+  background: rgb(248 113 113 / 12%);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition:
+    color 150ms,
+    background 150ms;
+
+  &:hover {
+    color: #f87171;
+    background: rgb(248 113 113 / 25%);
+  }
+}
+
+/* ── Кнопка замка ──────────────────────────────────────────────────── */
+.item-ctx-menu__lock {
+  position: absolute;
+  top: 4px;
+  right: 28px;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  background: rgb(251 191 36 / 12%);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 150ms;
+
+  &:hover {
+    background: rgb(251 191 36 / 25%);
+  }
+}
+
+/* ── Вкладки (Слоты / Системные) ──────────────────────────────────── */
+.item-ctx-menu__tabs {
+  display: flex;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+}
+
+.item-ctx-menu__tab {
+  flex: 1;
+  padding: 6px 0;
+  font-size: 11px;
+  text-align: center;
+  color: rgb(255 255 255 / 55%);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition:
+    color 150ms,
+    background 150ms;
+
+  &:hover {
+    color: rgb(255 255 255 / 80%);
+    background: rgb(255 255 255 / 6%);
+  }
+
+  &--active {
+    color: var(--color-primary, #a78bfa);
+    box-shadow: inset 0 -2px 0 var(--color-primary, #a78bfa);
+  }
+}
+
+/* ── Список строк ─────────────────────────────────────────────────── */
+.item-ctx-menu__list {
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.item-ctx-menu__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--color-text, #e2e8f0);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 120ms;
+
+  &:hover {
+    background: rgb(255 255 255 / 10%);
+  }
+}
+
+/* ── Иконка слота (mask-image) ────────────────────────────────────── */
+.item-ctx-menu__icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  display: inline-block;
+
+  &--emoji {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    mask-image: none !important;
+    background: transparent !important;
+  }
+}
+
+.item-ctx-menu__label {
+  white-space: nowrap;
+}
+
+/* ── Цветная точка редкости ───────────────────────────────────────── */
+.item-ctx-menu__dot {
+  width: 10px;
+  height: 10px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  box-shadow: 0 0 4px rgb(0 0 0 / 50%);
+}
+
+/* ── Кнопка «Назад» ──────────────────────────────────────────────── */
+.item-ctx-menu__back {
+  padding: 5px 10px;
+  font-size: 11px;
+  color: rgb(255 255 255 / 55%);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgb(255 255 255 / 10%);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    color 150ms,
+    background 150ms;
+
+  &:hover {
+    color: rgb(255 255 255 / 80%);
+    background: rgb(255 255 255 / 6%);
+  }
+}
+
+/* ── Transition ───────────────────────────────────────────────────── */
+.ctx-enter-active {
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.ctx-leave-active {
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.ctx-enter-from,
+.ctx-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(-6px);
+}

@@ -22,16 +22,19 @@ export function useTokenDrop(offsetX, offsetY) {
   function onDragOver(e) {
     // Проверяем что тянут токен (обычный или системный), а не файл из ОС или текст
     const hasToken =
-      e.dataTransfer.types.includes('tokenid') || e.dataTransfer.types.includes('systemtoken')
-    console.log('[drop] dragover types:', [...e.dataTransfer.types], 'hasToken:', hasToken)
+      e.dataTransfer.types.includes('tokenid') ||
+      e.dataTransfer.types.includes('systemtoken') ||
+      e.dataTransfer.types.includes('placeduid')
     if (!hasToken) return
     e.preventDefault()
-    e.dataTransfer.dropEffect = 'copy'
+    e.dataTransfer.dropEffect = e.dataTransfer.types.includes('placeduid') ? 'move' : 'copy'
 
     const store = useGameStore()
     const { col, row } = getDropCell(e)
     if (col >= 0 && row >= 0) {
-      store.setDropPreviewCell({ col, row })
+      const halfSize = e.dataTransfer.types.includes('halfsize')
+      const quarterSize = e.dataTransfer.types.includes('quartersize')
+      store.setDropPreviewCell({ col, row, halfSize, quarterSize })
     } else {
       store.setDropPreviewCell(null)
     }
@@ -50,14 +53,22 @@ export function useTokenDrop(offsetX, offsetY) {
     store.setDropPreviewCell(null)
 
     const { col, row } = getDropCell(e)
-    console.log('[drop] onDrop col:', col, 'row:', row, 'halfCell:', store.halfCell)
     if (col < 0 || row < 0) return
 
     const scenarioId = getCurrentScenarioId(store)
 
+    // Перемещение уже размещённого контейнера (drag с карты)
+    const placedUid = e.dataTransfer.getData('placedUid')
+    if (placedUid) {
+      store.moveToken(placedUid, col, row)
+      if (scenarioId) {
+        getSocket()?.emit('token:move', { scenarioId, uid: placedUid, col, row })
+      }
+      return
+    }
+
     // Сначала проверяем системный токен — у него свой action
     const systemToken = e.dataTransfer.getData('systemToken')
-    console.log('[drop] systemToken:', systemToken, 'tokenId:', e.dataTransfer.getData('tokenId'))
     if (systemToken) {
       const uid = store.placeSystemToken(systemToken, col, row)
       // Транслируем размещение зрителям через сокет

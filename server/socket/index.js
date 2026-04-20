@@ -1,20 +1,65 @@
 import jwt from 'jsonwebtoken'
 import Scenario from '../models/Scenario.js'
+import Campaign from '../models/Campaign.js'
 import Token from '../models/Token.js'
-import { askNpc, summarizeDialog } from '../ai/npcChat.js'
-import { getDispositionConfig } from '../ai/dispositionConfig.js'
+import {
+  askNpc,
+  summarizeDialog,
+  summarizeEvent,
+  rewritePersonalityAsCaptive,
+  generateBattleCry,
+} from '../ai/npcChat.js'
+import {
+  getAttitudeThresholds,
+  getPersuasionMultiplier,
+  ATTITUDE_WEIGHTS,
+} from '../ai/dispositionConfig.js'
+// eslint-disable-next-line no-unused-vars -- будет использоваться при расчёте торговли
+import { getItemPrice, applyAttitudeDiscount } from '../utils/itemPrice.js'
 
 // ─── Socket.io обработчики событий ───────────────────────────────────────────
 // Эта функция принимает io (сервер Socket.io) и навешивает все обработчики.
 
+// Активные сессии и функция закрытия — экспортируются для REST-эндпоинта (sendBeacon).
+export const activeSessions = new Map()
+// Map: scenarioId → Map<uid, { col, row }>
+export const activeLivePositions = new Map()
+
+/** Восстанавливает снапшоты и очищает память сессии. Вызывается из сокета и REST. */
+export async function forceCloseSession(userId, io) {
+  const session = activeSessions.get(userId)
+  if (!session) return
+  if (session.scenarioId) activeLivePositions.delete(session.scenarioId)
+  activeSessions.delete(userId)
+  if (io) {
+    const sessionList = Array.from(activeSessions.entries()).map(([sid, s]) => ({
+      sessionId: sid,
+      adminName: s.adminName,
+      campaignId: s.campaignId,
+      campaignName: s.campaignName,
+      scenarioId: s.scenarioId,
+    }))
+    io.emit('sessions:updated', sessionList)
+  }
+  if (session.scenarioSnapshots?.size > 0) {
+    await Promise.allSettled(
+      Array.from(session.scenarioSnapshots.entries()).map(([sid, snap]) =>
+        Scenario.findByIdAndUpdate(sid, {
+          $set: { placedTokens: snap.placedTokens, revealedCells: snap.revealedCells },
+        })
+      )
+    )
+  }
+}
+
 export function setupSocket(io) {
   // ─── Активные игровые сессии ──────────────────────────────────────────────
   // Map: userId (admin) → { adminSocketId, adminName, campaignId, campaignName, scenarioId, offsetX, offsetY }
-  const sessions = new Map()
+  const sessions = activeSessions
   // ─── Текущие позиции токенов (только в памяти, без записи в БД) ────────
   // Map: scenarioId → Map<uid, { col, row }>
   // Сбрасывается при закрытии сессии — позиции возвращаются к сохранённым в БД
-  const livePositions = new Map()
+  const livePositions = activeLivePositions
 
   function applyLivePositions(scenarioId, placedTokens) {
     const live = livePositions.get(String(scenarioId))
@@ -32,6 +77,40 @@ export function setupSocket(io) {
       campaignName: s.campaignName,
       scenarioId: s.scenarioId,
     }))
+  }
+
+  // ─── Глобальная хроника кампании ──────────────────────────────────────────
+  // Записывает ключевое событие в хронику кампании (Campaign.globalChronicle).
+  // Умные NPC получают эту хронику как «слухи» для обнаружения лжи.
+  // Лимит ~2000 символов — старые записи удаляются FIFO.
+  const CHRONICLE_MAX = 2000
+  async function appendChronicle(campaignId, entry) {
+    if (!campaignId || !entry) return
+    try {
+      const campaign = await Campaign.findById(campaignId)
+      if (!campaign) return
+      let chronicle = campaign.globalChronicle ?? ''
+      chronicle = chronicle ? chronicle + '\n' + entry : entry
+      // FIFO: убираем самые старые строки, если превышен лимит
+      while (chronicle.length > CHRONICLE_MAX) {
+        const idx = chronicle.indexOf('\n')
+        if (idx === -1) break
+        chronicle = chronicle.slice(idx + 1)
+      }
+      campaign.globalChronicle = chronicle
+      await campaign.save()
+    } catch (err) {
+      console.error('[appendChronicle] ошибка:', err.message)
+    }
+  }
+
+  // ─── Закрытие сессии: восстановление снапшотов + очистка памяти ──────────
+  // Используется в game:session:close (нормальный выход) и в disconnect (резкое закрытие).
+  // fire-and-forget — не ждём завершения, чтобы не блокировать disconnect.
+  function closeAdminSession(userId) {
+    forceCloseSession(userId, io).catch((err) =>
+      console.error('[closeAdminSession] ошибка:', err.message)
+    )
   }
 
   // ─── Middleware: проверка JWT при подключении ─────────────────────────────
@@ -242,18 +321,38 @@ export function setupSocket(io) {
           'npcName',
           'personality',
           'contextNotes',
+          'secretKnowledge',
+          'dispositionType',
           'strength',
           'agility',
           'intellect',
           'charisma',
           'inventory',
+          'xp',
+          'level',
+          'statPoints',
+          'autoLevel',
+          'race',
+          'heroClass',
+          'armed',
+          'stunned',
+          'captured',
+          'combatLog',
+          'items',
+          'opened',
+          'locked',
         ]
+        // contextNotes живёт только в placedTokens (сессионная память) —
+        // в defaultPlacedTokens не пишем, чтобы сброс к эталону её стирал.
+        const SKIP_IN_DEFAULT = new Set(['contextNotes'])
         const ptUpdate = {}
         const defUpdate = {}
         for (const key of ALLOWED) {
           if (Object.prototype.hasOwnProperty.call(fields, key)) {
             ptUpdate[`placedTokens.$[pt].${key}`] = fields[key] ?? null
-            defUpdate[`defaultPlacedTokens.$[def].${key}`] = fields[key] ?? null
+            if (!SKIP_IN_DEFAULT.has(key)) {
+              defUpdate[`defaultPlacedTokens.$[def].${key}`] = fields[key] ?? null
+            }
           }
         }
         if (Object.keys(ptUpdate).length === 0) {
@@ -267,6 +366,87 @@ export function setupSocket(io) {
         )
         ack?.({ ok: true })
       } catch {
+        ackError(ack, 'Ошибка сервера')
+      }
+    })
+
+    // ─── Сохранение всех placed-токенов перед сохранением сессии ────────
+    // Событие: scenario:persist-tokens { scenarioId, tokens: [ { uid, fields } ] }
+    // Клиент отправляет текущие поля всех размещённых токенов;
+    // сервер обновляет placedTokens + defaultPlacedTokens в Scenario.
+    // Вызывается ДО POST /api/game-sessions, чтобы снапшот содержал актуальные данные.
+    socket.on('scenario:persist-tokens', async ({ scenarioId, tokens }, ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+      try {
+        if (!Array.isArray(tokens) || tokens.length === 0) {
+          ack?.({ ok: true })
+          return
+        }
+        const scenario = await Scenario.findById(scenarioId)
+        if (!scenario) return ackError(ack, 'Сценарий не найден')
+
+        const ALLOWED = [
+          'name',
+          'attitude',
+          'hp',
+          'maxHp',
+          'npcName',
+          'personality',
+          'contextNotes',
+          'secretKnowledge',
+          'dispositionType',
+          'strength',
+          'agility',
+          'intellect',
+          'charisma',
+          'inventory',
+          'xp',
+          'level',
+          'statPoints',
+          'autoLevel',
+          'race',
+          'heroClass',
+          'armed',
+          'stunned',
+          'captured',
+          'combatLog',
+          'items',
+          'opened',
+          'locked',
+          'treeActivatedIds',
+          'abilities',
+          'passiveAbilities',
+        ]
+        const SKIP_IN_DEFAULT = new Set(['contextNotes'])
+
+        for (const { uid, fields } of tokens) {
+          if (!uid || !fields) continue
+          const pt = scenario.placedTokens.find((t) => String(t.uid) === String(uid))
+          if (!pt) continue
+          const def = scenario.defaultPlacedTokens?.find((t) => String(t.uid) === String(uid))
+          for (const key of ALLOWED) {
+            if (Object.prototype.hasOwnProperty.call(fields, key)) {
+              pt[key] = fields[key] ?? null
+              if (def && !SKIP_IN_DEFAULT.has(key)) def[key] = fields[key] ?? null
+            }
+          }
+        }
+        scenario.markModified('placedTokens')
+        if (scenario.defaultPlacedTokens?.length) scenario.markModified('defaultPlacedTokens')
+        await scenario.save()
+
+        // Обновляем снапшот сессии, чтобы close без повторного save не откатил
+        const session = sessions.get(socket.user.id)
+        if (session?.scenarioSnapshots?.has(String(scenarioId))) {
+          session.scenarioSnapshots.set(String(scenarioId), {
+            placedTokens: JSON.parse(JSON.stringify(scenario.placedTokens)),
+            revealedCells: JSON.parse(JSON.stringify(scenario.revealedCells ?? [])),
+          })
+        }
+
+        ack?.({ ok: true })
+      } catch (err) {
+        console.error('[scenario:persist-tokens]', err.message)
         ackError(ack, 'Ошибка сервера')
       }
     })
@@ -310,25 +490,45 @@ export function setupSocket(io) {
     // ─── Открытие игровой сессии (admin) ─────────────────────────────────────
     // Событие: game:session:open { campaignId, campaignName, scenarioId }
     // Создаёт публичную сессию — зрители видят её в лобби.
-    socket.on('game:session:open', ({ campaignId, campaignName, scenarioId }, ack) => {
+    // При открытии снимается снапшот сценария, чтобы восстановить его при выходе без сохранения.
+    socket.on('game:session:open', async ({ campaignId, campaignName, scenarioId }, ack) => {
       if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
 
       // Сбрасываем предыдущие позиции — новая сессия должна начинать с дефолтных из БД
       livePositions.delete(scenarioId)
 
       const sessionId = socket.user.id
+
+      // Снимаем снапшот сценария ДО начала игры.
+      // Если выйти без сохранения — сценарий будет восстановлен из этого снапшота.
+      // scenarioSnapshots: Map<scenarioId, { placedTokens, revealedCells }>
+      const scenarioSnapshots = new Map()
+      try {
+        const scenario = await Scenario.findById(scenarioId).lean()
+        if (scenario) {
+          scenarioSnapshots.set(String(scenarioId), {
+            placedTokens: JSON.parse(JSON.stringify(scenario.placedTokens ?? [])),
+            revealedCells: JSON.parse(JSON.stringify(scenario.revealedCells ?? [])),
+          })
+        }
+      } catch (err) {
+        console.error('[game:session:open] не удалось сделать снапшот сценария:', err.message)
+      }
+
       // Диалог и оценки отношения хранятся в памяти до закрытия сессии:
-      //   npcScores:       Map<npcUid, number>             — -100..+100
+      //   npcScores:       Map<npcUid, number>             — -30..+60
       //   npcCooldowns:    Map<npcUid, number>             — остаток ходов запрета роста
       //   npcHistory:      Map<npcUid, [{role, content}]>  — история GPT
       //   npcMeta:         Map<npcUid, {tokenId, name, attitude}>
       //   npcBehaviorNotes:Map<npcUid, string[]>           — накопленные впечатления (макс. 5 штук)
+      //   npcEventLogs:    Map<npcUid, string[]>           — журнал событий (бой, торговля и т.д.)
       sessions.set(sessionId, {
         adminSocketId: socket.id,
         adminName: username,
         campaignId,
         campaignName,
         scenarioId,
+        scenarioSnapshots,
         mapCenterX: null,
         mapCenterY: null,
         cursorMapX: null,
@@ -341,6 +541,11 @@ export function setupSocket(io) {
         npcHistory: new Map(),
         npcMeta: new Map(),
         npcBehaviorNotes: new Map(),
+        npcWarnings: new Map(),
+        npcEventLogs: new Map(),
+        // npcSummarizeAt: Map<npcUid, number> — кол-во реплик истории, уже вошедших в contextNotes.
+        // Используется для авто-суммаризации во время сессии (каждые SUMMARIZE_EVERY реплик).
+        npcSummarizeAt: new Map(),
       })
 
       socket.join(`viewer:${sessionId}`)
@@ -365,6 +570,21 @@ export function setupSocket(io) {
 
       // Сбрасываем позиции нового сценария
       livePositions.delete(scenarioId)
+
+      // Снимаем снапшот нового сценария, если ещё не снят (первый визит)
+      if (session.scenarioSnapshots && !session.scenarioSnapshots.has(String(scenarioId))) {
+        try {
+          const scenario = await Scenario.findById(scenarioId).lean()
+          if (scenario) {
+            session.scenarioSnapshots.set(String(scenarioId), {
+              placedTokens: JSON.parse(JSON.stringify(scenario.placedTokens ?? [])),
+              revealedCells: JSON.parse(JSON.stringify(scenario.revealedCells ?? [])),
+            })
+          }
+        } catch (err) {
+          console.error('[game:scenario:change] не удалось сделать снапшот:', err.message)
+        }
+      }
 
       // Переводим зрителей в комнату нового сценария
       const viewerRoom = `viewer:${sessionId}`
@@ -451,14 +671,12 @@ export function setupSocket(io) {
 
     // ─── Закрытие сессии (admin) ──────────────────────────────────────────────
     // Событие: game:session:close
-    socket.on('game:session:close', (ack) => {
+    // При закрытии восстанавливает ВСЕ посещённые сценарии из снапшотов,
+    // снятых в начале сессии. Это гарантирует, что несохранённые изменения
+    // не попадут в следующий запуск игры.
+    socket.on('game:session:close', async (ack) => {
       if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
-
-      const session = sessions.get(socket.user.id)
-      if (session?.scenarioId) livePositions.delete(session.scenarioId)
-
-      sessions.delete(socket.user.id)
-      io.emit('sessions:updated', listSessions())
+      closeAdminSession(socket.user.id)
       ack?.({ ok: true })
     })
 
@@ -531,27 +749,51 @@ export function setupSocket(io) {
         placedName,
         playerMessage,
         heroPersuasion,
+        heroDeception,
+        heroLuck,
+        npcItems,
+        mapContext,
+        combatLog,
+        captured,
       }) => {
         try {
           const tokenDoc = tokenId
             ? await Token.findById(tokenId)
-                .select('name npcName personality contextNotes secretKnowledge dispositionType')
+                .select(
+                  'name npcName personality contextNotes secretKnowledge dispositionType intellect'
+                )
                 .lean()
             : null
 
-          const npcName = tokenDoc?.npcName?.trim() || tokenDoc?.name || placedName || 'Незнакомец'
-          const personality = tokenDoc?.personality ?? ''
-          const contextNotes = tokenDoc?.contextNotes ?? ''
-          const secretKnowledge = tokenDoc?.secretKnowledge ?? ''
-          const dispositionType = tokenDoc?.dispositionType ?? 'neutral'
-          const disposition = getDispositionConfig(dispositionType)
+          // Поля personality/contextNotes/secretKnowledge могут быть переопределены
+          // в placedToken (сценарий), если пользователь отредактировал размещённый токен.
+          // placedToken-значения имеют приоритет над шаблоном.
+          // Загружаем сценарий один раз — для overrides и locationDescription.
+          const scenarioDoc = scenarioId
+            ? await Scenario.findById(scenarioId).select('locationDescription placedTokens').lean()
+            : null
+          const placedOverrides = scenarioDoc?.placedTokens?.find((pt) => pt.uid === npcUid) ?? {}
+
+          const npcName =
+            placedOverrides.npcName?.trim() ||
+            tokenDoc?.npcName?.trim() ||
+            tokenDoc?.name ||
+            placedName ||
+            'Незнакомец'
+          const personality = placedOverrides.personality ?? tokenDoc?.personality ?? ''
+          const contextNotes = placedOverrides.contextNotes ?? tokenDoc?.contextNotes ?? ''
+          const secretKnowledge = placedOverrides.secretKnowledge ?? tokenDoc?.secretKnowledge ?? ''
+          const dispositionType =
+            placedOverrides.dispositionType ?? tokenDoc?.dispositionType ?? 'neutral'
+          // Проницательность NPC для механики обмана (из placed-токена или шаблона)
+          const npcIntellect = placedOverrides.intellect ?? tokenDoc?.intellect ?? 0
+          const thresholds = getAttitudeThresholds(dispositionType)
+          const persuasionMult = getPersuasionMultiplier(
+            Number.isFinite(heroPersuasion) ? heroPersuasion : 0
+          )
           const message =
             typeof playerMessage === 'string' ? playerMessage.slice(0, 200) : 'Привет!'
 
-          // Описание локации из сценария
-          const scenarioDoc = scenarioId
-            ? await Scenario.findById(scenarioId).select('locationDescription').lean()
-            : null
           const locationDescription = scenarioDoc?.locationDescription ?? ''
 
           // Состояние сессии для этого НПС
@@ -562,15 +804,44 @@ export function setupSocket(io) {
           const histories = session?.npcHistory
           const metaMap = session?.npcMeta
           const behaviorNotesMap = session?.npcBehaviorNotes
+          const warningsMap = session?.npcWarnings
 
+          // ── Восстановление персистентных данных диалога из БД ──────────────
           if (!scores.has(npcUid)) {
-            const initScore =
-              placedAttitude === 'friendly' ? 50 : placedAttitude === 'hostile' ? -50 : 0
+            // attitudeScore из БД (пережил прошлую сессию), иначе — по disposition
+            const persistedScore = placedOverrides.attitudeScore
+            const initScore = Number.isFinite(persistedScore)
+              ? persistedScore
+              : placedAttitude === 'friendly'
+                ? 30
+                : placedAttitude === 'hostile'
+                  ? -20
+                  : 0
             scores.set(npcUid, initScore)
           }
           if (!cooldowns.has(npcUid)) cooldowns.set(npcUid, 0)
-          if (!histories.has(npcUid)) histories.set(npcUid, [])
-          if (!behaviorNotesMap.has(npcUid)) behaviorNotesMap.set(npcUid, [])
+          if (!histories.has(npcUid)) {
+            // Восстанавливаем историю диалога из БД (последние 10 реплик)
+            const persisted = placedOverrides.dialogHistory
+            const restored = Array.isArray(persisted) ? [...persisted] : []
+            histories.set(npcUid, restored)
+          }
+          if (!behaviorNotesMap.has(npcUid)) {
+            const persisted = placedOverrides.behaviorNotes
+            behaviorNotesMap.set(npcUid, Array.isArray(persisted) ? [...persisted] : [])
+          }
+          const eventLogsMap = session?.npcEventLogs
+          if (!eventLogsMap.has(npcUid)) {
+            const persisted = placedOverrides.eventLog
+            eventLogsMap.set(npcUid, Array.isArray(persisted) ? [...persisted] : [])
+          }
+          // npcSummarizeAt: инициализируем указателем на конец уже существующей истории —
+          // это предотвращает повторную суммаризацию реплик, восстановленных из БД.
+          const summarizeAtMap = session?.npcSummarizeAt
+          if (summarizeAtMap && !summarizeAtMap.has(npcUid)) {
+            const restoredLen = histories.get(npcUid)?.length ?? 0
+            summarizeAtMap.set(npcUid, restoredLen)
+          }
           if (!metaMap.has(npcUid)) {
             metaMap.set(npcUid, {
               tokenId: tokenId ?? null,
@@ -581,7 +852,7 @@ export function setupSocket(io) {
 
           const currentScore = scores.get(npcUid)
           const history = histories.get(npcUid)
-          // Сохраняем флаг до обработки: приветствие не запускает кулдаун
+          // Флаг первого сообщения — приветствие не меняет отношения
           const isFirstMessage = history.length === 0
 
           const {
@@ -589,6 +860,8 @@ export function setupSocket(io) {
             attitudeDelta: rawDelta,
             traitNote,
             persuasionCheck,
+            deceptionCheck,
+            action: aiAction,
           } = await askNpc({
             npcName,
             personality,
@@ -599,20 +872,83 @@ export function setupSocket(io) {
             history,
             playerMessage: message,
             behaviorNotes: behaviorNotesMap.get(npcUid) ?? [],
+            npcItems: Array.isArray(npcItems) ? npcItems : [],
+            mapContext: typeof mapContext === 'string' ? mapContext : '',
+            combatLog: Array.isArray(combatLog) ? combatLog : [],
+            captured: !!captured,
+            dispositionType,
+            threatWarned: warningsMap?.get(npcUid) ?? false,
+            eventLog: eventLogsMap.get(npcUid) ?? [],
+            npcInsight: Number.isFinite(npcIntellect) ? Math.max(0, npcIntellect) : 0,
+            // Глобальная хроника кампании — «слухи» для умных NPC
+            globalChronicle: session?.campaignId
+              ? ((await Campaign.findById(session.campaignId).select('globalChronicle').lean())
+                  ?.globalChronicle ?? '')
+              : '',
           })
 
           // ── Проверка убеждения (d20 + модификатор героя vs DC) ──
+          // Пленники подчиняются безоговорочно — бросок не нужен.
           let diceRoll = null
           let finalReply = reply
+          let finalAction = aiAction ?? null
           if (persuasionCheck) {
-            const mod = Number.isFinite(heroPersuasion) ? Math.max(0, heroPersuasion) : 0
-            const d20 = Math.floor(Math.random() * 20) + 1
-            const total = d20 + mod
-            const success = total >= persuasionCheck.dc
-            diceRoll = { d20, mod, total, dc: persuasionCheck.dc, success }
+            if (captured) {
+              // Пленник: автоуспех без броска
+              diceRoll = null
+              finalReply = persuasionCheck.successReply || reply
+              if (persuasionCheck.action) finalAction = persuasionCheck.action
+            } else {
+              const mod = Number.isFinite(heroPersuasion) ? Math.max(0, heroPersuasion) : 0
+              const luck = Number.isFinite(heroLuck) ? Math.max(0, heroLuck) : 0
+              // Бонус удачи — случайное число от 0 до luck (чем выше luck, тем больше шанс)
+              const luckBonus = luck > 0 ? Math.floor(Math.random() * (luck + 1)) : 0
+              const total = mod + luckBonus
+              const success = total >= persuasionCheck.dc
+              diceRoll = {
+                persuasion: mod,
+                luck: luckBonus,
+                total,
+                dc: persuasionCheck.dc,
+                success,
+              }
+              finalReply = success
+                ? persuasionCheck.successReply || reply
+                : persuasionCheck.failReply || reply
+              // action только при успехе persuasion
+              if (success && persuasionCheck.action) {
+                finalAction = persuasionCheck.action
+              } else if (!success) {
+                finalAction = null
+              }
+            }
+          }
+
+          // ── Проверка обмана (heroDeception + luck vs npcInsight) ──
+          // AI заподозрил ложь → сервер сравнивает навык обмана героя с проницательностью NPC
+          if (deceptionCheck && !persuasionCheck) {
+            const mod = Number.isFinite(heroDeception) ? Math.max(0, heroDeception) : 0
+            const luck = Number.isFinite(heroLuck) ? Math.max(0, heroLuck) : 0
+            const luckBonus = luck > 0 ? Math.floor(Math.random() * (luck + 1)) : 0
+            const heroTotal = mod + luckBonus
+            const npcCheck = Number.isFinite(npcIntellect) ? Math.max(0, npcIntellect) : 0
+            const success = heroTotal >= npcCheck
+            diceRoll = {
+              type: 'deception',
+              deception: mod,
+              luck: luckBonus,
+              total: heroTotal,
+              npcInsight: npcCheck,
+              success,
+            }
             finalReply = success
-              ? persuasionCheck.successReply || reply
-              : persuasionCheck.failReply || reply
+              ? deceptionCheck.successReply || reply
+              : deceptionCheck.failReply || reply
+            if (success && deceptionCheck.action) {
+              finalAction = deceptionCheck.action
+            } else if (!success) {
+              finalAction = null
+            }
           }
 
           history.push({ role: 'user', content: message })
@@ -620,40 +956,71 @@ export function setupSocket(io) {
 
           // Кулдаун: если положительный рост запрещён, игнорируем delta
           let cd = cooldowns.get(npcUid)
-          // Множитель нрава — только для положительных дельт. Дружелюбный завоевывает доверие быстрее,
-          // враждебный — медленнее. Отрицательные дельты (гнев, обиды) всегда ×1.
-          let attitudeDelta =
-            rawDelta > 0 ? Math.round(rawDelta * disposition.positiveMultiplier) : rawDelta
+          // Асимметричные веса: негатив ×1.0 (AI даёт финальные очки), позитив ×0.6 × persuasionMult
+          let attitudeDelta
+          if (rawDelta > 0) {
+            attitudeDelta = Math.round(rawDelta * ATTITUDE_WEIGHTS.positive * persuasionMult)
+          } else if (rawDelta < 0) {
+            attitudeDelta = Math.round(rawDelta * ATTITUDE_WEIGHTS.negative)
+          } else {
+            attitudeDelta = 0
+          }
+          // Приветствие не должно менять отношения — только реальный диалог
+          if (isFirstMessage) attitudeDelta = 0
           if (attitudeDelta > 0 && cd > 0) {
             attitudeDelta = 0 // запрет роста в течение кулдауна
           }
           // Уменьшаем кулдаун на 1 за каждое сообщение (независимо от знака дельты)
           if (cd > 0) cooldowns.set(npcUid, cd - 1)
 
-          const newScore = Math.max(-100, Math.min(100, currentScore + attitudeDelta))
+          const newScore = Math.max(-30, Math.min(60, currentScore + attitudeDelta))
           scores.set(npcUid, newScore)
 
-          // Сохраняем traitNote — накапливаем впечатления (последние 5)
+          // Пленник, отдавший предмет по принуждению — становится угрюмым.
+          // Принудительно опускаем счёт до -12 (≈20% шкалы, близко к враждебному).
+          // Применяем только если текущий счёт выше -12: не «награждаем» тех, кто и так был озлоблен.
+          if (captured && finalAction?.type === 'giveItem' && newScore > -12) {
+            scores.set(npcUid, -12)
+          }
+
+          // Читаем актуальный счёт — он мог быть скорректирован выше
+          const finalScore = scores.get(npcUid)
           if (traitNote) {
             const notes = behaviorNotesMap.get(npcUid)
             notes.push(traitNote)
             if (notes.length > 5) notes.shift()
           }
 
-          // Запускаем кулдаун 6 ходов только на ручных сообщениях игрока (не на приветствии)
+          // Запускаем кулдаун 2 сообщения после положительного сдвига (защита от спама комплиментов)
           if (attitudeDelta > 0 && newScore > currentScore && !isFirstMessage) {
-            cooldowns.set(npcUid, 6)
+            cooldowns.set(npcUid, 2)
           }
 
-          // Пороги: определяются типом нрава НПС
+          // Пороги: определяются начальным attitude НПС
           const prevAttitude = metaMap.get(npcUid).attitude
           const newAttitude =
-            newScore > disposition.ally
+            finalScore > thresholds.ally
               ? 'friendly'
-              : newScore < disposition.enemy
+              : finalScore < thresholds.enemy
                 ? 'hostile'
                 : 'neutral'
           metaMap.get(npcUid).attitude = newAttitude
+
+          // ── Предупреждение и инициация боя ──────────────────────────────────
+          let warning = false
+          let initiateCombat = false
+
+          if (!captured && newAttitude === 'hostile' && prevAttitude !== 'hostile') {
+            // NPC перешёл в состояние враждебности → начинаем бой (пленники не нападают)
+            initiateCombat = true
+          } else if (newAttitude !== 'hostile' && attitudeDelta <= -2) {
+            // Счёт приближается к порогу врага — предупреждение
+            const distToEnemy = Math.abs(finalScore - thresholds.enemy)
+            if (distToEnemy <= 8) {
+              warning = true
+              warningsMap?.set(npcUid, true)
+            }
+          }
 
           if (newAttitude !== prevAttitude && scenarioId) {
             io.to(String(scenarioId)).emit('token:attitude', { uid: npcUid, attitude: newAttitude })
@@ -668,16 +1035,76 @@ export function setupSocket(io) {
             npcUid,
             text: finalReply,
             attitudeDelta,
-            // rawDelta — реальное мнение ИИ (не зануляется кулдауном), нужно клиенту для стрелок
-            displayDelta: rawDelta,
-            newScore,
+            newScore: finalScore,
             newAttitude,
             cooldownLeft: cooldowns.get(npcUid),
-            // traitNote — наблюдение ИИ о поведении игрока (для отображения в UI)
             traitNote: traitNote ?? null,
-            // diceRoll — результат проверки убеждения (null если проверки не было)
             diceRoll,
+            action: finalAction,
+            warning,
+            initiateCombat,
           })
+
+          // ── Персистим историю диалога, впечатления и счёт в БД ──────────────
+          // Сохраняем последние 10 реплик (5 пар user/assistant), чтобы не раздувать документ
+          if (scenarioId) {
+            const trimmedHistory = history.slice(-10)
+            const trimmedNotes = (behaviorNotesMap.get(npcUid) ?? []).slice(-5)
+            Scenario.findOneAndUpdate(
+              { _id: scenarioId, 'placedTokens.uid': npcUid },
+              {
+                $set: {
+                  'placedTokens.$.dialogHistory': trimmedHistory,
+                  'placedTokens.$.behaviorNotes': trimmedNotes,
+                  'placedTokens.$.attitudeScore': newScore,
+                },
+              }
+            ).catch((e) => console.error('[npc:talk] persist dialog error:', e.message))
+          }
+
+          // ── Авто-суммаризация памяти каждые SUMMARIZE_EVERY реплик ──────────
+          // Срабатывает асинхронно, не блокирует ответ игроку.
+          // Новые реплики (с момента последней суммаризации) сжимаются AI в 1-2 предложения
+          // и дописываются в contextNotes — НПС «помнит» произошедшее уже в текущей сессии.
+          const SUMMARIZE_EVERY = 6 // 3 обмена (user + assistant = 2 реплики × 3)
+          if (summarizeAtMap && scenarioId) {
+            const prevAt = summarizeAtMap.get(npcUid) ?? 0
+            if (history.length - prevAt >= SUMMARIZE_EVERY) {
+              const newMessages = history.slice(prevAt)
+              summarizeAtMap.set(npcUid, history.length) // обновляем до await чтобы избежать двойного запуска
+              ;(async () => {
+                try {
+                  const summary = await summarizeDialog({
+                    npcName,
+                    history: newMessages,
+                    currentAttitude: newAttitude,
+                  })
+                  if (!summary) return
+
+                  // Загружаем текущий contextNotes и дописываем
+                  const doc = await Scenario.findOne(
+                    { _id: scenarioId, 'placedTokens.uid': npcUid },
+                    { 'placedTokens.$': 1 }
+                  ).lean()
+                  const currentNotes = doc?.placedTokens?.[0]?.contextNotes ?? ''
+                  const combined = currentNotes ? `${currentNotes}\n${summary}` : summary
+                  // Ограничиваем 800 символами, обрезая самое старое
+                  const trimmed =
+                    combined.length > 800 ? combined.slice(combined.length - 800) : combined
+
+                  await Scenario.findOneAndUpdate(
+                    { _id: scenarioId, 'placedTokens.uid': npcUid },
+                    { $set: { 'placedTokens.$.contextNotes': trimmed } }
+                  )
+
+                  // Уведомляем DM — стор на клиенте обновит contextNotes без перезагрузки
+                  socket.emit('npc:memory:updated', { npcUid, contextNotes: trimmed })
+                } catch (err) {
+                  console.error('[npc:talk] auto-summarize error:', err.message)
+                }
+              })()
+            }
+          }
         } catch (err) {
           console.error('[npc:talk] ошибка:', err.message)
           socket.emit('npc:reply', {
@@ -691,12 +1118,34 @@ export function setupSocket(io) {
       }
     )
 
+    // ─── Боевой выкрик NPC через AI ─────────────────────────────────────────
+    socket.on('npc:battleCry', async ({ npcUid, tokenId, npcName, combatContext }) => {
+      try {
+        const tokenDoc = tokenId
+          ? await Token.findById(tokenId).select('personality npcName name').lean()
+          : null
+        const name = tokenDoc?.npcName?.trim() || tokenDoc?.name || npcName || 'Противник'
+        const personality = tokenDoc?.personality ?? ''
+        const cry = await generateBattleCry({
+          npcName: name,
+          personality,
+          combatContext: typeof combatContext === 'string' ? combatContext.slice(0, 300) : '',
+        })
+        if (cry) {
+          socket.emit('npc:battleCryReply', { npcUid, text: cry })
+        }
+      } catch (err) {
+        console.error('[npc:battleCry] ошибка:', err.message)
+      }
+    })
+
     // ─── Итог сессии: суммаризация диалогов НПС ──────────────────────────────
-    // Событие: npc:session:summary → ack({ ok, npcs: [{npcUid, tokenId, name, attitude, summary}] })
+    // Событие: npc:session:summary → ack({ ok, npcs: [{npcUid, tokenId, name, attitude, summary, scenarioId}] })
     socket.on('npc:session:summary', async (ack) => {
       if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
       const session = sessions.get(socket.user.id)
       if (!session?.npcMeta?.size) return ack?.({ ok: true, npcs: [] })
+      const scenarioId = session.scenarioId
 
       try {
         const results = await Promise.all(
@@ -714,6 +1163,7 @@ export function setupSocket(io) {
               name: meta.name,
               attitude: meta.attitude,
               summary,
+              scenarioId,
             }
           })
         )
@@ -721,6 +1171,102 @@ export function setupSocket(io) {
       } catch (err) {
         console.error('[npc:session:summary] ошибка:', err.message)
         ack?.({ ok: false, error: err.message })
+      }
+    })
+
+    // ─── Запись события NPC (торговля, бой, подарок и т.д.) ─────────────────
+    // Событие: npc:event { scenarioId, uid, text }
+    // Fire-and-forget: пишем в in-memory + сразу в БД (без ожидания ответа)
+    socket.on('npc:event', ({ scenarioId, uid, text }) => {
+      if (role !== 'admin') return
+      if (!scenarioId || !uid || typeof text !== 'string' || !text.trim()) return
+
+      const session = sessions.get(socket.user.id)
+      const eventLogsMap = session?.npcEventLogs
+      if (eventLogsMap) {
+        if (!eventLogsMap.has(uid)) eventLogsMap.set(uid, [])
+        const logs = eventLogsMap.get(uid)
+        logs.push(text.slice(0, 120))
+        if (logs.length > 10) logs.shift()
+        Scenario.findOneAndUpdate(
+          { _id: scenarioId, 'placedTokens.uid': uid },
+          { $set: { 'placedTokens.$.eventLog': logs.slice(-10) } }
+        ).catch((e) => console.error('[npc:event] persist error:', e.message))
+      }
+      // Записываем событие NPC в глобальную хронику кампании
+      const npcName = session?.npcMeta?.get(uid)?.name ?? 'NPC'
+      appendChronicle(session?.campaignId, `[${npcName}] ${text.slice(0, 120)}`)
+    })
+
+    // ─── Список НПС для сохранения памяти при смене карты ───────────────────
+    // Событие: npc:map:summary → ack({ ok, npcs })
+    // Возвращает только тех NPC, с которыми были диалоги или события в текущей сессии,
+    // для отображения в попапе выбора перед переходом на другую карту.
+    socket.on('npc:map:summary', async (ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+      const session = sessions.get(socket.user.id)
+      const scenarioId = session?.scenarioId
+      if (!session?.npcMeta?.size) return ack?.({ ok: true, npcs: [] })
+
+      try {
+        const results = await Promise.all(
+          Array.from(session.npcMeta.entries()).map(async ([npcUid, meta]) => {
+            const history = session.npcHistory.get(npcUid) ?? []
+            const events = session.npcEventLogs?.get(npcUid) ?? []
+            if (!history.length && !events.length) return null
+
+            const summary = history.length
+              ? await summarizeDialog({
+                  npcName: meta.name,
+                  history,
+                  currentAttitude: meta.attitude,
+                })
+              : events.join('. ')
+
+            return {
+              npcUid,
+              tokenId: meta.tokenId,
+              name: meta.name,
+              attitude: meta.attitude,
+              summary,
+              scenarioId,
+            }
+          })
+        )
+        ack?.({ ok: true, npcs: results.filter(Boolean) })
+      } catch (err) {
+        console.error('[npc:map:summary] ошибка:', err.message)
+        ack?.({ ok: false, error: err.message })
+      }
+    })
+
+    // ─── Сохранение памяти NPC в placedToken сценария ───────────────────────
+    // Событие: npc:save:memory { saves: [{ scenarioId, uid, contextNotes }] }
+    // После сохранения — очищает dialogHistory/behaviorNotes/eventLog из placedToken:
+    // сырая история больше не нужна, контекст живёт в contextNotes.
+    socket.on('npc:save:memory', async ({ saves }, ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+      if (!Array.isArray(saves)) return ack?.({ ok: true })
+      try {
+        await Promise.all(
+          saves.map(({ scenarioId, uid, contextNotes }) => {
+            if (!scenarioId || !uid) return null
+            return Scenario.findOneAndUpdate(
+              { _id: scenarioId, 'placedTokens.uid': uid },
+              {
+                $set: { 'placedTokens.$.contextNotes': String(contextNotes ?? '').slice(0, 800) },
+                $unset: {
+                  'placedTokens.$.dialogHistory': '',
+                  'placedTokens.$.behaviorNotes': '',
+                  'placedTokens.$.eventLog': '',
+                },
+              }
+            )
+          })
+        )
+        ack?.({ ok: true })
+      } catch (err) {
+        ackError(ack, err.message)
       }
     })
 
@@ -739,14 +1285,82 @@ export function setupSocket(io) {
       }
     })
 
+    // ─── Захват NPC — AI перезаписывает personality ──────────────────────────
+    // Событие: npc:capture { scenarioId, uid, tokenId, npcName, combatLog }
+    socket.on('npc:capture', async ({ scenarioId, uid, tokenId, npcName, combatLog }, ack) => {
+      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
+      try {
+        const tokenDoc = tokenId ? await Token.findById(tokenId).select('personality').lean() : null
+        const oldPersonality = tokenDoc?.personality ?? ''
+
+        const newPersonality = await rewritePersonalityAsCaptive({
+          npcName: npcName || 'Незнакомец',
+          personality: oldPersonality,
+          combatLog: Array.isArray(combatLog) ? combatLog : [],
+        })
+
+        // Обновляем personality в шаблоне токена (Token)
+        if (tokenId) {
+          await Token.findByIdAndUpdate(tokenId, { personality: newPersonality })
+        }
+
+        // Обновляем personality в placedTokens сценария
+        if (scenarioId && uid) {
+          await Scenario.findOneAndUpdate(
+            { _id: scenarioId, 'placedTokens.uid': uid },
+            {
+              $set: {
+                'placedTokens.$[pt].personality': newPersonality,
+                'defaultPlacedTokens.$[def].personality': newPersonality,
+              },
+            },
+            { arrayFilters: [{ 'pt.uid': uid }, { 'def.uid': uid }] }
+          )
+        }
+
+        ack?.({ ok: true, personality: newPersonality })
+
+        // Записываем захват NPC в глобальную хронику кампании
+        const session = sessions.get(socket.user.id)
+        appendChronicle(session?.campaignId, `Герои захватили ${npcName || 'NPC'} в плен`)
+      } catch (err) {
+        ackError(ack, err.message)
+      }
+    })
+
+    // ── AI-журнал событий на карте ──────────────────────────────────────────
+    socket.on('map:journal', async ({ scenarioId, eventText }, ack) => {
+      if (!scenarioId || typeof eventText !== 'string' || !eventText.trim()) {
+        return ackError(ack, 'Некорректные параметры')
+      }
+      try {
+        const scenario = await Scenario.findById(scenarioId)
+        if (!scenario) return ackError(ack, 'Сценарий не найден')
+
+        const updated = await summarizeEvent({
+          eventText: eventText.slice(0, 500),
+          existingContext: scenario.mapContext ?? '',
+        })
+        scenario.mapContext = updated
+        await scenario.save()
+        // Уведомляем всех участников об обновлённом контексте
+        io.emit('map:contextUpdated', { scenarioId, mapContext: updated })
+        ack?.({ ok: true, mapContext: updated })
+
+        // Записываем ключевое событие карты в глобальную хронику кампании
+        const session = sessions.get(socket.user.id)
+        appendChronicle(session?.campaignId, eventText.slice(0, 200))
+      } catch (err) {
+        console.error('[map:journal] ошибка:', err.message)
+        ackError(ack, err.message)
+      }
+    })
+
     socket.on('disconnect', () => {
       console.log(`[socket] ${username} отключился — ${socket.id}`)
-      // Если отключился admin с активной сессией — закрываем её и сбрасываем позиции
+      // Если отключился admin с активной сессией — закрываем её, восстанавливаем снапшоты
       if (role === 'admin' && sessions.has(socket.user.id)) {
-        const session = sessions.get(socket.user.id)
-        if (session?.scenarioId) livePositions.delete(session.scenarioId)
-        sessions.delete(socket.user.id)
-        io.emit('sessions:updated', listSessions())
+        closeAdminSession(socket.user.id)
       }
     })
   })

@@ -63,6 +63,38 @@ export function useNpcDialog(store) {
     dialogBubbles.value = m
   }
 
+  function addTradeOffer(uid, { itemName, price, itemIcon, npcUid }) {
+    const m = new Map(dialogBubbles.value)
+    const b = m.get(uid)
+    if (!b) return
+    m.set(uid, {
+      ...b,
+      messages: [...b.messages, { who: 'trade', itemName, price, itemIcon, npcUid }],
+    })
+    dialogBubbles.value = m
+  }
+
+  function addWarningMessage(uid, text) {
+    const m = new Map(dialogBubbles.value)
+    const b = m.get(uid)
+    if (!b) return
+    m.set(uid, {
+      ...b,
+      messages: [...b.messages, { who: 'warning', text }],
+    })
+    dialogBubbles.value = m
+  }
+
+  /** Вставляет массив предыдущих сообщений в начало пузыря (для восстановления истории) */
+  function prependMessages(uid, msgs) {
+    if (!Array.isArray(msgs) || !msgs.length) return
+    const m = new Map(dialogBubbles.value)
+    const b = m.get(uid)
+    if (!b) return
+    m.set(uid, { ...b, messages: [...msgs, ...b.messages] })
+    dialogBubbles.value = m
+  }
+
   function triggerAttitudeArrow(uid, direction) {
     attitudeArrows.value = { ...attitudeArrows.value, [uid]: direction }
     setTimeout(() => {
@@ -85,6 +117,9 @@ export function useNpcDialog(store) {
     addNpcMessage,
     addDiceRollMessage,
     addPlayerMessage,
+    addTradeOffer,
+    addWarningMessage,
+    prependMessages,
     triggerAttitudeArrow,
   }
 }

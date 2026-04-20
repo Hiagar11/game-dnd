@@ -1,29 +1,12 @@
-import { watch, onUnmounted } from 'vue'
+import { watch } from 'vue'
 import { normalizeInventorySnapshot } from '../utils/inventoryState'
-import { getCurrentScenarioId } from '../utils/scenario'
 
-export function usePlacedInventorySync({ inventoryModel, props, isPlacedMode, store, getSocket }) {
-  let inventorySaveTimer = null
-
+export function usePlacedInventorySync({ inventoryModel, props, isPlacedMode, store }) {
   function inventoriesEqual(a, b) {
     return (
       JSON.stringify(normalizeInventorySnapshot(a)) ===
       JSON.stringify(normalizeInventorySnapshot(b))
     )
-  }
-
-  function queueInventoryPersist(inventory) {
-    clearTimeout(inventorySaveTimer)
-    const scenarioId = getCurrentScenarioId(store)
-    if (!scenarioId || !props.placedUid) return
-    const payload = normalizeInventorySnapshot(inventory)
-    inventorySaveTimer = setTimeout(() => {
-      getSocket()?.emit('token:edit', {
-        scenarioId,
-        uid: props.placedUid,
-        fields: { inventory: payload },
-      })
-    }, 250)
   }
 
   watch(
@@ -36,13 +19,14 @@ export function usePlacedInventorySync({ inventoryModel, props, isPlacedMode, st
       const normalized = normalizeInventorySnapshot(value)
       if (inventoriesEqual(normalized, token.inventory)) return
 
-      store.editPlacedToken(props.placedUid, { inventory: normalized })
-      queueInventoryPersist(normalized)
+      // Если оружие убрано из слота — сбросить флаг armed
+      const hasWeapon = !!normalized?.equipped?.weapon
+      const fields = { inventory: normalized }
+      if (!hasWeapon && token.armed) fields.armed = false
+
+      // Обновляем только локальный store; в БД попадёт при сохранении сессии
+      store.editPlacedToken(props.placedUid, fields)
     },
     { deep: true }
   )
-
-  onUnmounted(() => {
-    clearTimeout(inventorySaveTimer)
-  })
 }

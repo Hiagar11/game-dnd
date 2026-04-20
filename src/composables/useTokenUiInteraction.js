@@ -7,10 +7,10 @@ export function useTokenUiInteraction({
   heroIds,
   wasDragged,
   getSocket,
-  ctxState,
+  // ctxState — зарезервирован для контекстного меню
   openContextMenu,
   closeContextMenu,
-  emitDoorTransition,
+  // emitDoorTransition — зарезервирован для переходов через дверь
 }) {
   const editPlacedUid = ref(null)
   const editInitialTab = ref('stats')
@@ -25,13 +25,9 @@ export function useTokenUiInteraction({
   function onContextMenu(placed) {
     if (wasDragged.value) return
 
-    store.selectPlacedToken(null)
-
-    if (ctxState.value.visible && ctxState.value.uid === placed.uid) {
-      closeContextMenu()
-    } else {
-      openContextMenu(placed.uid)
-    }
+    // Правый клик на токене — открываем контекстное меню.
+    // Деселекцию делает родитель (.game-tokens) через onMapRightClick — событие всплывает наверх.
+    openContextMenu(placed.uid)
   }
 
   function handleRemove(uid) {
@@ -69,20 +65,6 @@ export function useTokenUiInteraction({
     editInitialTab.value = 'stats'
   }
 
-  function onDblClick(placed, clickTimerRef) {
-    if (clickTimerRef.value !== null) {
-      clearTimeout(clickTimerRef.value)
-      clickTimerRef.value = null
-    }
-    store.setCombatPair(null, null)
-    store.selectPlacedToken(placed.uid)
-    closeContextMenu()
-    if (placed.systemToken === 'door' && placed.targetScenarioId) {
-      const sourceScenarioId = store.currentScenario?.id ?? null
-      emitDoorTransition({ targetScenarioId: placed.targetScenarioId, sourceScenarioId })
-    }
-  }
-
   return {
     editPlacedUid,
     editInitialTab,
@@ -94,6 +76,5 @@ export function useTokenUiInteraction({
     handleInventory,
     handleAbilities,
     closeEditPopup,
-    onDblClick,
   }
 }

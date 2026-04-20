@@ -28,6 +28,7 @@
               'combat-tracker__item--current': i === store.currentInitiativeIndex,
               'combat-tracker__item--hero': isHeroToken(entry),
               'combat-tracker__item--hostile': isHostileNpcToken(entry),
+              'combat-tracker__item--ally': isFriendlyNpcToken(entry),
             }"
           >
             <span class="combat-tracker__init">{{ entry.initiative }}</span>
@@ -44,7 +45,7 @@
 <script setup>
   import { ref, watch, nextTick } from 'vue'
   import { useGameStore } from '../stores/game'
-  import { isHeroToken, isHostileNpcToken } from '../utils/tokenFilters'
+  import { isHeroToken, isHostileNpcToken, isFriendlyNpcToken } from '../utils/tokenFilters'
 
   const store = useGameStore()
   const listRef = ref(null)
@@ -147,6 +148,10 @@
       border-color: rgb(200 60 60 / 30%);
     }
 
+    &--ally {
+      border-color: rgb(60 180 100 / 30%);
+    }
+
     &--current {
       background: rgb(255 200 60 / 10%);
       border-color: rgb(220 160 50 / 70%);
@@ -156,6 +161,12 @@
         background: rgb(220 60 60 / 12%);
         border-color: rgb(220 80 60 / 70%);
         box-shadow: 0 0 10px rgb(200 60 60 / 25%);
+      }
+
+      &.combat-tracker__item--ally {
+        background: rgb(40 160 90 / 12%);
+        border-color: rgb(60 200 110 / 70%);
+        box-shadow: 0 0 10px rgb(40 180 90 / 25%);
       }
 
       .combat-tracker__init {

@@ -1,14 +1,19 @@
 // Игровое состояние: сетка, токены на карте, текущий сценарий, кампания.
-// Шаблоны токенов (CRUD) вынесены в stores/tokens.js.
+// Боевая система вынесена в useGameCombat.js.
+// Предметы/контейнеры — в useGameLoot.js.
+// Шаблоны токенов (CRUD) — в stores/tokens.js.
 // Константы — в constants/systemTokens.js.
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
+import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
 import { useTokensStore } from './tokens'
 import { mapServerToken } from '../utils/mapServerToken'
-import { calcMaxHp } from '../utils/combatFormulas'
+import { calcMaxHp, getEffectiveStats } from '../utils/combatFormulas'
 import { createEmptyInventory } from '../utils/inventoryState'
-import { getHeroTokens, getHostileNpcTokens, getNpcAttitude } from '../utils/tokenFilters'
+import { getNpcAttitude } from '../utils/tokenFilters'
+import { useGameCombat } from './useGameCombat'
+import { useGameLoot } from './useGameLoot'
 
 // Re-export для обратной совместимости (GameMenuSystem.vue)
 export { SYSTEM_TOKENS }
@@ -48,66 +53,11 @@ export const useGameStore = defineStore('game', () => {
   const selectedPlacedUid = ref(null)
   const shakingTokenUid = ref(null)
 
-  // ─── Предметы на земле ──────────────────────────────────────────────────────
-  // Массив { id, col, row, items: [item, …] } — кучки лута, лежащие на карте.
-  const groundItems = ref([])
-
-  /**
-   * Добавить предмет на землю рядом с (col, row).
-   * Если в радиусе MERGE_RADIUS суб-клеток уже есть кучка — кладём туда.
-   * Иначе создаём новую.
-   */
-  const MERGE_RADIUS = 3
-  function addGroundLoot(col, row, item) {
-    let nearest = null
-    let bestDist = Infinity
-    for (const g of groundItems.value) {
-      const d = Math.abs(g.col - col) + Math.abs(g.row - row)
-      if (d <= MERGE_RADIUS && d < bestDist) {
-        bestDist = d
-        nearest = g
-      }
-    }
-    if (nearest) {
-      nearest.items.push(item)
-    } else {
-      groundItems.value.push({ id: crypto.randomUUID(), col, row, items: [item] })
-    }
-  }
-
-  /** Забрать предмет из кучки. Если кучка опустела — удалить. */
-  function pickupGroundItem(pileId, itemIdx) {
-    const pile = groundItems.value.find((g) => g.id === pileId)
-    if (!pile) return null
-    const [item] = pile.items.splice(itemIdx, 1)
-    if (!pile.items.length) {
-      groundItems.value = groundItems.value.filter((g) => g.id !== pileId)
-    }
-    return item ?? null
-  }
-
-  /** Инициализация предметов на земле из сервера. */
-  function initGroundItems(serverItems) {
-    groundItems.value = (serverItems ?? []).map((g) => ({
-      id: g.id ?? crypto.randomUUID(),
-      col: g.col,
-      row: g.row,
-      items: [...(g.items ?? [])],
-    }))
-  }
-
   // ─── Стены ────────────────────────────────────────────────────────────────────
   // Массив { col, row } — клетки, отмеченные как стена.
   // wallMode: true — включён режим рисования стен (задаётся редактором).
   const walls = ref([])
   const wallMode = ref(false)
-
-  // Пара токенов в боевом контакте — показывает значок мечей между ними
-  // { heroUid: string, npcUid: string, npcInitiated: boolean } | null
-  const combatPair = ref(null)
-  function setCombatPair(heroUid, npcUid, npcInitiated = false) {
-    combatPair.value = heroUid && npcUid ? { heroUid, npcUid, npcInitiated } : null
-  }
 
   // Фантомный путь при ховере: массив { col, row } клеток маршрута.
   // Устанавливается из GameRangeOverlay при mousemove, очищается при mouseleave.
@@ -122,107 +72,14 @@ export const useGameStore = defineStore('game', () => {
     hoveredCell.value = cell ?? null
   }
 
-  // Превью при перетаскивании токена — 2×2 sub-cell зона дропа
-  const dropPreviewCell = ref(null) // { col, row } | null
+  // Превью при перетаскивании токена — зона дропа (2×2 или 1×2 sub-cells)
+  const dropPreviewCell = ref(null) // { col, row, halfSize?, quarterSize? } | null
   function setDropPreviewCell(cell) {
     dropPreviewCell.value = cell ?? null
   }
 
-  // ─── Боевой режим / инициатива ────────────────────────────────────────────────
-  // Радиус видимости: враг считается «видимым», если находится в пределах
-  // VISIBILITY_RADIUS клеток от любого героя (расстояние по Евклиду).
-  const VISIBILITY_RADIUS = 6
-
-  const combatMode = ref(false)
-  // Массив { uid, initiative, name, src, tokenType, attitude } — отсортирован по убыванию инициативы.
-  const initiativeOrder = ref([])
-  const currentInitiativeIndex = ref(0) // индекс текущего участника в initiativeOrder
-  const combatRound = ref(0) // номер текущего раунда боя
-  // uid → кол-во раундов, в которые враг был вне зоны видимости.
-  const enemyHiddenTurns = ref({})
-
-  /** Проверяет, находится ли токен в зоне видимости хотя бы одного героя */
-  function isTokenVisible(token) {
-    const heroes = getHeroTokens(placedTokens.value)
-    return heroes.some((hero) => {
-      const dc = Math.abs(hero.col - token.col)
-      const dr = Math.abs(hero.row - token.row)
-      return Math.sqrt(dc * dc + dr * dr) <= VISIBILITY_RADIUS
-    })
-  }
-
-  /** Бросок d20 инициативы для всех не-системных токенов, сортировка по убыванию */
-  function rollInitiativeAll(excludeUid = null, visibleKeys = null) {
-    return placedTokens.value
-      .filter((t) => {
-        if (t.systemToken || t.uid === excludeUid) return false
-        // Если передана карта видимости — включаем только видимых токенов
-        if (visibleKeys && !visibleKeys.has(`${t.col}:${t.row}`)) return false
-        return true
-      })
-      .map((t) => ({
-        uid: t.uid,
-        initiative: Math.floor(Math.random() * 20) + 1,
-        name: t.name,
-        src: t.src,
-        tokenType: t.tokenType ?? 'npc',
-        attitude: getNpcAttitude(t),
-      }))
-      .sort((a, b) => b.initiative - a.initiative)
-  }
-
-  /**
-   * Войти в боевой режим.
-   * @param {string|null} firstUid — uid токена, который начал бой (встаёт ПОСЛЕДНИМ в инициативу).
-   * @param {Set<string>|null} visibleKeys — Set «col:row» видимых клеток; если null — все токены.
-   */
-  function enterCombat(firstUid = null, visibleKeys = null) {
-    if (combatMode.value) return
-    // Остальные токены разыгрывают порядок по d20; firstUid в жеребьёвке не участвует
-    const order = rollInitiativeAll(firstUid, visibleKeys)
-    if (firstUid) {
-      const t = placedTokens.value.find((e) => e.uid === firstUid)
-      if (t) {
-        order.push({
-          uid: t.uid,
-          initiative: 0, // гарантированно последний
-          name: t.name,
-          src: t.src,
-          tokenType: t.tokenType ?? 'npc',
-          attitude: getNpcAttitude(t),
-        })
-      }
-    }
-    initiativeOrder.value = order
-    currentInitiativeIndex.value = 0
-    combatRound.value = 1
-    enemyHiddenTurns.value = {}
-    combatMode.value = true
-  }
-
-  /** Выйти из боевого режима — все враги убиты или сбежали */
-  function exitCombat() {
-    combatMode.value = false
-    initiativeOrder.value = []
-    currentInitiativeIndex.value = 0
-    combatRound.value = 0
-    enemyHiddenTurns.value = {}
-    // Восстановить AP всем токенам
-    for (const t of placedTokens.value) {
-      t.actionPoints = 8
-    }
-  }
-
-  /** Проверка условия конца боя: нет живых видимых врагов */
-  function checkCombatEnd() {
-    const hostiles = getHostileNpcTokens(placedTokens.value)
-    if (!hostiles.length) {
-      exitCombat()
-      return
-    }
-    const allFled = hostiles.every((t) => (enemyHiddenTurns.value[t.uid] ?? 0) >= 3)
-    if (allFled) exitCombat()
-  }
+  // ─── Боевой режим (composable) ────────────────────────────────────────────────
+  const combat = useGameCombat(placedTokens, selectedPlacedUid)
 
   // Проверяет, есть ли стена в клетке (col, row). Используется в useGridDraw.
   function hasWall(col, row) {
@@ -243,6 +100,23 @@ export const useGameStore = defineStore('game', () => {
   // ─── Туман войны ──────────────────────────────────────────────────────────
   // true — туман виден, false — админ его скрыл (игроки всегда видят туман).
   const fogEnabled = ref(true)
+
+  // ─── Способности ──────────────────────────────────────────────────────────
+  // Выбранная способность, ожидающая выбора цели/зоны на карте.
+  // { name, icon, apCost, areaType, areaSize, slotIndex, tokenUid } | null
+  const pendingAbility = ref(null)
+
+  // Превью зоны AoE-способности при ховере — массив { col, row }
+  const abilityPreviewCells = ref([])
+
+  // Активная анимация удара (impact) — { cells: [{col,row}], color, icon } | null
+  const abilityImpact = ref(null)
+
+  // Активный летящий снаряд — { fromX, fromY, toX, toY, color, icon } | null
+  const abilityProjectile = ref(null)
+
+  // SVG-дуга удара мечом — { col, row, color } | null
+  const meleeSlash = ref(null)
 
   // ─── Сессия ───────────────────────────────────────────────────────────────────
   const currentScenario = ref(null)
@@ -273,7 +147,8 @@ export const useGameStore = defineStore('game', () => {
     const uid = crypto.randomUUID()
     const str = def?.strength ?? 0
     const agi = def?.agility ?? 0
-    const mhp = calcMaxHp(str, agi)
+    const es = getEffectiveStats(def)
+    const mhp = calcMaxHp(es.strength, es.agility)
     placedTokens.value.push({
       uid,
       tokenId,
@@ -291,7 +166,17 @@ export const useGameStore = defineStore('game', () => {
       charisma: def?.charisma ?? 0,
       maxHp: mhp,
       hp: mhp,
-      actionPoints: 8,
+      actionPoints: DEFAULT_AP,
+      movementPoints: DEFAULT_MP,
+      xp: def?.xp ?? 0,
+      level: def?.level ?? 1,
+      statPoints: 0,
+      autoLevel: def?.tokenType === 'npc',
+      race: def?.race ?? '',
+      armed: false,
+      contextNotes: def?.contextNotes ?? '',
+      secretKnowledge: def?.secretKnowledge ?? '',
+      dispositionType: def?.dispositionType ?? 'neutral',
       inventory: createEmptyInventory(),
     })
     return uid
@@ -311,13 +196,18 @@ export const useGameStore = defineStore('game', () => {
       hidden: false,
       name: def.name,
       src: def.src,
+      srcOpened: def.srcOpened ?? null,
+      opened: false,
+      halfSize: def.halfSize ?? false,
+      quarterSize: def.quarterSize ?? false,
       strength: 0,
       agility: 0,
       intellect: 0,
       charisma: 0,
       maxHp: 10,
       hp: 10,
-      actionPoints: 8,
+      actionPoints: DEFAULT_AP,
+      movementPoints: DEFAULT_MP,
     })
     return uid
   }
@@ -338,76 +228,20 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  // Тратит 1 очко действия. Возвращает false если AP = 0 (нельзя ходить).
-  function spendActionPoint(uid) {
+  // Тратит очки действия (AP). cost — сколько AP списать (по умолчанию 1).
+  function spendActionPoint(uid, cost = 1) {
     const token = placedTokens.value.find((t) => t.uid === uid)
-    if (!token || !(token.actionPoints > 0)) return false
-    token.actionPoints -= 1
+    if (!token || token.actionPoints < cost) return false
+    token.actionPoints -= cost
     return true
   }
 
-  // Завершить ход.
-  // Мирный режим → восстановить AP всем.
-  // Боевой режим → передать ход следующему по инициативе;
-  //   при начале нового раунда — проверить видимость врагов и условие выхода из боя.
-  function endTurn() {
-    if (!combatMode.value) {
-      for (const t of placedTokens.value) {
-        t.actionPoints = 8
-      }
-      return
-    }
-
-    // ── Боевой режим ──────────────────────────────────────────────────────────
-    const order = initiativeOrder.value
-    if (!order.length) return
-
-    // Забрать AP у текущего участника
-    const currUid = order[currentInitiativeIndex.value]?.uid
-    const currToken = placedTokens.value.find((t) => t.uid === currUid)
-    if (currToken) currToken.actionPoints = 0
-
-    // Перейти к следующему
-    const prevIndex = currentInitiativeIndex.value
-    const nextIndex = prevIndex + 1
-    const isNewRound = nextIndex >= order.length
-    currentInitiativeIndex.value = isNewRound ? 0 : nextIndex
-
-    if (isNewRound) {
-      combatRound.value++
-
-      // Обновить счётчики скрытых ходов для враждебных токенов
-      const hostiles = getHostileNpcTokens(placedTokens.value)
-      for (const t of hostiles) {
-        if (isTokenVisible(t)) {
-          enemyHiddenTurns.value[t.uid] = 0
-        } else {
-          enemyHiddenTurns.value[t.uid] = (enemyHiddenTurns.value[t.uid] ?? 0) + 1
-        }
-      }
-
-      // Убрать сбежавших (> 3 раундов вне видимости) из порядка инициативы
-      const fledUids = new Set(
-        hostiles.filter((t) => (enemyHiddenTurns.value[t.uid] ?? 0) >= 3).map((t) => t.uid)
-      )
-      if (fledUids.size) {
-        initiativeOrder.value = initiativeOrder.value.filter((e) => !fledUids.has(e.uid))
-        if (currentInitiativeIndex.value >= initiativeOrder.value.length) {
-          currentInitiativeIndex.value = 0
-        }
-      }
-
-      checkCombatEnd()
-      if (!combatMode.value) return // Бой завершён — exitCombat уже восстановил AP
-    }
-
-    // Восстановить AP следующему участнику и выбрать его
-    const nextUid = initiativeOrder.value[currentInitiativeIndex.value]?.uid
-    const nextToken = placedTokens.value.find((t) => t.uid === nextUid)
-    if (nextToken) {
-      nextToken.actionPoints = 8
-      selectedPlacedUid.value = nextUid
-    }
+  // Тратит 1 очко передвижения (MP). Для ходьбы по клеткам.
+  function spendMovementPoint(uid) {
+    const token = placedTokens.value.find((t) => t.uid === uid)
+    if (!token || !(token.movementPoints > 0)) return false
+    token.movementPoints -= 1
+    return true
   }
 
   function editPlacedToken(uid, fields) {
@@ -427,6 +261,14 @@ export const useGameStore = defineStore('game', () => {
     if (isGlobal) token.targetScenarioId = null
   }
 
+  /** Удаляет все размещённые экземпляры шаблона (при удалении шаблона из библиотеки). */
+  function removeTokensByTemplateId(tokenId) {
+    placedTokens.value = placedTokens.value.filter((t) => t.tokenId !== tokenId)
+  }
+
+  // ─── Лут и контейнеры (composable) ────────────────────────────────────────────
+  const loot = useGameLoot(placedTokens, { placeSystemToken, removeToken })
+
   // ─── Инициализация из сервера ─────────────────────────────────────────────────
   function initPlacedTokens(serverTokens) {
     const tokensStore = useTokensStore()
@@ -440,6 +282,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   return {
+    // Сетка
     cellSize,
     halfCell,
     colorGrid,
@@ -448,55 +291,59 @@ export const useGameStore = defineStore('game', () => {
     gridOffsetY,
     gridNormOX,
     gridNormOY,
+    setCellSize,
+    setColorGrid,
     setGridOffset,
+    // Токены на карте
     placedTokens,
     selectedPlacedUid,
     shakingTokenUid,
-    walls,
-    wallMode,
-    groundItems,
-    combatPair,
-    fogEnabled,
-    currentScenario,
-    activeCampaign,
-    setCellSize,
-    setColorGrid,
-    setActiveCampaign,
     selectPlacedToken,
     shakeToken,
     placeToken,
     placeSystemToken,
     removeToken,
+    removeTokensByTemplateId,
     moveToken,
     editPlacedToken,
-    calcMaxHp,
     spendActionPoint,
-    endTurn,
-    setCombatPair,
+    spendMovementPoint,
+    // Двери
+    setDoorTarget,
+    setDoorGlobalMapExit,
+    // Стены
+    walls,
+    wallMode,
+    hasWall,
+    addWall,
+    removeWall,
+    // UI
     hoveredPath,
     setHoveredPath,
     hoveredCell,
     setHoveredCell,
     dropPreviewCell,
     setDropPreviewCell,
-    setDoorTarget,
-    setDoorGlobalMapExit,
+    // Туман
+    fogEnabled,
+    // Способности
+    pendingAbility,
+    abilityPreviewCells,
+    abilityImpact,
+    abilityProjectile,
+    meleeSlash,
+    // Сессия
+    currentScenario,
+    activeCampaign,
+    setActiveCampaign,
+    // Утилиты
+    calcMaxHp,
+    // Инициализация
     initPlacedTokens,
     initWalls,
-    initGroundItems,
-    addGroundLoot,
-    pickupGroundItem,
-    hasWall,
-    addWall,
-    removeWall,
-    // Боевой режим
-    combatMode,
-    initiativeOrder,
-    currentInitiativeIndex,
-    combatRound,
-    enemyHiddenTurns,
-    enterCombat,
-    exitCombat,
-    isTokenVisible,
+    // Боевая система (из useGameCombat)
+    ...combat,
+    // Лут и контейнеры (из useGameLoot)
+    ...loot,
   }
 })

@@ -10,6 +10,69 @@ const clickSound = new Audio('/sounds/click.wav')
 const nextSound = new Audio('/sounds/next.wav')
 const successSound = new Audio('/sounds/success.wav')
 const fistSound = new Audio('/sounds/fist.wav')
+const swordSound = new Audio('/sounds/sword.mp3')
+const whooshSound = new Audio('/sounds/whoosh.wav')
+const levelUpSound = new Audio('/sounds/success.wav')
+
+// ── Web Audio API для мгновенного воспроизведения боевых звуков ────────────────
+// MP3 через new Audio() имеет задержку декодирования ~50-150мс.
+// AudioContext + предзагруженный буфер воспроизводит мгновенно.
+let audioCtx = null
+let swordBuffer = null
+let whooshBuffer = null
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+  return audioCtx
+}
+
+async function preloadBuffer(url) {
+  try {
+    const res = await fetch(url)
+    const arrayBuf = await res.arrayBuffer()
+    return await getAudioCtx().decodeAudioData(arrayBuf)
+  } catch {
+    return null
+  }
+}
+
+// Предзагрузка при первом взаимодействии пользователя (AudioContext требует жест)
+// Промис хранится, чтобы повторные вызовы не запускали загрузку заново
+// и чтобы playSword/playMiss могли дождаться окончания загрузки
+let combatBuffersPromise = null
+function ensureCombatBuffers() {
+  if (combatBuffersPromise) return combatBuffersPromise
+  combatBuffersPromise = (async () => {
+    const ctx = getAudioCtx()
+    if (ctx.state === 'suspended') await ctx.resume()
+    ;[swordBuffer, whooshBuffer] = await Promise.all([
+      preloadBuffer('/sounds/sword.mp3'),
+      preloadBuffer('/sounds/whoosh.wav'),
+    ])
+  })()
+  return combatBuffersPromise
+}
+
+// Загружаем боевые буферы по первому клику/касанию — к началу боя они уже будут готовы
+function onFirstGesture() {
+  ensureCombatBuffers()
+  document.removeEventListener('click', onFirstGesture)
+  document.removeEventListener('touchstart', onFirstGesture)
+}
+document.addEventListener('click', onFirstGesture, { once: true })
+document.addEventListener('touchstart', onFirstGesture, { once: true })
+
+function playBuffer(buffer, volume = 0.85) {
+  if (!buffer) return
+  const ctx = getAudioCtx()
+  const source = ctx.createBufferSource()
+  const gain = ctx.createGain()
+  source.buffer = buffer
+  gain.gain.value = volume
+  source.connect(gain)
+  gain.connect(ctx.destination)
+  source.start(0)
+}
 const battleMusic = new Audio('/sounds/battle.mp3')
 const travelMusic = new Audio('/sounds/travel.mp3')
 const mainMenuMusic = new Audio('/sounds/main-menu.mp3')
@@ -20,6 +83,9 @@ clickSound.volume = 0.5
 nextSound.volume = 0.6
 successSound.volume = 0.7
 fistSound.volume = 0.8
+swordSound.volume = 0.85
+whooshSound.volume = 0.75
+levelUpSound.volume = 0.9
 battleMusic.volume = 0
 battleMusic.loop = true
 travelMusic.volume = 0
@@ -72,6 +138,7 @@ function hardStopMainMenuMusic() {
 }
 
 export function playBattleMusic() {
+  ensureCombatBuffers()
   hardStopTravelMusic()
   hardStopMainMenuMusic()
   if (battleFadeId) clearInterval(battleFadeId)
@@ -125,6 +192,51 @@ export function playSuccess() {
 export function playFist() {
   fistSound.currentTime = 0
   fistSound.play().catch(() => {})
+}
+export function playSword() {
+  if (swordBuffer) {
+    playBuffer(swordBuffer, 0.85)
+    return
+  }
+  // Буферы ещё загружаются — дождаться и воспроизвести мгновенно
+  if (combatBuffersPromise) {
+    combatBuffersPromise.then(() => {
+      if (swordBuffer) playBuffer(swordBuffer, 0.85)
+      else {
+        swordSound.currentTime = 0
+        swordSound.play().catch(() => {})
+      }
+    })
+    return
+  }
+  // Буферы не запрашивались — запустить загрузку + пока fallback
+  ensureCombatBuffers()
+  swordSound.currentTime = 0
+  swordSound.play().catch(() => {})
+}
+export function playMiss() {
+  if (whooshBuffer) {
+    playBuffer(whooshBuffer, 0.75)
+    return
+  }
+  // Буферы ещё загружаются — дождаться
+  if (combatBuffersPromise) {
+    combatBuffersPromise.then(() => {
+      if (whooshBuffer) playBuffer(whooshBuffer, 0.75)
+      else {
+        whooshSound.currentTime = 0
+        whooshSound.play().catch(() => {})
+      }
+    })
+    return
+  }
+  ensureCombatBuffers()
+  whooshSound.currentTime = 0
+  whooshSound.play().catch(() => {})
+}
+export function playLevelUp() {
+  levelUpSound.currentTime = 0
+  levelUpSound.play().catch(() => {})
 } // ── Музыка главного меню ─────────────────────────────────────────
 
 export function playMainMenuMusic() {

@@ -27,7 +27,7 @@ function isWallBlocked(col, row, wallSet) {
  * Два 2×2-блока пересекаются если |c1-c2| < 2 && |r1-r2| < 2.
  * Поэтому для каждого occupied (oc, or) блокируем позиции (oc-1..oc+1, or-1..or+1).
  */
-function expandOccupied2x2(occupiedKeys) {
+export function expandOccupied2x2(occupiedKeys) {
   const blocked = new Set()
   for (const key of occupiedKeys) {
     const [c, r] = key.split(',').map(Number)
@@ -161,6 +161,8 @@ const ADJACENT_2x2 = [
   [0, 2],
   [1, 2],
 ]
+
+export { ADJACENT_2x2 }
 
 export function buildAttackCells(token, placedTokens, walls) {
   if (token.tokenType !== 'hero') return new Set()

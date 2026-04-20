@@ -30,8 +30,6 @@
           @back-to-scenario="onBackToScenario"
         />
         <EditorScenarioSection v-show="activeSection === 'scenarios'" @open-level="onOpenLevel" />
-        <EditorItemsSection v-if="activeSection === 'items'" />
-        <EditorTraitsSection v-if="activeSection === 'traits'" />
       </main>
     </div>
   </div>
@@ -44,8 +42,6 @@
   import EditorMapsSection from '../components/EditorMapsSection.vue'
   import EditorLevelSection from '../components/EditorLevelSection.vue'
   import EditorScenarioSection from '../components/EditorScenarioSection.vue'
-  import EditorItemsSection from '../components/EditorItemsSection.vue'
-  import EditorTraitsSection from '../components/EditorTraitsSection.vue'
   import EditorGlobalMapSection from '../components/EditorGlobalMapSection.vue'
   import { useSound } from '../composables/useSound'
 
@@ -54,8 +50,6 @@
     { key: 'maps', label: 'Загрузить карты' },
     { key: 'levels', label: 'Заполнить карты' },
     { key: 'scenarios', label: 'Создать сценарий' },
-    { key: 'items', label: 'Создание предметов' },
-    { key: 'traits', label: 'Создание свойств' },
   ]
 
   const router = useRouter()

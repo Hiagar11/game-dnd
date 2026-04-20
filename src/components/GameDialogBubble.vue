@@ -54,16 +54,70 @@
             class="dialog-bubble__dice"
             :class="msg.success ? 'dialog-bubble__dice--success' : 'dialog-bubble__dice--fail'"
           >
-            <span class="dialog-bubble__dice-icon">🎲</span>
-            <span class="dialog-bubble__dice-label">Убеждение</span>
-            <span class="dialog-bubble__dice-roll">
-              {{ msg.d20 }}
-              <span v-if="msg.mod" class="dialog-bubble__dice-mod">+{{ msg.mod }}</span>
-              = {{ msg.total }} / {{ msg.dc }}
-            </span>
+            <!-- Обман: heroDeception + luck vs npcInsight -->
+            <template v-if="msg.type === 'deception'">
+              <span class="dialog-bubble__dice-icon">🎭</span>
+              <span class="dialog-bubble__dice-label">Обман</span>
+              <span class="dialog-bubble__dice-roll">
+                {{ msg.deception }}
+                <span v-if="msg.luck" class="dialog-bubble__dice-mod">+🍀{{ msg.luck }}</span>
+                = {{ msg.total }} / 👁{{ msg.npcInsight }}
+              </span>
+            </template>
+            <!-- Убеждение: heroPersuasion + luck vs DC -->
+            <template v-else>
+              <span class="dialog-bubble__dice-icon">✨</span>
+              <span class="dialog-bubble__dice-label">Убеждение</span>
+              <span class="dialog-bubble__dice-roll">
+                {{ msg.persuasion }}
+                <span v-if="msg.luck" class="dialog-bubble__dice-mod">+🍀{{ msg.luck }}</span>
+                = {{ msg.total }} / {{ msg.dc }}
+              </span>
+            </template>
             <span class="dialog-bubble__dice-result">
               {{ msg.success ? 'Успех!' : 'Провал' }}
             </span>
+          </div>
+        </template>
+
+        <!-- Торговое предложение -->
+        <template v-if="msg.who === 'trade'">
+          <div class="dialog-bubble__trade">
+            <div class="dialog-bubble__trade-header">
+              <span class="dialog-bubble__trade-icon">🪙</span>
+              Торговля
+            </div>
+            <div class="dialog-bubble__trade-item">
+              {{ msg.itemName }}
+            </div>
+            <div class="dialog-bubble__trade-price">
+              {{ formatPrice(msg.price) }}
+            </div>
+            <div v-if="!msg.resolved" class="dialog-bubble__trade-actions">
+              <button
+                class="dialog-bubble__trade-btn dialog-bubble__trade-btn--buy"
+                @click="onBuy(msg)"
+              >
+                Купить
+              </button>
+              <button
+                class="dialog-bubble__trade-btn dialog-bubble__trade-btn--decline"
+                @click="onDecline(msg)"
+              >
+                Отказаться
+              </button>
+            </div>
+            <div v-else class="dialog-bubble__trade-resolved">
+              {{ msg.resolved }}
+            </div>
+          </div>
+        </template>
+
+        <!-- Предупреждение о враждебности -->
+        <template v-if="msg.who === 'warning'">
+          <div class="dialog-bubble__warning">
+            <span class="dialog-bubble__warning-icon">⚠️</span>
+            <span class="dialog-bubble__warning-text">{{ msg.text }}</span>
           </div>
         </template>
       </div>
@@ -92,6 +146,16 @@
         :disabled="loading"
         @keydown.enter.prevent="onSend"
       />
+      <button
+        v-if="speech.isSupported"
+        class="dialog-bubble__mic"
+        :class="{ 'dialog-bubble__mic--active': speech.isListening.value }"
+        :disabled="loading"
+        :title="speech.isListening.value ? 'Остановить запись' : 'Голосовой ввод'"
+        @click="speech.toggle()"
+      >
+        <PhMicrophone :size="14" weight="fill" />
+      </button>
       <button class="dialog-bubble__send" :disabled="!draft || loading" @click="onSend">
         <PhPaperPlaneRight :size="14" weight="fill" />
       </button>
@@ -102,7 +166,7 @@
       <div class="dialog-bubble__attitude-track">
         <div
           class="dialog-bubble__attitude-pin"
-          :style="{ left: `${((props.npcScore + 100) / 200) * 100}%` }"
+          :style="{ left: `${((props.npcScore + 30) / 90) * 100}%` }"
         />
       </div>
     </div>
@@ -111,8 +175,10 @@
 
 <script setup>
   import { ref, toRef } from 'vue'
-  import { PhPaperPlaneRight } from '@phosphor-icons/vue'
+  import { PhPaperPlaneRight, PhMicrophone } from '@phosphor-icons/vue'
   import { useDialogBubblePosition } from '../composables/useDialogBubblePosition'
+  import { useSpeechToText } from '../composables/useSpeechToText'
+  import { splitCoins } from '../utils/inventoryState'
 
   const props = defineProps({
     messages: { type: Array, required: true },
@@ -123,7 +189,7 @@
     npcScore: { type: Number, default: 0 },
   })
 
-  const emit = defineEmits(['send'])
+  const emit = defineEmits(['send', 'trade-accept', 'trade-decline'])
 
   const el = ref(null)
   const scrollEl = ref(null)
@@ -136,11 +202,33 @@
   const messagesRef = toRef(props, 'messages')
   const loadingRef = toRef(props, 'loading')
 
+  // Голосовой ввод — Web Speech API (Chrome/Edge)
+  const speech = useSpeechToText({ target: draft, lang: 'ru-RU' })
+
   function onSend() {
     const text = draft.value.trim()
     if (!text || props.loading) return
     draft.value = ''
     emit('send', text)
+  }
+
+  function formatPrice(copper) {
+    const { gold, silver, copper: cp } = splitCoins(copper)
+    const parts = []
+    if (gold) parts.push(`${gold} зол.`)
+    if (silver) parts.push(`${silver} сер.`)
+    if (cp) parts.push(`${cp} мед.`)
+    return parts.join(' ') || '0 мед.'
+  }
+
+  function onBuy(msg) {
+    msg.resolved = 'Покупка...'
+    emit('trade-accept', { npcUid: msg.npcUid, itemName: msg.itemName, price: msg.price })
+  }
+
+  function onDecline(msg) {
+    msg.resolved = 'Отказ'
+    emit('trade-decline', { npcUid: msg.npcUid })
   }
 
   useDialogBubblePosition({

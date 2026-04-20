@@ -58,6 +58,10 @@ const campaignSchema = new mongoose.Schema(
     // Позиция карточки глобальной карты на холсте редактора
     globalMapNodeX: { type: Number, default: null },
     globalMapNodeY: { type: Number, default: null },
+    // Глобальная хроника — единый журнал ключевых событий кампании (все карты).
+    // Умные NPC (высокий intellect) получают доступ к этим записям как к «слухам».
+    // Формат: краткие записи, разделённые переносом строки. Лимит ~2000 символов.
+    globalChronicle: { type: String, default: '' },
   },
   { timestamps: true }
 )

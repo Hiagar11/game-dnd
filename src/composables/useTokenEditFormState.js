@@ -21,6 +21,11 @@ export function useTokenEditFormState({
     contextNotes: '',
     secretKnowledge: '',
     ...defaultStats,
+    xp: 0,
+    level: 1,
+    statPoints: 0,
+    autoLevel: false,
+    race: '',
   })
 
   const inventoryModel = ref(null)
@@ -53,6 +58,11 @@ export function useTokenEditFormState({
       agility,
       intellect,
       charisma,
+      xp: token.xp ?? 0,
+      level: token.level ?? 1,
+      statPoints: token.statPoints ?? 0,
+      autoLevel: token.autoLevel ?? false,
+      race: token.race ?? '',
     }
     inventoryModel.value = normalizeInventorySnapshot(token?.inventory)
     previewSrc.value = src
@@ -81,6 +91,11 @@ export function useTokenEditFormState({
       contextNotes: '',
       secretKnowledge: '',
       ...defaultStats,
+      xp: 0,
+      level: 1,
+      statPoints: 0,
+      autoLevel: false,
+      race: '',
     }
     previewSrc.value = null
     fileRef.value = null

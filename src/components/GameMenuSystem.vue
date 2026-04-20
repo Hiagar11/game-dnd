@@ -12,11 +12,11 @@
         :key="token.id"
         class="game-menu-system__item"
         :title="token.name"
-        draggable="false"
+        draggable="true"
         @mouseenter="playHover"
         @dragstart="onDragStart($event, token)"
       >
-        <img :src="token.src" :alt="token.name" class="game-menu-system__img" draggable="true" />
+        <img :src="token.src" :alt="token.name" class="game-menu-system__img" draggable="false" />
       </button>
     </div>
 
@@ -135,6 +135,8 @@
   function onDragStart(e, token) {
     e.dataTransfer.effectAllowed = 'copy'
     e.dataTransfer.setData('systemToken', token.id)
+    if (token.halfSize) e.dataTransfer.setData('halfSize', '1')
+    if (token.quarterSize) e.dataTransfer.setData('quarterSize', '1')
   }
 </script>
 

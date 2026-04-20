@@ -8,6 +8,7 @@
 // поэтому нужно обрабатывать оба случая — строка и объект.
 
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
+import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
 import { calcMaxHp } from './combatFormulas'
 import { normalizeInventorySnapshot } from './inventoryState'
 import { getNpcAttitude } from './tokenFilters'
@@ -37,7 +38,13 @@ export function mapServerToken(serverToken, clientTokens) {
       row,
       hidden: hidden ?? false,
       name: def?.name ?? systemToken,
-      src: def?.src ?? '',
+      src: serverToken.opened && def?.srcOpened ? def.srcOpened : (def?.src ?? ''),
+      srcOpened: def?.srcOpened ?? null,
+      opened: serverToken.opened ?? false,
+      locked: serverToken.locked ?? false,
+      halfSize: def?.halfSize ?? false,
+      quarterSize: def?.quarterSize ?? false,
+      items: serverToken.items ? [...serverToken.items] : undefined,
       strength: 0,
       agility: 0,
       intellect: 0,
@@ -72,6 +79,8 @@ export function mapServerToken(serverToken, clientTokens) {
     npcName: serverToken.npcName ?? def?.npcName ?? tokenObj?.npcName ?? '',
     personality: serverToken.personality ?? def?.personality ?? tokenObj?.personality ?? '',
     contextNotes: serverToken.contextNotes ?? def?.contextNotes ?? tokenObj?.contextNotes ?? '',
+    secretKnowledge:
+      serverToken.secretKnowledge ?? def?.secretKnowledge ?? tokenObj?.secretKnowledge ?? '',
     dispositionType:
       serverToken.dispositionType ?? def?.dispositionType ?? tokenObj?.dispositionType ?? 'neutral',
     src: def?.src ?? fallbackSrc,
@@ -79,9 +88,11 @@ export function mapServerToken(serverToken, clientTokens) {
     agility: serverToken.agility ?? def?.agility ?? tokenObj?.stats?.agility ?? 0,
     intellect: serverToken.intellect ?? def?.intellect ?? tokenObj?.stats?.intellect ?? 0,
     charisma: serverToken.charisma ?? def?.charisma ?? tokenObj?.stats?.charisma ?? 0,
-    // Опыт и уровень — берём из шаблона (def из tokensStore) или из populated tokenId
-    xp: def?.xp ?? tokenObj?.xp ?? 0,
-    level: def?.level ?? tokenObj?.level ?? 1,
+    // Опыт и уровень — предпочитаем сохранённое переопределение в экземпляре
+    xp: serverToken.xp ?? def?.xp ?? tokenObj?.xp ?? 0,
+    level: serverToken.level ?? def?.level ?? tokenObj?.level ?? 1,
+    statPoints: serverToken.statPoints ?? 0,
+    autoLevel: serverToken.autoLevel ?? false,
     // HP: берём сохранённое override-значение или пересчитываем из характеристик по формуле
     maxHp:
       serverToken.maxHp ??
@@ -95,7 +106,13 @@ export function mapServerToken(serverToken, clientTokens) {
         serverToken.strength ?? def?.strength ?? tokenObj?.stats?.strength ?? 0,
         serverToken.agility ?? def?.agility ?? tokenObj?.stats?.agility ?? 0
       ),
-    actionPoints: serverToken.actionPoints ?? 4,
+    actionPoints: serverToken.actionPoints ?? DEFAULT_AP,
+    movementPoints: serverToken.movementPoints ?? DEFAULT_MP,
+    race: serverToken.race ?? def?.race ?? tokenObj?.race ?? '',
     inventory: normalizeInventorySnapshot(serverToken.inventory),
+    // Дерево способностей и активные слоты
+    treeActivatedIds: serverToken.treeActivatedIds ?? [],
+    abilities: serverToken.abilities ?? [],
+    passiveAbilities: serverToken.passiveAbilities ?? [],
   }
 }

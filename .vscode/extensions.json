@@ -1,7 +1,13 @@
 {
   "recommendations": [
     "Vue.volar",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "stylelint.vscode-stylelint",
+    "vitest.explorer",
     "streetsidesoftware.code-spell-checker",
-    "streetsidesoftware.code-spell-checker-russian"
+    "streetsidesoftware.code-spell-checker-russian",
+    "GitHub.copilot",
+    "GitHub.copilot-chat"
   ]
 }

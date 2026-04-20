@@ -61,10 +61,12 @@
           :visible="showSavePopup"
           :model-value="levelName"
           :location-description="locationDescription"
+          :map-context="mapContext"
           :saving="saving"
           :error="saveError"
           @update:model-value="levelName = $event"
           @update:location-description="locationDescription = $event"
+          @update:map-context="mapContext = $event"
           @save="onSaveLevel"
           @close="closeSavePopup"
         />
@@ -182,6 +184,7 @@
     showSavePopup,
     levelName,
     locationDescription,
+    mapContext,
     saving,
     saveError,
     saveSuccess,

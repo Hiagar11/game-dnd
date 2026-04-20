@@ -1,26 +1,51 @@
-import { calcCritChance, calcDamageBonus, calcDefense, calcEvasion } from '../utils/combatFormulas'
+import {
+  calcCritChance,
+  calcPerception,
+  calcEvasion,
+  calcMagicResist,
+  calcBlock,
+  calcCritDamage,
+  calcArmorPen,
+  calcMagicPen,
+  calcLuck,
+  calcStealth,
+  calcHealing,
+  calcInitiative,
+  calcPersuasion,
+  calcDeception,
+} from '../utils/combatFormulas'
 
 export function useTokenDerivedStats({ totalStats, modelValue, directDerivedBonus }) {
   function computeFromStats(stats, key, extra = 0) {
-    const { strength: s = 0, agility: a = 0, intellect: i = 0, charisma: c = 0 } = stats
-
     switch (key) {
-      case 'damage':
-        return calcDamageBonus(stats) + extra
       case 'critChance':
         return calcCritChance(stats) + extra
-      case 'defense':
-        return calcDefense(stats) + extra
       case 'evasion':
         return calcEvasion(stats) + extra
       case 'initiative':
-        return Math.floor((a + i) / 2) + extra
-      case 'resistance':
-        return Math.floor((i + s) / 3) + extra
-      case 'magicPower':
-        return Math.floor((i * 2) / 3) + extra
+        return calcInitiative(stats) + extra
+      case 'perception':
+        return calcPerception(stats) + extra
       case 'persuasion':
-        return Math.floor((c * 2 + i) / 3) + extra
+        return calcPersuasion(stats) + extra
+      case 'deception':
+        return calcDeception(stats) + extra
+      case 'magicResist':
+        return calcMagicResist(stats) + extra
+      case 'block':
+        return calcBlock(stats) + extra
+      case 'critDamage':
+        return calcCritDamage(stats) + extra
+      case 'armorPen':
+        return calcArmorPen(stats) + extra
+      case 'magicPen':
+        return calcMagicPen(stats) + extra
+      case 'luck':
+        return calcLuck(stats) + extra
+      case 'stealth':
+        return calcStealth(stats) + extra
+      case 'healing':
+        return calcHealing(stats) + extra
       default:
         return 0
     }

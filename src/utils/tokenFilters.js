@@ -11,11 +11,15 @@ export function isNpcToken(token) {
 }
 
 export function isHostileNpcToken(token) {
-  return isNpcToken(token) && getNpcAttitude(token) === 'hostile'
+  return isNpcToken(token) && !token.captured && getNpcAttitude(token) === 'hostile'
 }
 
 export function isFriendlyNpcToken(token) {
   return isNpcToken(token) && getNpcAttitude(token) === 'friendly'
+}
+
+export function isNeutralNpcToken(token) {
+  return isNpcToken(token) && !token.captured && getNpcAttitude(token) === 'neutral'
 }
 
 export function isTalkableNpcToken(token) {
@@ -25,8 +29,8 @@ export function isTalkableNpcToken(token) {
 
 export function getNpcAttitudeScore(tokenOrAttitude) {
   const attitude = getNpcAttitude(tokenOrAttitude)
-  if (attitude === 'friendly') return 50
-  if (attitude === 'hostile') return -50
+  if (attitude === 'friendly') return 30
+  if (attitude === 'hostile') return -20
   return 0
 }
 

@@ -11,6 +11,7 @@
   import GameMenuTokenList from './GameMenuTokenList.vue'
   import GameMenuSystem from './GameMenuSystem.vue'
   import GameMenuSelectedToken from './GameMenuSelectedToken.vue'
+  import GameAbilityBar from './GameAbilityBar.vue'
   import GameEndTurnButton from './GameEndTurnButton.vue'
   import { useGameStore } from '../stores/game'
   import { useSound } from '../composables/useSound'
@@ -46,7 +47,7 @@
     <div class="game-menu__center" :class="{ 'game-menu__center--token': hasSelectedToken }">
       <template v-if="hasSelectedToken">
         <GameMenuSelectedToken />
-        <div class="game-menu__perks" />
+        <GameAbilityBar />
       </template>
 
       <div v-else class="game-menu__tab-area">

@@ -1,6 +1,8 @@
 // ─── GameLootPickupPopup ──────────────────────────────────────────────────────
 // Двойной инвентарь: предметы на земле + сумка героя.
 
+@import './invTooltip.css';
+
 .loot-popup__title {
   margin: 0;
   font-size: 1.15rem;

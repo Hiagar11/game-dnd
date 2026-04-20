@@ -17,9 +17,15 @@ export function useSessionExitFlow({
   const activeSessionName = ref(null)
 
   function onBeforeUnload(e) {
-    if (sessionActive.value && sessionChanged.value) {
-      e.preventDefault()
-    }
+    if (!sessionChanged.value) return
+    // Показываем нативный диалог "Покинуть страницу?"
+    e.preventDefault()
+    // Если пользователь нажал "Остаться" — setTimeout срабатывает и мы показываем свой попап.
+    // Если нажал "Покинуть" — страница закрывается, setTimeout не выполняется.
+    // Снапшоты сценария в обоих случаях откатываются сервером через disconnect.
+    setTimeout(() => {
+      showSavePopup.value = true
+    }, 0)
   }
 
   async function onExitClick() {
@@ -48,6 +54,7 @@ export function useSessionExitFlow({
 
   async function onSummaryConfirm(saves) {
     const socket = getSocket()
+    // Сохраняем contextNotes в шаблон токена (Token) — глобальная база памяти
     await Promise.allSettled(
       saves.map(
         ({ tokenId, notes }) =>
@@ -56,6 +63,18 @@ export function useSessionExitFlow({
           )
       )
     )
+    // Также сохраняем в placedTokens и очищаем dialogHistory/behaviorNotes/eventLog
+    const memorySaves = saves
+      .map((s) => {
+        const npc = summaryNpcs.value.find((n) => n.tokenId === s.tokenId)
+        return { scenarioId: npc?.scenarioId, uid: npc?.npcUid, contextNotes: s.notes }
+      })
+      .filter((s) => s.scenarioId && s.uid)
+    if (memorySaves.length > 0) {
+      await new Promise((resolve) =>
+        socket?.emit('npc:save:memory', { saves: memorySaves }, resolve)
+      )
+    }
     showSummaryPopup.value = false
     showSavePopup.value = true
   }
@@ -82,11 +101,26 @@ export function useSessionExitFlow({
 
   async function onSaveSession(name, { resolve, reject }) {
     try {
+      // Перед созданием снапшота — пушим текущее состояние всех токенов в БД
+      const scenarioId = selectedScenario.value?.id
+      if (scenarioId) {
+        const tokens = gameStore.placedTokens.map((t) => ({ uid: t.uid, fields: { ...t } }))
+        await new Promise((res, rej) => {
+          const socket = getSocket()
+          if (!socket) return res()
+          socket.emit('scenario:persist-tokens', { scenarioId, tokens }, (response) => {
+            response?.ok ? res() : rej(new Error(response?.error ?? 'persist-tokens error'))
+          })
+          // Таймаут на случай если сокет не ответит
+          setTimeout(res, 5000)
+        })
+      }
+
       await gameSessionsStore.saveSession({
         name,
         campaignId: gameStore.activeCampaign?.id,
         campaignName: gameStore.activeCampaign?.name ?? '',
-        currentScenarioId: selectedScenario.value?.id,
+        currentScenarioId: scenarioId,
         currentScenarioName: selectedScenario.value?.name ?? '',
       })
       resolve()

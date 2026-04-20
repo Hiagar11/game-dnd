@@ -20,8 +20,8 @@
       display: grid;
       grid-template-columns: calc(100% / 12 * 4) 1fr;
       grid-template-rows: 1fr;
-      margin-block-start: calc(-1 * var(--menu-overflow) + 30px);
-      block-size: calc(100% + var(--menu-overflow) - 30px);
+      margin-block-start: calc(-1 * var(--menu-overflow) + 10px);
+      block-size: calc(100% + var(--menu-overflow) - 10px);
     }
   }
 
@@ -31,12 +31,6 @@
     min-height: 0;
     min-width: 0;
     flex: 1;
-  }
-
-  &__perks {
-    background-image: url('/systemImage/panel-center.jpg');
-    background-size: cover;
-    background-position: center;
   }
 
   &__tabs {

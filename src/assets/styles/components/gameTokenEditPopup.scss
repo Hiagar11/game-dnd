@@ -9,16 +9,16 @@
 }
 
 .token-edit-popup__body {
-  display: flex;
-  gap: var(--space-6);
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr 3fr;
+  gap: 30px;
+  align-items: start;
 }
 
 .token-edit-popup__fields {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: 30px;
 }
 
 .token-edit-popup__label {
@@ -28,6 +28,14 @@
   font-size: 13px;
   color: var(--color-text-muted);
   font-family: var(--font-ui);
+}
+
+// ─── Строка Имя + Раса ─────────────────────────────────────────────
+.token-edit-popup__name-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  align-items: start;
 }
 
 .token-edit-popup__input {
@@ -154,63 +162,219 @@
   text-align: center;
 }
 
-// ─── Шкала здоровья ───────────────────────────────────────────────
-.token-edit-popup__hp {
+// ─── Карточка героя (вертикальная, 1/4 ширины) ───────────────
+.token-edit-popup__hero-card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-}
-
-.token-edit-popup__hp-header {
-  display: flex;
   align-items: center;
-  gap: var(--space-2);
-}
+  gap: var(--space-3);
+  padding: 10%;
+  border-radius: var(--radius-md);
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 8%);
 
-.token-edit-popup__hp-icon {
-  color: #f87171;
-  flex-shrink: 0;
-}
-
-.token-edit-popup__hp-label {
-  font-size: 13px;
-  color: var(--color-text-muted);
-  font-family: var(--font-ui);
-}
-
-.token-edit-popup__hp-value {
-  margin-left: auto;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgb(255 255 255 / 80%);
-  font-family: var(--font-ui);
-
-  b {
-    color: #f87171;
-    font-size: 16px;
+  // Токен — круг, занимает всю ширину (с учётом padding)
+  :deep(.token-preview) {
+    width: 100%;
+    aspect-ratio: 1;
+    height: auto;
+    border-radius: var(--radius-full);
   }
 }
 
-.token-edit-popup__hp-bar {
+// ── HP секция (под токеном) ────────────────────────────────────
+.token-edit-popup__hero-hp {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  align-self: stretch;
+  gap: var(--space-2);
+}
+
+.token-edit-popup__hero-hp-numbers {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+}
+
+.token-edit-popup__hero-hp-icon {
+  color: #f87171;
+  align-self: center;
+}
+
+.token-edit-popup__hero-hp-current {
+  font-size: 24px;
+  font-weight: 700;
+  color: #f87171;
+  font-family: var(--font-ui);
+  line-height: 1;
+}
+
+.token-edit-popup__hero-hp-sep {
+  font-size: 16px;
+  color: rgb(255 255 255 / 30%);
+  font-family: var(--font-ui);
+}
+
+.token-edit-popup__hero-hp-max {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 50%);
+  font-family: var(--font-ui);
+}
+
+.token-edit-popup__hero-hp-bar {
   width: 100%;
-  height: 7px;
+  height: 5px;
   background: rgb(255 255 255 / 10%);
-  border-radius: 4px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
-.token-edit-popup__hp-fill {
+.token-edit-popup__hero-hp-fill {
   height: 100%;
   background: linear-gradient(90deg, #ef4444, #f87171);
-  border-radius: 4px;
+  border-radius: 3px;
   transition: width 0.3s ease;
 }
 
-.token-edit-popup__hp-hint {
-  margin: 0;
-  font-size: 11px;
-  color: rgb(255 255 255 / 25%);
+// ── Уровень + XP (под HP) ─────────────────────────────────────
+.token-edit-popup__hero-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
   font-family: var(--font-ui);
+}
+
+.token-edit-popup__hero-level-badge {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.token-edit-popup__hero-xp {
+  font-size: 12px;
+  color: rgb(255 255 255 / 45%);
+}
+
+.token-edit-popup__hero-stat-points {
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: #1a1200;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.token-edit-popup__level-up-btn {
+  padding: 2px 8px;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 6%);
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 50%);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  &:hover {
+    background: rgb(59 130 246 / 20%);
+    border-color: rgb(59 130 246 / 50%);
+    color: #fff;
+  }
+}
+
+// ── Класс персонажа (под уровнем) ─────────────────────────────
+.token-edit-popup__hero-class {
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 3px 10px;
+  border: 1px solid currentcolor;
+  border-radius: 6px;
+  opacity: 0.85;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+
+  // Синергетический класс — переливающийся фиолетовый текст
+  &--synergy {
+    opacity: 1;
+    border-color: transparent;
+    background: linear-gradient(135deg, rgb(168 85 247 / 15%), rgb(217 70 239 / 10%));
+
+    // Переливающийся текст
+    color: transparent !important;
+    background-image: linear-gradient(
+      90deg,
+      #a855f7 0%,
+      #d946ef 25%,
+      #f0abfc 50%,
+      #d946ef 75%,
+      #a855f7 100%
+    );
+    background-size: 200% 100%;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: synergy-text-flow 3s linear infinite;
+
+    // Свечение вокруг бейджа
+    box-shadow: 0 0 8px rgb(168 85 247 / 25%);
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      background:
+        linear-gradient(rgb(0 0 0 / 30%), rgb(0 0 0 / 30%)) padding-box,
+        linear-gradient(90deg, #a855f7, #d946ef, #a855f7) border-box;
+      pointer-events: none;
+    }
+
+    position: relative;
+  }
+}
+
+@keyframes synergy-text-flow {
+  0% {
+    background-position: 200% center;
+  }
+
+  100% {
+    background-position: -200% center;
+  }
+}
+
+.token-edit-popup__rc-hint {
+  font-size: 11px;
+  color: rgb(255 255 255 / 35%);
+  font-family: var(--font-ui);
+}
+
+/* Чекбокс автолевелинга */
+.token-edit-popup__checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: 13px;
+  color: rgb(255 255 255 / 60%);
+  cursor: pointer;
+  font-family: var(--font-ui);
+
+  input[type='checkbox'] {
+    accent-color: var(--color-primary);
+  }
 }
 
 // ─── Табы ─────────────────────────────────────────────────────────
@@ -246,6 +410,47 @@
     color: var(--color-primary);
     border-bottom-color: var(--color-primary);
   }
+
+  &--highlight {
+    color: #22c55e;
+
+    &:not(.token-edit-popup__tab--active) {
+      animation: tab-glow 2s ease-in-out infinite;
+    }
+  }
+}
+
+.token-edit-popup__tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  animation: tab-dot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes tab-glow {
+  0%,
+  100% {
+    color: #22c55e;
+  }
+
+  50% {
+    color: #86efac;
+  }
+}
+
+@keyframes tab-dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: scale(0.7);
+  }
 }
 
 // ─── Панель личности ИИ ───────────────────────────────────────────
@@ -262,44 +467,6 @@
   gap: var(--space-2);
 }
 
-.token-edit-popup__personality-name {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin-left: auto;
-}
-
-.token-edit-popup__input--name {
-  width: 160px;
-  padding: var(--space-1) var(--space-3);
-  font-size: 13px;
-}
-
-.token-edit-popup__random-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgb(255 255 255 / 12%);
-  background: rgb(255 255 255 / 5%);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-
-  &:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-    background: rgb(from var(--color-primary) r g b / 10%);
-  }
-
-  &:active {
-    transform: rotate(180deg);
-  }
-}
-
 .token-edit-popup__personality-icon {
   color: var(--color-primary);
   flex-shrink: 0;
@@ -310,51 +477,6 @@
   font-family: var(--font-ui);
   color: var(--color-text);
   font-weight: 600;
-}
-
-// Строка выбора нрава
-.token-edit-popup__disposition-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-2) 0 var(--space-3);
-  border-bottom: 1px solid rgb(255 255 255 / 8%);
-  margin-bottom: var(--space-2);
-}
-
-.token-edit-popup__disposition-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-muted, #9ca3af);
-  white-space: nowrap;
-  font-family: var(--font-ui);
-  min-width: 42px;
-}
-
-.token-edit-popup__disposition-select-wrap {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex: 1;
-  min-width: 0;
-}
-
-.token-edit-popup__disposition-select {
-  @include form-input(rgb(255 255 255 / 6%), 13px);
-
-  padding: 4px 8px;
-  height: 30px;
-  cursor: pointer;
-  min-width: 130px;
-}
-
-.token-edit-popup__disposition-hint {
-  font-size: 11px;
-  color: var(--color-text-muted, #9ca3af);
-  font-family: var(--font-ui);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 // Двухколоночная компоновка: textarea слева, теги справа
@@ -513,4 +635,77 @@
 :deep(.popup-shell__box) {
   width: fit-content;
   max-width: 94vw;
+}
+
+// ── AI-подсказки после прокачки ───────────────────────────────
+.token-edit-popup__hints {
+  margin-top: var(--space-3);
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px dashed rgb(255 255 255 / 12%);
+  background: rgb(139 92 246 / 6%);
+}
+
+.token-edit-popup__hints-loading {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-style: italic;
+  color: rgb(255 255 255 / 40%);
+  animation: token-spin 2s linear infinite;
+  animation-name: hints-pulse;
+}
+
+.token-edit-popup__hint {
+  margin: 0 0 4px;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-style: italic;
+  line-height: 1.4;
+  color: rgb(255 255 255 / 65%);
+
+  &:last-of-type {
+    margin-bottom: 0;
+  }
+}
+
+.token-edit-popup__hints-dismiss {
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--font-ui);
+  font-size: 10px;
+  color: rgb(255 255 255 / 30%);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+
+  &:hover {
+    color: rgb(255 255 255 / 55%);
+  }
+}
+
+// Анимация появления/исчезновения
+.hints-fade-enter-active,
+.hints-fade-leave-active {
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+
+.hints-fade-enter-from,
+.hints-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@keyframes hints-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 1;
+  }
 }

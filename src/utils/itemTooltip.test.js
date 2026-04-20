@@ -7,36 +7,40 @@ describe('itemTooltip', () => {
     expect(translateSlot('unknown-slot')).toBe('unknown-slot')
   })
 
-  it('builds rows from traits and effects', () => {
+  it('builds rows from affixes and implicit', () => {
     const item = {
-      traitIds: ['t1'],
-      effects: [{ kind: 'healing', restoreHp: 10 }],
+      implicit: { stat: 'damage', value: 3 },
+      affixes: [
+        { name: 'Острый', stat: 'damage', value: 4, type: 'prefix' },
+        { name: 'Меткости', stat: 'hit_chance', value: 2, type: 'suffix' },
+      ],
     }
-    const traits = [{ id: 't1', name: 'Меткость', mods: [{ stat: 'hit_chance', value: 2 }] }]
 
-    const rows = buildTooltipRows(item, traits)
-    expect(rows.length).toBe(2)
-    expect(rows[0].name).toBe('Меткость')
-    expect(rows[1].name).toBe('Эффект')
+    const rows = buildTooltipRows(item)
+    expect(rows.length).toBe(3)
+    expect(rows[0].implicit).toBe(true)
+    expect(rows[0].mods[0].text).toBe('Урон +3')
+    expect(rows[1].name).toBe('Острый')
+    expect(rows[2].name).toBe('Меткости')
   })
 
-  it('applies traitOverrides for relic items', () => {
+  it('builds rows for items with effects only', () => {
     const item = {
-      traitIds: ['t1', 't2'],
-      traitOverrides: {
-        t1: [{ stat: 'damage', value: 6 }],
-        t2: [{ stat: 'defense', value: -3 }],
-      },
+      effects: [{ kind: 'healing', restoreHp: 10 }],
     }
-    const traits = [
-      { id: 't1', name: 'Огонь', mods: [{ stat: 'damage', value: 3 }] },
-      { id: 't2', name: 'Земля', mods: [{ stat: 'defense', value: 3 }] },
-    ]
 
-    const rows = buildTooltipRows(item, traits)
-    expect(rows[0].mods[0].text).toBe('Урон +6')
-    expect(rows[0].mods[0].positive).toBe(true)
-    expect(rows[1].mods[0].text).toBe('Защита -3')
-    expect(rows[1].mods[0].positive).toBe(false)
+    const rows = buildTooltipRows(item)
+    expect(rows.length).toBe(1)
+    expect(rows[0].name).toBe('Эффект')
+  })
+
+  it('handles cursed affixes (negative values)', () => {
+    const item = {
+      affixes: [{ name: 'Скорости', stat: 'initiative', value: -3, type: 'suffix', cursed: true }],
+    }
+
+    const rows = buildTooltipRows(item)
+    expect(rows[0].mods[0].text).toBe('Инициатива -3')
+    expect(rows[0].mods[0].positive).toBe(false)
   })
 })

@@ -8,8 +8,8 @@
       :alt="activeToken.name"
       class="game-menu-icon__img"
     />
-    <span v-if="activeToken?.npcName" class="game-menu-icon__name">
-      {{ activeToken.npcName }}
+    <span v-if="activeToken" class="game-menu-icon__name">
+      {{ activeToken.npcName || activeToken.name }}
     </span>
   </div>
 </template>

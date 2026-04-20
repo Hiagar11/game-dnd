@@ -1,6 +1,10 @@
 ﻿<template>
-  <Transition name="combat-popup">
-    <div v-if="visible && heroToken && npcToken" class="combat-popup-wrapper">
+  <Teleport to="body">
+    <div
+      v-if="visible && heroToken && npcToken"
+      class="combat-popup-wrapper"
+      style="position: fixed; top: 7vh; left: 50%; transform: translateX(-50%); z-index: 99999"
+    >
       <Transition name="result-banner">
         <div
           v-if="resultText"
@@ -61,13 +65,35 @@
           </div>
 
           <div class="combat-popup__combat-stats">
-            <div class="combat-popup__csrow">
+            <div v-if="isMagicWeapon(currentAttacker)" class="combat-popup__csrow">
+              <span class="combat-popup__cslabel">Тип</span>
+              <span class="combat-popup__csval">Магия (авто-хит)</span>
+            </div>
+            <div v-else class="combat-popup__csrow">
               <span class="combat-popup__cslabel">Шанс удара</span>
-              <span class="combat-popup__csval">+{{ calcCritChance(currentAttacker) }}</span>
+              <span class="combat-popup__csval">
+                +{{ calcCritChance(currentAttacker) }}
+                <template v-if="isDualWielding(currentAttacker)">
+                  &minus;{{ DUAL_WIELD_HIT_PENALTY }}
+                </template>
+              </span>
             </div>
             <div class="combat-popup__csrow">
-              <span class="combat-popup__cslabel">Бонус урона</span>
-              <span class="combat-popup__csval">+{{ calcDamageBonus(currentAttacker) }}</span>
+              <span class="combat-popup__cslabel">Урон оружия</span>
+              <span class="combat-popup__csval">
+                {{ getWeaponDamageRange(currentAttacker).min }}&ndash;{{
+                  getWeaponDamageRange(currentAttacker).max
+                }}
+                <template v-if="isDualWielding(currentAttacker)"> + ½ оффхенд </template>
+              </span>
+            </div>
+            <div class="combat-popup__csrow">
+              <span class="combat-popup__cslabel">Пробивание</span>
+              <span class="combat-popup__csval">{{
+                isMagicWeapon(currentAttacker)
+                  ? calcMagicPen(currentAttacker)
+                  : calcArmorPen(currentAttacker)
+              }}</span>
             </div>
           </div>
 
@@ -75,11 +101,14 @@
             <div class="combat-popup__actions-title">Действия</div>
             <button
               class="combat-popup__action"
-              :disabled="phase !== 'idle' || (currentAttacker.actionPoints ?? 0) <= 0"
+              :disabled="
+                phase !== 'idle' ||
+                (currentAttacker.actionPoints ?? 0) < getAttackApCost(currentAttacker)
+              "
               @click="onPunch(npcIsAttacking)"
             >
               <PhHandFist :size="18" weight="bold" />
-              <span>Удар рукой</span>
+              <span>Удар ({{ getAttackApCost(currentAttacker) }} AP)</span>
             </button>
           </div>
         </div>
@@ -97,7 +126,13 @@
                 </span>
               </div>
               <div v-if="phase !== 'rolling-hit'" class="combat-popup__roll-formula">
-                {{ hitRoll?.d20 }} + {{ hitRoll?.bonus }} = {{ hitRoll?.total }}
+                {{ hitRoll?.d20 }} + {{ hitRoll?.bonus }}
+                <template v-if="hitRoll?.evasion">&minus; {{ hitRoll.evasion }}</template>
+                <template v-if="hitRoll?.hitPenalty"
+                  >&minus; {{ hitRoll.hitPenalty }}
+                  <span style="opacity: 0.6">(2 меча)</span>
+                </template>
+                = {{ hitRoll?.total }}
               </div>
             </template>
 
@@ -115,8 +150,18 @@
                 v-if="phase === 'done'"
                 class="combat-popup__roll-formula combat-popup__roll-formula--damage"
               >
-                {{ damageRoll?.d4 }} + {{ damageRoll?.bonus }} =
-                <strong>{{ damageRoll?.total }}</strong>
+                <span v-if="damageRoll?.isCrit" style="color: #fbbf24">☄ КРИТ! </span>
+                {{ damageRoll?.d4 }}
+                <template v-if="damageRoll?.armor">
+                  &minus; {{ damageRoll.armor }}
+                  <span style="opacity: 0.6">({{ damageRoll?.magic ? 'маг.' : 'броня' }})</span>
+                </template>
+                <span v-if="damageRoll?.blocked" style="color: #60a5fa"> ↑ Блок!</span>
+                <template v-if="damageRoll?.offhandDmg">
+                  + {{ damageRoll.offhandDmg }}
+                  <span style="opacity: 0.6">(оффхенд)</span>
+                </template>
+                = <strong>{{ damageRoll?.total }}</strong>
               </div>
             </template>
           </div>
@@ -196,8 +241,16 @@
               <span class="combat-popup__csval">{{ calcEvasion(currentDefender) }}</span>
             </div>
             <div class="combat-popup__csrow">
-              <span class="combat-popup__cslabel">Защита</span>
-              <span class="combat-popup__csval">{{ calcDefense(currentDefender) }}</span>
+              <span class="combat-popup__cslabel">Броня</span>
+              <span class="combat-popup__csval">{{ calcTotalArmor(currentDefender) }}</span>
+            </div>
+            <div class="combat-popup__csrow">
+              <span class="combat-popup__cslabel">Маг. сопр.</span>
+              <span class="combat-popup__csval">{{ calcMagicResist(currentDefender) }}</span>
+            </div>
+            <div class="combat-popup__csrow">
+              <span class="combat-popup__cslabel">Блок</span>
+              <span class="combat-popup__csval">{{ calcBlock(currentDefender) * 2 }}%</span>
             </div>
           </div>
         </div>
@@ -207,18 +260,28 @@
         </button>
       </div>
     </div>
-  </Transition>
+  </Teleport>
 </template>
 
 <script setup>
-  import { computed } from 'vue'
+  import { computed, watch } from 'vue'
   import { PhHeart, PhLightning, PhHandFist, PhX } from '@phosphor-icons/vue'
   import { useGameStore } from '../stores/game'
+  import { useSocket } from '../composables/useSocket'
+  import { getCurrentScenarioId } from '../utils/scenario'
   import {
     calcCritChance,
-    calcDamageBonus,
-    calcDefense,
     calcEvasion,
+    calcMagicResist,
+    calcTotalArmor,
+    calcBlock,
+    calcArmorPen,
+    calcMagicPen,
+    isMagicWeapon,
+    getWeaponDamageRange,
+    getAttackApCost,
+    isDualWielding,
+    DUAL_WIELD_HIT_PENALTY,
   } from '../utils/combatFormulas'
   import { useCombatLogic } from '../composables/useCombatLogic'
 
@@ -250,5 +313,23 @@
     onPunch,
     onClose,
   } = useCombatLogic({ store, heroToken, npcToken, emitClose: () => emit('close') })
+
+  // Синхронизируем combatLog NPC на сервер при закрытии popup
+  const { getSocket } = useSocket()
+  watch(
+    () => npcToken.value?.combatLog,
+    (log) => {
+      if (!log?.length || !npcToken.value) return
+      const scenarioId = getCurrentScenarioId(store)
+      if (scenarioId) {
+        getSocket()?.emit('token:edit', {
+          scenarioId,
+          uid: npcToken.value.uid,
+          fields: { combatLog: log },
+        })
+      }
+    },
+    { deep: true }
+  )
 </script>
-<style scoped lang="scss" src="../assets/styles/components/gameCombatPopup.scss"></style>
+<style lang="scss" src="../assets/styles/components/gameCombatPopup.scss"></style>

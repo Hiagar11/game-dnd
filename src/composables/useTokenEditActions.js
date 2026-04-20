@@ -16,6 +16,9 @@ export function useTokenEditActions({
   tokensStore,
   fileRef,
   emit,
+  localTreeIds,
+  localAbilities,
+  localPassives,
 }) {
   async function onSave() {
     if (!canSave.value) return
@@ -23,7 +26,8 @@ export function useTokenEditActions({
     saving.value = true
     saveError.value = ''
     try {
-      const { name, npcName, strength, agility, intellect, charisma } = form.value
+      const { npcName, strength, agility, intellect, charisma } = form.value
+      const name = npcName
       if (isPlacedMode.value) {
         const fields = {
           name,
@@ -37,14 +41,19 @@ export function useTokenEditActions({
           agility,
           intellect,
           charisma,
+          xp: form.value.xp ?? 0,
+          level: form.value.level ?? 1,
+          statPoints: form.value.statPoints ?? 0,
+          autoLevel: !!form.value.autoLevel,
+          race: form.value.race ?? '',
           inventory: normalizeInventorySnapshot(inventoryModel.value),
+          treeActivatedIds: localTreeIds?.value ?? [],
+          abilities: localAbilities?.value ?? [],
+          passiveAbilities: localPassives?.value ?? [],
         }
         store.editPlacedToken(props.placedUid, fields)
-        // Persist placed-token edits to backend so session save keeps latest values.
-        const scenarioId = getCurrentScenarioId(store)
-        if (scenarioId) {
-          getSocket()?.emit('token:edit', { scenarioId, uid: props.placedUid, fields })
-        }
+        // Изменения живут только в Pinia-сторе до сохранения сессии.
+        // В БД попадут при game:session:save → scenario:persist-tokens.
       } else if (isEditMode.value) {
         await tokensStore.editToken(props.tokenId, {
           name,
@@ -58,6 +67,7 @@ export function useTokenEditActions({
           agility,
           intellect,
           charisma,
+          race: form.value.race ?? '',
         })
       } else {
         const fd = new FormData()
@@ -74,6 +84,7 @@ export function useTokenEditActions({
         fd.append('agility', agility)
         fd.append('intellect', intellect)
         fd.append('charisma', charisma)
+        fd.append('race', form.value.race ?? '')
         await tokensStore.addToken(fd)
       }
       emit('close')
@@ -87,7 +98,7 @@ export function useTokenEditActions({
   async function onDelete() {
     playClick()
     if (isPlacedMode.value) {
-      if (!confirm(`Убрать токен «${form.value.name}» с карты?`)) return
+      if (!confirm(`Убрать токен «${form.value.npcName || form.value.name}» с карты?`)) return
       store.removeToken(props.placedUid)
       const scenarioId = getCurrentScenarioId(store)
       if (scenarioId) getSocket()?.emit('token:remove', { scenarioId, uid: props.placedUid })
@@ -95,7 +106,7 @@ export function useTokenEditActions({
       return
     }
 
-    if (!confirm(`Удалить токен «${form.value.name}»?`)) return
+    if (!confirm(`Удалить токен «${form.value.npcName || form.value.name}»?`)) return
     saving.value = true
     try {
       await tokensStore.deleteToken(props.tokenId)

@@ -1,3 +1,5 @@
+@import './invTooltip.css';
+
 /* ── Корневой контейнер ─────────────────────────────────────────────── */
 
 .inv-panel {
@@ -92,6 +94,11 @@
   left: 5px;
 }
 
+.inv-panel__slot--weapon2 {
+  top: 252px;
+  left: 5px;
+}
+
 .inv-panel__slot--offhand {
   top: 198px;
   right: 5px;
@@ -100,7 +107,7 @@
 /* Перчатки — под оружием (левая рука) */
 .inv-panel__slot--gloves {
   top: 252px;
-  left: 5px;
+  right: 5px;
 }
 
 .inv-panel__slot--belt {
@@ -174,6 +181,85 @@
   color: var(--color-text);
 }
 
+/* ── DEV buttons row ── */
+.inv-panel__dev-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.inv-panel__dev-btn {
+  padding: 2px 8px;
+  font-size: 9px;
+  font-family: var(--font-fantasy);
+  color: var(--color-text-muted);
+  background: rgb(200 154 74 / 12%);
+  border: 1px solid rgb(200 154 74 / 30%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.inv-panel__dev-btn:hover {
+  background: rgb(200 154 74 / 25%);
+  color: var(--color-text);
+}
+
+/* ── Кошелёк (слева от шлема) ── */
+
+.inv-panel__wallet {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  pointer-events: none;
+  padding: 3px 5px 4px;
+  background: rgb(0 0 0 / 35%);
+  border: 1px solid rgb(200 154 74 / 20%);
+  border-radius: var(--radius-sm);
+  box-shadow:
+    inset 0 1px 6px rgb(0 0 0 / 40%),
+    0 0 8px rgb(200 154 74 / 10%);
+}
+
+.inv-panel__wallet-icon {
+  width: 38px;
+  height: 38px;
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 50%));
+}
+
+.inv-panel__wallet-row {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.inv-panel__wallet-val {
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+  letter-spacing: 0.02em;
+}
+
+.inv-panel__wallet-val--gold {
+  color: #ffd700;
+  text-shadow: 0 0 5px rgb(255 215 0 / 35%);
+}
+
+.inv-panel__wallet-val--silver {
+  color: #c0c0c0;
+  text-shadow: 0 0 5px rgb(192 192 192 / 30%);
+}
+
+.inv-panel__wallet-val--copper {
+  color: #cd7f32;
+  text-shadow: 0 0 5px rgb(205 127 50 / 30%);
+}
+
 .inv-panel__grid {
   flex: 1;
   display: grid;
@@ -236,104 +322,6 @@
 .inv-tt-leave-to {
   opacity: 0;
   transform: translateX(-10px) scale(0.95);
-}
-
-.inv-tooltip {
-  position: fixed;
-  z-index: var(--z-popup, 300);
-  min-width: 180px;
-  max-width: 260px;
-  background: linear-gradient(160deg, #0d1220 0%, #16213e 100%);
-  border: 1px solid rgb(200 154 74 / 50%);
-  border-radius: var(--radius-md);
-  padding: 0;
-  box-shadow:
-    0 12px 40px rgb(0 0 0 / 80%),
-    0 0 20px rgb(200 154 74 / 20%),
-    inset 0 1px 0 rgb(255 255 255 / 5%);
-  backdrop-filter: blur(10px);
-  overflow: hidden;
-  pointer-events: none;
-}
-
-/* Полоска редкости наверху окна */
-.inv-tooltip__bar {
-  height: 3px;
-  width: 100%;
-  opacity: 0.85;
-}
-
-.inv-tooltip__name {
-  margin: 0;
-  padding: var(--space-2) var(--space-3) 0;
-  font-size: 13px;
-  font-family: var(--font-fantasy);
-  font-weight: 700;
-  letter-spacing: 0.07em;
-  line-height: 1.3;
-  text-shadow: 0 0 14px currentcolor;
-}
-
-.inv-tooltip__slot {
-  margin: 0;
-  padding: 2px var(--space-3) var(--space-1);
-  font-size: 10px;
-  font-family: var(--font-fantasy);
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: rgb(200 154 74 / 65%);
-}
-
-.inv-tooltip__list {
-  margin: 0;
-  padding: var(--space-1) var(--space-3) var(--space-2);
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  border-top: 1px solid rgb(200 154 74 / 15%);
-}
-
-.inv-tooltip__item {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px;
-  line-height: 1.4;
-}
-
-.inv-tooltip__trait-name {
-  font-size: 11px;
-  font-family: var(--font-fantasy);
-  font-weight: 400;
-  color: var(--color-text);
-}
-
-.inv-tooltip__mod {
-  font-size: 10px;
-  font-family: var(--font-fantasy);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
-.inv-tooltip__mod--pos {
-  color: #4caf82;
-  text-shadow: 0 0 8px rgb(76 175 130 / 60%);
-}
-
-.inv-tooltip__mod--neg {
-  color: #e05c5c;
-  text-shadow: 0 0 8px rgb(224 92 92 / 60%);
-}
-
-.inv-tooltip__empty {
-  margin: 0;
-  padding: var(--space-1) var(--space-3) var(--space-2);
-  font-size: 11px;
-  font-family: var(--font-fantasy);
-  color: var(--color-text-muted);
-  border-top: 1px solid rgb(200 154 74 / 15%);
 }
 
 /* ── Иконка предмета в слоте экипировки ──────────────────────────── */
@@ -409,4 +397,145 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* ── Кнопка добавления предмета ──────────────────────────────────── */
+
+.inv-panel__add-btn {
+  margin-left: auto;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  line-height: 18px;
+  text-align: center;
+  color: var(--color-text-muted);
+  background: rgb(167 139 250 / 15%);
+  border: 1px solid rgb(167 139 250 / 40%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s,
+    border-color 0.2s;
+}
+
+.inv-panel__add-btn:hover {
+  background: rgb(167 139 250 / 30%);
+  color: #fff;
+  border-color: rgb(167 139 250 / 70%);
+}
+
+/* ── Пикер предметов ──────────────────────────────────────────────── */
+
+.inv-panel__picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  margin-bottom: 6px;
+  background: rgb(30 30 46 / 95%);
+  border: 1px solid rgb(167 139 250 / 30%);
+  border-radius: var(--radius-md);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.inv-panel__picker-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.inv-panel__picker-tab {
+  flex: 1;
+  padding: 3px 0;
+  font-size: 10px;
+  font-family: var(--font-fantasy);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.inv-panel__picker-tab:hover {
+  background: rgb(255 255 255 / 8%);
+}
+
+.inv-panel__picker-tab--active {
+  background: rgb(167 139 250 / 20%);
+  color: #e2e8f0;
+  border-color: rgb(167 139 250 / 40%);
+}
+
+.inv-panel__picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inv-panel__picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.inv-panel__picker-row:hover {
+  background: rgb(167 139 250 / 15%);
+  color: #fff;
+}
+
+.inv-panel__picker-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.inv-panel__picker-back {
+  padding: 3px 8px;
+  font-size: 10px;
+  font-family: var(--font-ui);
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s;
+}
+
+.inv-panel__picker-back:hover {
+  color: #fff;
+}
+
+/* Плавное появление пикера */
+.inv-picker-enter-active,
+.inv-picker-leave-active {
+  transition:
+    opacity 150ms ease,
+    max-height 200ms ease;
+}
+
+.inv-picker-enter-from,
+.inv-picker-leave-to {
+  opacity: 0;
+  max-height: 0;
 }

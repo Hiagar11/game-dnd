@@ -23,6 +23,12 @@ export function useGameViewProviders({ getSocket, sessionActive, offsetX, offset
   const overlayTokenContextMenu = ref(null)
   provide('overlayTokenContextMenu', overlayTokenContextMenu)
 
+  const overlayOpenLoot = ref(null)
+  provide('overlayOpenLoot', overlayOpenLoot)
+
+  const overlayExecuteAoE = ref(null)
+  provide('overlayExecuteAoE', overlayExecuteAoE)
+
   return {
     onMenuEnter,
     onMenuLeave,

@@ -4,6 +4,7 @@ export const EQUIP_SLOT_KEYS = [
   'cloak',
   'armor',
   'weapon',
+  'weapon2',
   'offhand',
   'gloves',
   'belt',

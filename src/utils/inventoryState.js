@@ -5,7 +5,22 @@ export function createEmptyInventory() {
   return {
     cells: Array(20).fill(null),
     equipped,
+    coins: 0,
   }
+}
+
+/**
+ * Разбивает общее количество медяков на номиналы.
+ * 1 золотой = 100 серебряных = 10 000 медяков.
+ * @param {number} totalCopper
+ * @returns {{ gold: number, silver: number, copper: number }}
+ */
+export function splitCoins(totalCopper) {
+  const total = Math.max(0, Math.floor(totalCopper || 0))
+  const gold = Math.floor(total / 10_000)
+  const silver = Math.floor((total % 10_000) / 100)
+  const copper = total % 100
+  return { gold, silver, copper }
 }
 
 export function normalizeInventorySnapshot(raw) {
@@ -25,5 +40,7 @@ export function normalizeInventorySnapshot(raw) {
     }
   }
 
-  return { cells, equipped }
+  const coins = Number.isFinite(raw.coins) && raw.coins >= 0 ? Math.floor(raw.coins) : 0
+
+  return { cells, equipped, coins }
 }

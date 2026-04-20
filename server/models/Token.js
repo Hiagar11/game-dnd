@@ -26,6 +26,7 @@ import mongoose from 'mongoose'
 //  6  | resistance    | Сопротивление     | floor((intellect + strength) / 3)    | Интеллект, Сила
 //  7  | magicPower    | Магическая сила   | floor(intellect * 2 / 3)             | Интеллект ×2
 //  8  | persuasion    | Убеждение         | floor((charisma*2 + intellect) / 3)  | Хариз. ×2, Интел.
+//  9  | deception     | Обман             | floor((charisma*2 + agility + intellect) / 4) | Хариз. ×2, Ловк, Интел.
 //
 // ─── ПРОВЕРКА ПРИМЕРА ─────────────────────────────────────────────────────────
 // Сила=2, Ловкость=2, Интеллект=0, Харизма=0 (всё остальное 0 по умолчанию):
@@ -150,6 +151,8 @@ const tokenSchema = new mongoose.Schema(
       default: 1,
       min: 1,
     },
+    race: { type: String, default: '' },
+    heroClass: { type: String, default: '' },
   },
   { timestamps: true }
 )

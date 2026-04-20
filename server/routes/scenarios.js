@@ -8,6 +8,64 @@ const router = Router()
 // Все роуты требуют авторизации
 router.use(requireAuth)
 
+/**
+ * Нормализует один placed-токен из клиентского payload в формат Mongoose-схемы.
+ * Используется и в POST (создание), и в PATCH (обновление расстановки).
+ */
+function normalizeTokenPayload(t) {
+  return {
+    uid: String(t.uid),
+    ...(t.systemToken
+      ? { systemToken: String(t.systemToken) }
+      : { tokenId: t.tokenId ? new mongoose.Types.ObjectId(String(t.tokenId)) : null }),
+    targetScenarioId: t.targetScenarioId
+      ? new mongoose.Types.ObjectId(String(t.targetScenarioId))
+      : null,
+    globalMapExit: Boolean(t.globalMapExit),
+    col: Number(t.col),
+    row: Number(t.row),
+    hidden: Boolean(t.hidden),
+    inventory: t.inventory ?? null,
+    // Переопределяемые поля экземпляра (null → при загрузке фолбэк к шаблону Token)
+    tokenType: t.tokenType ?? null,
+    name: t.name ?? null,
+    attitude: t.attitude ?? null,
+    npcName: t.npcName ?? null,
+    personality: t.personality ?? null,
+    contextNotes: t.contextNotes ?? null,
+    dispositionType: t.dispositionType ?? null,
+    strength: t.strength != null ? Number(t.strength) : null,
+    agility: t.agility != null ? Number(t.agility) : null,
+    intellect: t.intellect != null ? Number(t.intellect) : null,
+    charisma: t.charisma != null ? Number(t.charisma) : null,
+    hp: t.hp != null ? Number(t.hp) : null,
+    maxHp: t.maxHp != null ? Number(t.maxHp) : null,
+    // XP, уровень, очки характеристик, автолевел
+    xp: t.xp != null ? Number(t.xp) : 0,
+    level: t.level != null ? Number(t.level) : 1,
+    statPoints: t.statPoints != null ? Number(t.statPoints) : 0,
+    autoLevel: Boolean(t.autoLevel),
+    race: t.race ?? '',
+    heroClass: t.heroClass ?? '',
+    armed: Boolean(t.armed),
+    secretKnowledge: t.secretKnowledge ?? null,
+    // Боевые статусы
+    stunned: Boolean(t.stunned),
+    captured: Boolean(t.captured),
+    combatLog: Array.isArray(t.combatLog) ? t.combatLog : [],
+    // Дерево способностей и активные слоты
+    treeActivatedIds: Array.isArray(t.treeActivatedIds) ? t.treeActivatedIds : [],
+    abilities: Array.isArray(t.abilities) ? t.abilities : [],
+    passiveAbilities: Array.isArray(t.passiveAbilities) ? t.passiveAbilities : [],
+    // Контейнеры / визуал
+    items: Array.isArray(t.items) ? t.items : undefined,
+    opened: Boolean(t.opened),
+    locked: Boolean(t.locked),
+    halfSize: Boolean(t.halfSize),
+    quarterSize: Boolean(t.quarterSize),
+  }
+}
+
 // ─── POST /api/scenarios ──────────────────────────────────────────────────────
 // Создание нового сценария. Только для admin.
 router.post('/', requireAdmin, async (req, res) => {
@@ -20,6 +78,7 @@ router.post('/', requireAdmin, async (req, res) => {
     placedTokens,
     walls,
     locationDescription,
+    mapContext,
   } = req.body
 
   if (!name?.trim()) {
@@ -34,34 +93,7 @@ router.post('/', requireAdmin, async (req, res) => {
     }
 
     const normalizedTokens = Array.isArray(placedTokens)
-      ? placedTokens.map(
-          ({
-            uid,
-            tokenId,
-            systemToken,
-            targetScenarioId,
-            globalMapExit,
-            col,
-            row,
-            hidden = false,
-            inventory,
-          }) => ({
-            uid: String(uid),
-            // Системные токены (дверь, ловушка) не ссылаются на шаблон Token —
-            // они хранятся через поле systemToken.
-            ...(systemToken
-              ? { systemToken: String(systemToken) }
-              : { tokenId: new mongoose.Types.ObjectId(String(tokenId)) }),
-            targetScenarioId: targetScenarioId
-              ? new mongoose.Types.ObjectId(String(targetScenarioId))
-              : null,
-            globalMapExit: Boolean(globalMapExit),
-            col: Number(col),
-            row: Number(row),
-            hidden: Boolean(hidden),
-            inventory: inventory ?? null,
-          })
-        )
+      ? placedTokens.map(normalizeTokenPayload)
       : []
 
     const scenario = await Scenario.create({
@@ -73,6 +105,7 @@ router.post('/', requireAdmin, async (req, res) => {
       gridOffsetY: Number(gridOffsetY) || 0,
       locationDescription:
         typeof locationDescription === 'string' ? locationDescription.slice(0, 600) : '',
+      mapContext: typeof mapContext === 'string' ? mapContext.slice(0, 1000) : '',
       placedTokens: normalizedTokens,
       defaultPlacedTokens: normalizedTokens,
       walls: Array.isArray(walls)
@@ -137,7 +170,15 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (String(scenario.owner) !== String(req.user.id))
       return res.status(403).json({ error: 'Нет доступа' })
 
-    const { name, mapImagePath, cellSize, gridOffsetX, gridOffsetY, locationDescription } = req.body
+    const {
+      name,
+      mapImagePath,
+      cellSize,
+      gridOffsetX,
+      gridOffsetY,
+      locationDescription,
+      mapContext,
+    } = req.body
     if (name !== undefined) scenario.name = name.trim()
     if (mapImagePath !== undefined) scenario.mapImagePath = mapImagePath
     if (cellSize !== undefined) scenario.cellSize = Number(cellSize)
@@ -145,6 +186,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
     if (gridOffsetY !== undefined) scenario.gridOffsetY = Number(gridOffsetY)
     if (locationDescription !== undefined)
       scenario.locationDescription = String(locationDescription).slice(0, 600)
+    if (mapContext !== undefined) scenario.mapContext = String(mapContext).slice(0, 1000)
 
     await scenario.save()
     res.json(formatScenario(scenario, req))
@@ -174,32 +216,7 @@ router.patch('/:id/placed-tokens', requireAdmin, async (req, res) => {
       scenario.name = name.trim()
     }
 
-    scenario.placedTokens = placedTokens.map(
-      ({
-        uid,
-        tokenId,
-        systemToken,
-        targetScenarioId,
-        globalMapExit,
-        col,
-        row,
-        hidden = false,
-        inventory,
-      }) => ({
-        uid,
-        ...(systemToken
-          ? { systemToken: String(systemToken) }
-          : { tokenId: tokenId ? new mongoose.Types.ObjectId(String(tokenId)) : null }),
-        targetScenarioId: targetScenarioId
-          ? new mongoose.Types.ObjectId(String(targetScenarioId))
-          : null,
-        globalMapExit: Boolean(globalMapExit),
-        col,
-        row,
-        hidden,
-        inventory: inventory ?? null,
-      })
-    )
+    scenario.placedTokens = placedTokens.map(normalizeTokenPayload)
     // Редактор устанавливает эталон — синхронно обновляем defaultPlacedTokens
     scenario.defaultPlacedTokens = scenario.placedTokens
 
@@ -269,6 +286,7 @@ function formatScenario(scenario, req, { full = false, showHidden = false } = {}
     gridOffsetX: scenario.gridOffsetX ?? 0,
     gridOffsetY: scenario.gridOffsetY ?? 0,
     locationDescription: scenario.locationDescription ?? '',
+    mapContext: scenario.mapContext ?? '',
     tokensCount: scenario.placedTokens?.length ?? 0,
     createdAt: scenario.createdAt,
   }

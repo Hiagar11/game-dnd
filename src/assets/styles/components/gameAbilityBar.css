@@ -1,0 +1,232 @@
+/* ── Панель способностей (ability bar) ─────────────────────────── */
+.ability-bar {
+  background-image: url('/systemImage/panel-center.jpg');
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 8px 12px 5px;
+  gap: 6px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Снаряжение (оружие) ─────────────────────────────────────── */
+.ability-bar__weapons {
+  display: flex;
+  gap: 4px;
+  width: 100%;
+}
+
+.ability-bar__weapon {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 5px;
+  border: 1px solid rgb(255 255 255 / 10%);
+  background: rgb(0 0 0 / 25%);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+  position: relative;
+}
+
+.ability-bar__weapon:hover {
+  background: rgb(255 255 255 / 8%);
+}
+
+.ability-bar__weapon--active {
+  background: rgb(250 204 21 / 8%);
+  border-color: rgb(250 204 21 / 30%);
+}
+
+.ability-bar__weapon-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+.ability-bar__weapon-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.ability-bar__weapon-name {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: rgb(255 255 255 / 70%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ability-bar__weapon-name--empty {
+  color: rgb(255 255 255 / 25%);
+  font-style: italic;
+}
+
+.ability-bar__weapon-dmg {
+  font-size: 9px;
+  font-family: var(--font-ui);
+  color: rgb(239 68 68 / 75%);
+}
+
+.ability-bar__armed-badge {
+  color: rgb(250 204 21 / 85%);
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 3px rgb(250 204 21 / 50%));
+}
+
+/* ── Сетка ячеек (6 в ряд) ────────────────────────────────────── */
+.ability-bar__slots {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  width: 100%;
+}
+
+/* ── Ячейка ──────────────────────────────────────────────────── */
+.ability-bar__cell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  border: 1.5px solid rgb(255 255 255 / 12%);
+  background: rgb(0 0 0 / 35%);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.1s ease;
+}
+
+.ability-bar__cell:hover:not(.ability-bar__cell--empty, .ability-bar__cell--disabled) {
+  border-color: rgb(255 255 255 / 35%);
+  background: rgb(255 255 255 / 8%);
+}
+
+.ability-bar__cell--empty {
+  border-style: dashed;
+  border-color: rgb(255 255 255 / 8%);
+  cursor: default;
+  background: rgb(0 0 0 / 20%);
+}
+
+.ability-bar__cell--active {
+  border-color: var(--color-primary);
+  background: rgb(from var(--color-primary) r g b / 15%);
+  box-shadow:
+    0 0 8px rgb(from var(--color-primary) r g b / 30%),
+    inset 0 0 12px rgb(from var(--color-primary) r g b / 10%);
+  transform: translateY(-2px);
+}
+
+.ability-bar__cell--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+/* ── Иконка способности ──────────────────────────────────────── */
+.ability-bar__icon {
+  width: 28px;
+  height: 28px;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+}
+
+/* ── Горячая клавиша (номер) ─────────────────────────────────── */
+.ability-bar__hotkey {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 9px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: rgb(255 255 255 / 30%);
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ── Стоимость AP ────────────────────────────────────────────── */
+.ability-bar__cost {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 9px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: rgb(250 204 21 / 75%);
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* ── Подсказка (tooltip внизу) ───────────────────────────────── */
+.ability-bar__hint {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgb(0 0 0 / 55%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  max-width: 260px;
+  text-align: center;
+}
+
+.ability-bar__hint-name {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 90%);
+}
+
+.ability-bar__hint-desc {
+  font-size: 11px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 55%);
+  line-height: 1.3;
+}
+
+.ability-bar__hint-area {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  color: rgb(250 204 21 / 65%);
+  letter-spacing: 0.03em;
+}
+
+/* ── Анимация подсказки ──────────────────────────────────────── */
+.ability-hint-enter-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.ability-hint-leave-active {
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease;
+}
+
+.ability-hint-enter-from,
+.ability-hint-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
+}

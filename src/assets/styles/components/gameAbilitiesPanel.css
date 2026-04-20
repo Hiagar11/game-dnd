@@ -1,0 +1,371 @@
+/* ── Панель способностей (вкладка edit popup) ────────────────── */
+.abilities-panel {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--space-5);
+  padding: var(--space-2) 0;
+  min-height: 320px;
+}
+
+/* ── Заголовки секций ────────────────────────────────────────── */
+.abilities-panel__heading {
+  margin: 0 0 var(--space-2);
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(255 255 255 / 40%);
+}
+
+/* ── Левая колонка: активные слоты ───────────────────────────── */
+.abilities-panel__active {
+  display: flex;
+  flex-direction: column;
+}
+
+.abilities-panel__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+/* ── Ячейка (общая) ──────────────────────────────────────────── */
+.abilities-panel__cell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1.5px solid rgb(255 255 255 / 12%);
+  background: rgb(0 0 0 / 30%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.abilities-panel__cell--empty {
+  border-style: dashed;
+  border-color: rgb(255 255 255 / 8%);
+  background: rgb(0 0 0 / 15%);
+}
+
+.abilities-panel__cell--drag-over {
+  border-color: var(--color-primary);
+  background: rgb(from var(--color-primary) r g b / 12%);
+  box-shadow: inset 0 0 12px rgb(from var(--color-primary) r g b / 8%);
+}
+
+/* ── Иконка способности ──────────────────────────────────────── */
+.abilities-panel__icon {
+  width: 28px;
+  height: 28px;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  flex-shrink: 0;
+}
+
+.abilities-panel__cell-name {
+  font-size: 9px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 60%);
+  text-align: center;
+  line-height: 1.1;
+  max-width: 90%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.abilities-panel__cell-hotkey {
+  position: absolute;
+  top: 3px;
+  left: 5px;
+  font-size: 9px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: rgb(255 255 255 / 22%);
+  pointer-events: none;
+}
+
+.abilities-panel__cell-cost {
+  position: absolute;
+  bottom: 3px;
+  right: 5px;
+  font-size: 8px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: rgb(250 204 21 / 60%);
+  pointer-events: none;
+}
+
+/* ── Пассивные ───────────────────────────────────────────────── */
+.abilities-panel__cell--passive {
+  border-color: rgb(139 92 246 / 20%);
+}
+
+.abilities-panel__cell--passive.abilities-panel__cell--drag-over {
+  border-color: rgb(139 92 246 / 60%);
+  background: rgb(139 92 246 / 10%);
+  box-shadow: inset 0 0 12px rgb(139 92 246 / 8%);
+}
+
+/* ── Правая колонка ──────────────────────────────────────────── */
+.abilities-panel__right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.abilities-panel__passive {
+  flex-shrink: 0;
+}
+
+.abilities-panel__passive-grid {
+  display: flex;
+  gap: 6px;
+}
+
+.abilities-panel__passive-grid .abilities-panel__cell {
+  width: 64px;
+  height: 64px;
+  aspect-ratio: auto;
+}
+
+/* ── Библиотека открытых способностей ────────────────────────── */
+.abilities-panel__library {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Вкладки каталога ────────────────────────────────────────── */
+.abilities-panel__tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  padding-bottom: 0;
+}
+
+.abilities-panel__tab {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: rgb(255 255 255 / 40%);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.abilities-panel__tab:hover {
+  color: rgb(255 255 255 / 65%);
+}
+
+.abilities-panel__tab--active {
+  color: rgb(255 255 255 / 90%);
+  border-color: var(--color-primary);
+}
+
+.abilities-panel__tab-count {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 6%);
+  color: rgb(255 255 255 / 35%);
+  line-height: 16px;
+}
+
+.abilities-panel__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+  max-height: 180px;
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 12%) transparent;
+}
+
+.abilities-panel__entry {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: rgb(255 255 255 / 3%);
+  cursor: grab;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.abilities-panel__entry:hover {
+  background: rgb(255 255 255 / 7%);
+  border-color: rgb(255 255 255 / 10%);
+}
+
+.abilities-panel__entry--selected {
+  border-color: var(--color-primary);
+  background: rgb(from var(--color-primary) r g b / 8%);
+}
+
+.abilities-panel__entry-icon {
+  width: 22px;
+  height: 22px;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  flex-shrink: 0;
+}
+
+.abilities-panel__entry-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.abilities-panel__entry-name {
+  font-size: 12px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: rgb(255 255 255 / 85%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.abilities-panel__entry-desc {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 40%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.abilities-panel__entry-cost {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: rgb(250 204 21 / 65%);
+  flex-shrink: 0;
+}
+
+.abilities-panel__empty {
+  margin: 0;
+  padding: var(--space-6) 0;
+  text-align: center;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 25%);
+}
+
+/* ── Детальное описание ──────────────────────────────────────── */
+.abilities-panel__detail {
+  padding: var(--space-3);
+  border-radius: 8px;
+  background: rgb(0 0 0 / 30%);
+  border: 1px solid rgb(255 255 255 / 8%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.abilities-panel__detail-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.abilities-panel__detail-icon {
+  width: 24px;
+  height: 24px;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  flex-shrink: 0;
+}
+
+.abilities-panel__detail-name {
+  font-size: 14px;
+  font-family: var(--font-ui);
+  font-weight: 700;
+  color: rgb(255 255 255 / 90%);
+}
+
+.abilities-panel__detail-desc {
+  margin: 0;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  color: rgb(255 255 255 / 55%);
+  line-height: 1.5;
+}
+
+.abilities-panel__detail-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.abilities-panel__tag {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  border: 1px solid rgb(255 255 255 / 15%);
+  color: rgb(255 255 255 / 60%);
+  background: rgb(255 255 255 / 5%);
+}
+
+.abilities-panel__tag--ap {
+  border-color: rgb(250 204 21 / 35%);
+  color: rgb(250 204 21 / 80%);
+  background: rgb(250 204 21 / 8%);
+}
+
+.abilities-panel__tag--passive {
+  border-color: rgb(139 92 246 / 35%);
+  color: rgb(139 92 246 / 80%);
+  background: rgb(139 92 246 / 8%);
+}
+
+/* ── Анимация подробностей ───────────────────────────────────── */
+.ability-detail-enter-active {
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.ability-detail-leave-active {
+  transition:
+    opacity 0.1s ease,
+    transform 0.1s ease;
+}
+
+.ability-detail-enter-from,
+.ability-detail-leave-to {
+  opacity: 0;
+  transform: translateY(4px);
+}

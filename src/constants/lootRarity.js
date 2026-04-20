@@ -1,16 +1,32 @@
 /**
- * Цвета редкости.
- * Ключ = кол-во позитивных свойств на предмете (1-3), 4 — бордовый (реликт).
- * 0 — предметы-шаблоны без свойств (зелья без трейтов).
+ * Система редкости предметов (PoE-стиль).
+ *
+ * normal  — серый: базовый предмет, только implicit
+ * magic   — синий: 1-2 аффикса (1 prefix + 1 suffix)
+ * rare    — жёлтый: 3-4 аффикса (до 2 prefix + 2 suffix)
+ * relic   — бордовый: 4 аффикса + один удвоенный + один проклятый
  */
+
+export const RARITIES = ['normal', 'magic', 'rare', 'relic']
+
 export const RARITY_COLORS = {
-  0: '#c8a04a',
-  1: '#ffffff',
-  2: '#4fc3f7',
-  3: '#ffd700',
-  4: '#8b0000',
+  normal: '#9d9d9d',
+  magic: '#4fc3f7',
+  rare: '#ffd700',
+  relic: '#8b0000',
 }
 
+export const RARITY_LABELS = {
+  normal: 'Обычный',
+  magic: 'Магический',
+  rare: 'Редкий',
+  relic: 'Реликвия',
+}
+
+/**
+ * Веса выпадения по профилю слотов.
+ * Профиль определяет, как часто выпадает каждая редкость.
+ */
 export const SLOT_RARITY_PROFILES = {
   weapon: 'weapon',
   two_handed: 'weapon',
@@ -29,36 +45,29 @@ export const SLOT_RARITY_PROFILES = {
   other: 'other',
 }
 
-/**
- * count: итоговая «ступень» редкости.
- *   1 → белый  (1 положительное свойство)
- *   2 → синий  (2 положительных свойства)
- *   3 → золотой (3 положительных свойства)
- *   4 → бордовый (3 положительных + 1 удвоенное + 1 отрицательное)
- */
 export const RARITY_WEIGHTS_BY_PROFILE = {
   weapon: [
-    { count: 1, weight: 60 },
-    { count: 2, weight: 25 },
-    { count: 3, weight: 10 },
-    { count: 4, weight: 5 },
+    { rarity: 'normal', weight: 45 },
+    { rarity: 'magic', weight: 35 },
+    { rarity: 'rare', weight: 16 },
+    { rarity: 'relic', weight: 4 },
   ],
   armor: [
-    { count: 1, weight: 60 },
-    { count: 2, weight: 25 },
-    { count: 3, weight: 10 },
-    { count: 4, weight: 5 },
+    { rarity: 'normal', weight: 45 },
+    { rarity: 'magic', weight: 35 },
+    { rarity: 'rare', weight: 16 },
+    { rarity: 'relic', weight: 4 },
   ],
   accessory: [
-    { count: 1, weight: 60 },
-    { count: 2, weight: 25 },
-    { count: 3, weight: 10 },
-    { count: 4, weight: 5 },
+    { rarity: 'normal', weight: 50 },
+    { rarity: 'magic', weight: 32 },
+    { rarity: 'rare', weight: 14 },
+    { rarity: 'relic', weight: 4 },
   ],
   other: [
-    { count: 1, weight: 60 },
-    { count: 2, weight: 25 },
-    { count: 3, weight: 10 },
-    { count: 4, weight: 5 },
+    { rarity: 'normal', weight: 55 },
+    { rarity: 'magic', weight: 28 },
+    { rarity: 'rare', weight: 13 },
+    { rarity: 'relic', weight: 4 },
   ],
 }

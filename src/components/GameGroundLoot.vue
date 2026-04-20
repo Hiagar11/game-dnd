@@ -12,7 +12,11 @@
       :style="pileStyle(pile)"
       @click.stop="onPileClick(pile)"
     >
-      <span class="game-ground-loot__sparkle" />
+      <img
+        src="https://api.iconify.design/game-icons/swap-bag.svg?color=%23ffd700"
+        alt="Лут"
+        class="game-ground-loot__bag"
+      />
     </div>
   </div>
 </template>

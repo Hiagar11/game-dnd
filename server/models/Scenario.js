@@ -43,6 +43,36 @@ const placedTokenSchema = new mongoose.Schema(
     charisma: { type: Number, default: null },
     // Персональный инвентарь экземпляра токена (сумка + экипировка)
     inventory: { type: mongoose.Schema.Types.Mixed, default: null },
+    // ─── Новые поля (XP, уровень, статус, автолевел) ────────────────────────
+    xp: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
+    statPoints: { type: Number, default: 0 },
+    autoLevel: { type: Boolean, default: false },
+    race: { type: String, default: '' },
+    heroClass: { type: String, default: '' },
+    armed: { type: Boolean, default: false },
+    secretKnowledge: { type: String, default: null },
+    stunned: { type: Boolean, default: false },
+    captured: { type: Boolean, default: false },
+    combatLog: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    // ─── Дерево способностей и активные слоты ───────────────────────────────
+    treeActivatedIds: { type: [String], default: [] },
+    abilities: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    passiveAbilities: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    // История диалога с NPC (последние 10 реплик, персистится между сессиями)
+    dialogHistory: { type: [mongoose.Schema.Types.Mixed], default: undefined },
+    // Накопленные впечатления NPC о игроке (макс. 5)
+    behaviorNotes: { type: [String], default: undefined },
+    // Текущий счёт отношения NPC (-30..+60)
+    attitudeScore: { type: Number, default: undefined },
+    // Журнал событий NPC — действия игрока (торговля, бой, подарки и т.д.), макс. 10
+    eventLog: { type: [String], default: undefined },
+    // ─── Поля контейнеров / визуала ─────────────────────────────────────────
+    items: { type: [mongoose.Schema.Types.Mixed], default: undefined },
+    opened: { type: Boolean, default: false },
+    locked: { type: Boolean, default: false },
+    halfSize: { type: Boolean, default: false },
+    quarterSize: { type: Boolean, default: false },
   },
   { _id: false }
 )
@@ -110,6 +140,13 @@ const scenarioSchema = new mongoose.Schema(
       type: String,
       default: '',
       maxlength: 600,
+    },
+    // Контекст карты — знания, доступные игроку.
+    // НПС читает этот контекст и реагирует на упоминания из него.
+    mapContext: {
+      type: String,
+      default: '',
+      maxlength: 1000,
     },
   },
   { timestamps: true }

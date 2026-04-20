@@ -1,0 +1,418 @@
+// ── Попап подтверждения ──────────────────────────────────────────────────────
+
+.gm-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(0 0 0 / 70%);
+  backdrop-filter: blur(4px);
+}
+
+.gm-confirm__box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6, 24px);
+  padding: var(--space-8, 32px) var(--space-10, 40px);
+  background: var(--color-surface, #1e1e2e);
+  border: 1px solid var(--color-primary, #a78bfa);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow:
+    0 8px 32px rgb(0 0 0 / 70%),
+    0 0 16px var(--color-primary-glow, rgb(167 139 250 / 30%));
+  text-align: center;
+}
+
+.gm-confirm__text {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--color-text, #e2e8f0);
+  font-family: var(--font-ui, sans-serif);
+}
+
+.gm-confirm__actions {
+  display: flex;
+  gap: var(--space-4, 16px);
+  justify-content: center;
+}
+
+.gm-confirm__btn {
+  padding: 8px 24px;
+  font-size: 0.95rem;
+  font-family: var(--font-ui, sans-serif);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+
+  &--yes {
+    background: var(--color-primary, #a78bfa);
+    color: #fff;
+
+    &:hover {
+      background: var(--color-primary-hover, #8b5cf6);
+    }
+  }
+
+  &--no {
+    background: transparent;
+    color: var(--color-text-muted, #94a3b8);
+    border-color: var(--color-text-muted, #94a3b8);
+
+    &:hover {
+      border-color: var(--color-text, #e2e8f0);
+      color: var(--color-text, #e2e8f0);
+    }
+  }
+}
+
+// ── Попап подтверждения: transition ─────────────────────────────────────────
+
+.popup-fade-enter-active,
+.popup-fade-leave-active {
+  transition: opacity 200ms ease;
+}
+
+.popup-fade-enter-from,
+.popup-fade-leave-to {
+  opacity: 0;
+}
+
+// ── Оверлей глобальной карты ────────────────────────────────────────────────
+
+.gm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+.gm-overlay__canvas-wrap {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.gm-overlay__scene {
+  position: relative;
+  width: max-content;
+  height: max-content;
+}
+
+.gm-overlay__canvas {
+  display: block;
+  image-rendering: auto;
+}
+
+// ── Токен колесницы ─────────────────────────────────────────────────────────
+
+.gm-overlay__chariot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+  transition:
+    left 0.12s linear,
+    top 0.12s linear;
+  animation: gm-chariot-bob 0.8s ease-in-out infinite;
+}
+
+.gm-overlay__chariot-icon {
+  display: block;
+  font-size: 48px;
+  filter: drop-shadow(0 0 14px rgb(250 204 21 / 50%)) drop-shadow(0 4px 10px rgb(0 0 0 / 70%));
+}
+
+@keyframes gm-chariot-bob {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) translateY(-4px);
+  }
+}
+
+// ── Маркеры остановок ───────────────────────────────────────────────────────
+
+.gm-overlay__marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.gm-overlay__marker-core {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d4a853, #8b6914);
+  border: 2.5px solid rgb(255 255 255 / 50%);
+  box-shadow:
+    0 0 10px rgb(250 204 21 / 40%),
+    0 2px 8px rgb(0 0 0 / 50%);
+  animation: gm-marker-float 3.5s ease-in-out infinite;
+  position: relative;
+  z-index: 1;
+}
+
+.gm-overlay__marker-ping {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 22px;
+  height: 22px;
+  transform: translate(-50%, -50%) scale(1);
+  border-radius: 50%;
+  border: 2px solid rgb(250 204 21 / 50%);
+  opacity: 0;
+  animation: gm-marker-ping 3s ease-out infinite;
+}
+
+.gm-overlay__marker-label {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  text-shadow:
+    0 2px 6px rgb(0 0 0 / 80%),
+    0 0 10px rgb(0 0 0 / 60%);
+  white-space: nowrap;
+  letter-spacing: 0.05em;
+  font-family: var(--font-ui, sans-serif);
+}
+
+// Остановка-источник (текущая) — изумрудная
+.gm-overlay__marker--source .gm-overlay__marker-core {
+  background: radial-gradient(circle at 35% 35%, #6ee7b7, #059669);
+  border-color: rgb(255 255 255 / 60%);
+  box-shadow:
+    0 0 14px rgb(16 185 129 / 50%),
+    0 2px 8px rgb(0 0 0 / 50%);
+}
+
+.gm-overlay__marker--source .gm-overlay__marker-ping {
+  border-color: rgb(16 185 129 / 60%);
+}
+
+// Достижимые остановки (фаза choosing) — яркая пульсация
+.gm-overlay__marker--reachable .gm-overlay__marker-core {
+  box-shadow:
+    0 0 18px rgb(250 204 21 / 60%),
+    0 2px 8px rgb(0 0 0 / 50%);
+  animation:
+    gm-marker-float 3.5s ease-in-out infinite,
+    gm-marker-glow 1.6s ease-in-out infinite;
+}
+
+.gm-overlay__marker--reachable .gm-overlay__marker-ping {
+  border-color: rgb(250 204 21 / 70%);
+  animation: gm-marker-ping 2s ease-out infinite;
+}
+
+// Непривязанная (серая)
+.gm-overlay__marker:not(.gm-overlay__marker--linked, .gm-overlay__marker--source)
+  .gm-overlay__marker-core {
+  background: radial-gradient(circle at 35% 35%, #94a3b8, #64748b);
+  box-shadow:
+    0 0 6px rgb(148 163 184 / 30%),
+    0 2px 6px rgb(0 0 0 / 40%);
+}
+
+.gm-overlay__marker:not(.gm-overlay__marker--linked, .gm-overlay__marker--source)
+  .gm-overlay__marker-ping {
+  display: none;
+}
+
+@keyframes gm-marker-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes gm-marker-ping {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+
+  100% {
+    transform: translate(-50%, -50%) scale(3.2);
+    opacity: 0;
+  }
+}
+
+@keyframes gm-marker-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 12px rgb(250 204 21 / 40%),
+      0 2px 8px rgb(0 0 0 / 50%);
+  }
+
+  50% {
+    box-shadow:
+      0 0 24px rgb(250 204 21 / 70%),
+      0 2px 8px rgb(0 0 0 / 50%);
+  }
+}
+
+// ── Кнопки выбора направления ───────────────────────────────────────────────
+
+.gm-overlay__dest {
+  position: absolute;
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 10px 24px;
+  font-size: 1rem;
+  font-weight: 600;
+  font-family: var(--font-ui, sans-serif);
+  color: #fff;
+  background: rgb(167 139 250 / 85%);
+  border: 2px solid rgb(255 255 255 / 40%);
+  border-radius: 24px;
+  cursor: pointer;
+  white-space: nowrap;
+  box-shadow: 0 2px 16px rgb(0 0 0 / 50%);
+  transition:
+    background 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s,
+    border-color 0.2s;
+  animation: gm-dest-pulse 2s ease-in-out infinite;
+
+  &:hover {
+    background: rgb(139 92 246 / 95%);
+    border-color: rgb(250 204 21 / 80%);
+    transform: translateX(-50%) scale(1.12);
+    box-shadow:
+      0 0 24px rgb(250 204 21 / 50%),
+      0 4px 20px rgb(0 0 0 / 60%);
+    animation: none;
+  }
+}
+
+@keyframes gm-dest-pulse {
+  0%,
+  100% {
+    box-shadow: 0 2px 12px rgb(0 0 0 / 50%);
+  }
+
+  50% {
+    box-shadow:
+      0 2px 12px rgb(0 0 0 / 50%),
+      0 0 20px rgb(167 139 250 / 40%);
+  }
+}
+
+// ── Цикл день/ночь ──────────────────────────────────────────────────────────
+
+.gm-overlay__daynight {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, #0d1033 0%, #1a1040 50%, #070a1e 100%);
+  pointer-events: none;
+  z-index: 8;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(1px 1px at 10% 15%, rgb(255 255 255 / 80%) 50%, transparent 50%),
+      radial-gradient(1.5px 1.5px at 25% 35%, rgb(255 255 255 / 55%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 45% 10%, rgb(255 255 255 / 70%) 50%, transparent 50%),
+      radial-gradient(2px 2px at 60% 50%, rgb(255 255 255 / 45%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 75% 25%, rgb(255 255 255 / 75%) 50%, transparent 50%),
+      radial-gradient(1.5px 1.5px at 15% 65%, rgb(255 255 255 / 50%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 85% 70%, rgb(255 255 255 / 60%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 35% 80%, rgb(255 255 255 / 40%) 50%, transparent 50%),
+      radial-gradient(2px 2px at 55% 30%, rgb(255 255 255 / 55%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 90% 45%, rgb(255 255 255 / 50%) 50%, transparent 50%),
+      radial-gradient(1.5px 1.5px at 5% 40%, rgb(255 255 255 / 65%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 70% 85%, rgb(255 255 255 / 50%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 40% 55%, rgb(255 255 255 / 35%) 50%, transparent 50%),
+      radial-gradient(1.5px 1.5px at 20% 90%, rgb(255 255 255 / 60%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 80% 12%, rgb(255 255 255 / 70%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 50% 75%, rgb(255 255 255 / 45%) 50%, transparent 50%),
+      radial-gradient(2px 2px at 30% 20%, rgb(255 255 255 / 50%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 65% 60%, rgb(255 255 255 / 40%) 50%, transparent 50%),
+      radial-gradient(1px 1px at 95% 82%, rgb(255 255 255 / 55%) 50%, transparent 50%),
+      radial-gradient(1.5px 1.5px at 8% 50%, rgb(255 255 255 / 45%) 50%, transparent 50%);
+    animation: gm-stars-twinkle 4s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes gm-stars-twinkle {
+  0% {
+    opacity: 0.2;
+  }
+
+  100% {
+    opacity: 0.8;
+  }
+}
+
+// ── Текстовая подсказка внизу ───────────────────────────────────────────────
+
+.gm-overlay__hint {
+  flex-shrink: 0;
+  padding: 14px 0;
+  text-align: center;
+  font-size: 1.05rem;
+  color: var(--color-text-muted, #94a3b8);
+  font-family: var(--font-ui, sans-serif);
+  letter-spacing: 0.05em;
+  background: rgb(0 0 0 / 70%);
+}
+
+// ── Transition: fade-to-black ───────────────────────────────────────────────
+
+.gm-fade-enter-active {
+  animation: gm-fadein 1s ease forwards;
+}
+
+.gm-fade-leave-active {
+  animation: gm-fadeout 0.8s ease forwards;
+}
+
+@keyframes gm-fadein {
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes gm-fadeout {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+  }
+}

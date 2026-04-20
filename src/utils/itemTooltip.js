@@ -14,6 +14,7 @@ const SLOT_LABELS = {
   amulet: 'Амулет',
   ring: 'Кольцо',
   potion: 'Зелье',
+  key: 'Ключ',
   other: 'Прочее',
 }
 
@@ -22,10 +23,17 @@ const STAT_LABELS = {
   hit_chance: 'Шанс удара',
   initiative: 'Инициатива',
   persuasion: 'Убеждение',
-  defense: 'Защита',
+  deception: 'Обман',
   dodge: 'Уклонение',
-  magic_power: 'Маг. сила',
-  resistance: 'Сопротивление',
+  perception: 'Восприятие',
+  magic_resist: 'Маг. сопр.',
+  block: 'Блок',
+  crit_damage: 'Крит. урон',
+  armor_pen: 'Проб. брони',
+  magic_pen: 'Проб. маг.',
+  luck: 'Удача',
+  stealth: 'Скрытность',
+  healing: 'Лечение',
 }
 
 export function translateSlot(slot) {
@@ -125,13 +133,112 @@ export function effectRows(item) {
   })
 }
 
-export function buildTooltipRows(item, traits = []) {
-  const overrides = item?.traitOverrides ?? {}
-  return [
-    ...(item?.traitIds ?? []).map((traitId) => ({
-      key: traitId,
-      ...traitData(traitId, traits, overrides),
-    })),
-    ...effectRows(item),
-  ]
+/**
+ * По слоту предмета находит снаряжённый предмет из `equipped`.
+ * Возвращает null если ничего не найдено.
+ */
+const SLOT_TO_EQUIP_KEY = {
+  helmet: ['helmet'],
+  amulet: ['amulet'],
+  cloak: ['cloak'],
+  armor: ['armor'],
+  weapon: ['weapon', 'weapon2'],
+  magic_weapon: ['weapon', 'weapon2'],
+  two_handed: ['weapon'],
+  ranged: ['weapon'],
+  offhand: ['offhand'],
+  gloves: ['gloves'],
+  belt: ['belt'],
+  legs: ['legs'],
+  boots: ['boots'],
+  ring: ['ring-left', 'ring-right'],
+}
+
+export function findCompareItem(equipped, itemSlot) {
+  const keys = SLOT_TO_EQUIP_KEY[itemSlot]
+  if (!keys || !equipped) return null
+  for (const key of keys) {
+    if (equipped[key]) return equipped[key]
+  }
+  return null
+}
+
+export function buildTooltipRows(item) {
+  const rows = []
+
+  // Base weapon damage (диапазон урона оружия)
+  if (item?.baseDamage) {
+    rows.push({
+      key: 'baseDamage',
+      name: '',
+      mods: [
+        {
+          text: `Урон ${item.baseDamage.min}–${item.baseDamage.max}`,
+          positive: true,
+        },
+      ],
+      implicit: true,
+    })
+  }
+
+  // AP cost for heavy weapons
+  if (item?.apCost && item.apCost > 1) {
+    rows.push({
+      key: 'apCost',
+      name: '',
+      mods: [
+        {
+          text: `Стоимость атаки: ${item.apCost} AP`,
+          positive: false,
+        },
+      ],
+      implicit: true,
+    })
+  }
+
+  // Base armor (поглощение урона)
+  if (item?.baseArmor) {
+    rows.push({
+      key: 'baseArmor',
+      name: '',
+      mods: [
+        {
+          text: `Броня ${item.baseArmor}`,
+          positive: true,
+        },
+      ],
+      implicit: true,
+    })
+  }
+
+  // Implicit mod (встроенный)
+  if (item?.implicit) {
+    rows.push({
+      key: 'implicit',
+      name: '',
+      mods: [
+        { text: `${translateStat(item.implicit.stat)} +${item.implicit.value}`, positive: true },
+      ],
+      implicit: true,
+    })
+  }
+
+  // Affixes (PoE-стиль)
+  for (const [i, affix] of (item?.affixes ?? []).entries()) {
+    rows.push({
+      key: `affix_${i}`,
+      name: affix.name,
+      mods: [
+        {
+          text: `${translateStat(affix.stat)} ${affix.value >= 0 ? '+' : ''}${affix.value}`,
+          positive: affix.value >= 0,
+        },
+      ],
+    })
+  }
+
+  // Legacy effects (зелья и т.д.)
+  rows.push(...effectRows(item))
+
+  return rows
 }

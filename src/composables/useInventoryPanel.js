@@ -1,15 +1,8 @@
 import { ref, reactive, computed, watch, nextTick } from 'vue'
-import { useItemsStore } from '../stores/items'
-import { useTraitsStore } from '../stores/traits'
-import { normalizeInventorySnapshot } from '../utils/inventoryState'
-import { RARITY_COLORS } from '../constants/lootRarity'
-import {
-  rollRarityCount,
-  statWeightsForSlot,
-  positiveTraitsPool,
-  pickWeightedTraitIds,
-} from '../utils/lootGenerator'
-import { translateSlot, buildTooltipRows } from '../utils/itemTooltip'
+import { normalizeInventorySnapshot, splitCoins } from '../utils/inventoryState'
+import { generateItem } from '../utils/lootGenerator'
+import { translateSlot, buildTooltipRows, findCompareItem } from '../utils/itemTooltip'
+import { SYSTEM_ITEMS } from '../constants/itemSlots'
 
 const ICON_BASE = 'https://api.iconify.design/game-icons/'
 
@@ -36,12 +29,12 @@ function isIconLoaded(slug) {
 }
 
 export function useInventoryPanel(props, emit) {
-  const itemsStore = useItemsStore()
-  const traitsStore = useTraitsStore()
-
   const initialInventory = normalizeInventorySnapshot(props.modelValue)
   const cells = ref(initialInventory.cells)
   const equipped = ref(initialInventory.equipped)
+  const coins = ref(initialInventory.coins)
+
+  const coinDisplay = computed(() => splitCoins(coins.value))
 
   const drag = ref(null)
   const dragOverSlot = ref(null)
@@ -53,7 +46,8 @@ export function useInventoryPanel(props, emit) {
     { key: 'amulet', label: 'Амулет', title: 'Амулет' },
     { key: 'cloak', label: 'Плащ', title: 'Плащ' },
     { key: 'armor', label: 'Броня', title: 'Броня' },
-    { key: 'weapon', label: 'Оружие', title: 'Оружие' },
+    { key: 'weapon', label: 'Оружие 1', title: 'Оружие (основное)' },
+    { key: 'weapon2', label: 'Оружие 2', title: 'Оружие (запасное)' },
     { key: 'offhand', label: 'Щит', title: 'Щит / доп. рука' },
     { key: 'gloves', label: 'Перч.', title: 'Перчатки' },
     { key: 'belt', label: 'Пояс', title: 'Пояс' },
@@ -69,6 +63,7 @@ export function useInventoryPanel(props, emit) {
     cloak: ['cloak'],
     armor: ['armor'],
     weapon: ['weapon', 'magic_weapon', 'ranged', 'two_handed'],
+    weapon2: ['weapon', 'magic_weapon', 'ranged', 'two_handed'],
     offhand: ['offhand', 'weapon', 'magic_weapon'],
     gloves: ['gloves'],
     belt: ['belt'],
@@ -87,6 +82,13 @@ export function useInventoryPanel(props, emit) {
     top: `${tooltip.value.y}px`,
     left: `${tooltip.value.x}px`,
   }))
+
+  const compareItem = computed(() => {
+    const item = tooltip.value.item
+    if (!tooltip.value.visible || !item) return null
+    const match = findCompareItem(equipped.value, item.slot)
+    return match && match !== item ? match : null
+  })
 
   function gameIconUrl(slug) {
     return `${ICON_BASE}${slug}.svg`
@@ -113,87 +115,14 @@ export function useInventoryPanel(props, emit) {
   }
 
   function generateAndPlaceItem(cellIdx) {
-    const items = itemsStore.items
-    const traits = traitsStore.traits
-    if (!items.length) return
-
-    const item = items[Math.floor(Math.random() * items.length)]
-
-    if (item.effects?.length || item.traitIds?.length || item.rarityColor) {
-      cells.value[cellIdx] = {
-        ...item,
-        traitIds: [...(item.traitIds ?? [])],
-        effects: [...(item.effects ?? [])],
-        rarityColor:
-          item.rarityColor ?? RARITY_COLORS[Math.min(4, item.traitIds?.length ?? 0)] ?? '#ffffff',
-      }
-      return
-    }
-
-    const slotWeights = statWeightsForSlot(item.slot)
-    if (!Object.keys(slotWeights).length) {
-      cells.value[cellIdx] = { ...item, traitIds: [], rarityColor: RARITY_COLORS[0] ?? '#c8a04a' }
-      return
-    }
-
-    const pool = positiveTraitsPool(traits)
-    if (!pool.length) {
-      cells.value[cellIdx] = { ...item, traitIds: [], rarityColor: RARITY_COLORS[0] ?? '#c8a04a' }
-      return
-    }
-
-    const maxTraits = Math.min(4, pool.length)
-    const count = maxTraits > 0 ? rollRarityCount(item.slot, maxTraits) : 0
-
-    if (count === 0) {
-      cells.value[cellIdx] = { ...item, traitIds: [], rarityColor: RARITY_COLORS[0] ?? '#c8a04a' }
-      return
-    }
-
-    // Бордовый (count === 4): 3 положительных + 1 удвоенный + 1 отрицательный
-    if (count === 4) {
-      const selectedIds = pickWeightedTraitIds(pool, 4, item.slot, props.ownerStats)
-      const overrides = {}
-
-      // Один из первых 3 — удваиваем моды
-      const doubleIdx = Math.floor(Math.random() * 3)
-      const doubledTrait = traits.find((t) => t.id === selectedIds[doubleIdx])
-      if (doubledTrait) {
-        overrides[doubledTrait.id] = doubledTrait.mods.map((m) => ({
-          stat: m.stat,
-          value: m.value * 2,
-        }))
-      }
-
-      // 4-й — инвертируем моды (становится отрицательным)
-      const negatedTrait = traits.find((t) => t.id === selectedIds[3])
-      if (negatedTrait) {
-        overrides[negatedTrait.id] = negatedTrait.mods.map((m) => ({
-          stat: m.stat,
-          value: -Math.abs(m.value),
-        }))
-      }
-
-      cells.value[cellIdx] = {
-        ...item,
-        traitIds: selectedIds,
-        traitOverrides: overrides,
-        rarityColor: RARITY_COLORS[4],
-      }
-      return
-    }
-
-    // Белый (1) / Синий (2) / Золотой (3) — только положительные
-    const selectedIds = pickWeightedTraitIds(pool, count, item.slot, props.ownerStats)
-    cells.value[cellIdx] = {
-      ...item,
-      traitIds: selectedIds,
-      rarityColor: RARITY_COLORS[selectedIds.length] ?? '#ffffff',
-    }
+    const ilvl = props.generationLevel ?? 1
+    const item = generateItem('random', ilvl)
+    if (!item) return
+    cells.value[cellIdx] = item
   }
 
   function tooltipRows(item) {
-    return buildTooltipRows(item, traitsStore.traits)
+    return buildTooltipRows(item)
   }
 
   function canDropOnSlot(slotKey) {
@@ -202,6 +131,8 @@ export function useInventoryPanel(props, emit) {
     if (!EQUIP_SLOT_ACCEPTS[slotKey]?.includes(item?.slot)) return false
     if (slotKey === 'weapon' && isTwoHanded(item) && equipped.value.offhand) return false
     if (slotKey === 'offhand' && isTwoHanded(equipped.value.weapon)) return false
+    // Запасное оружие не поддерживает двуручное
+    if (slotKey === 'weapon2' && isTwoHanded(item)) return false
     return true
   }
 
@@ -215,6 +146,7 @@ export function useInventoryPanel(props, emit) {
     if (!item) return
     drag.value = { source: 'bag', bagIdx: idx, slotKey: null, item }
     event.dataTransfer.effectAllowed = 'move'
+    bindGlobalDrag()
   }
 
   function onEquipDragStart(event, slotKey) {
@@ -222,13 +154,34 @@ export function useInventoryPanel(props, emit) {
     if (!item) return
     drag.value = { source: 'equip', bagIdx: null, slotKey, item }
     event.dataTransfer.effectAllowed = 'move'
+    bindGlobalDrag()
   }
 
   // Флаг: drop произошёл внутри панели (сумка / слот экипировки).
   // Если после dragend флаг false — предмет брошен за пределы попапа → выброс на землю.
   let droppedInside = false
 
+  // ── Глобальные обработчики: показывают «move» курсор за пределами панели ──
+  function globalDragOver(e) {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+  }
+  function globalDrop(e) {
+    e.preventDefault()
+    // Drop внутри попапа — не считается выбросом на землю
+    if (e.target.closest('.popup-shell__box')) droppedInside = true
+  }
+  function bindGlobalDrag() {
+    document.addEventListener('dragover', globalDragOver)
+    document.addEventListener('drop', globalDrop)
+  }
+  function unbindGlobalDrag() {
+    document.removeEventListener('dragover', globalDragOver)
+    document.removeEventListener('drop', globalDrop)
+  }
+
   function onDragEnd() {
+    unbindGlobalDrag()
     const d = drag.value
     if (d && !droppedInside) {
       if (d.source === 'bag') cells.value[d.bagIdx] = null
@@ -350,6 +303,8 @@ export function useInventoryPanel(props, emit) {
     const filteredCandidates = candidates.filter((k) => {
       if (k === 'weapon' && isTwoHanded(equipped.value.weapon)) return false
       if (k === 'offhand' && isTwoHanded(equipped.value.weapon)) return false
+      // Запасной слот оружия не принимает двуручное
+      if (k === 'weapon2' && isTwoHanded(item)) return false
       return true
     })
     const pool = filteredCandidates.length ? filteredCandidates : candidates
@@ -385,6 +340,7 @@ export function useInventoryPanel(props, emit) {
       const normalized = normalizeInventorySnapshot(value)
       cells.value = normalized.cells
       equipped.value = normalized.equipped
+      coins.value = normalized.coins
       nextTick(() => {
         syncingFromParent.value = false
       })
@@ -393,12 +349,16 @@ export function useInventoryPanel(props, emit) {
   )
 
   watch(
-    [cells, equipped],
+    [cells, equipped, coins],
     () => {
       if (syncingFromParent.value) return
       emit(
         'update:modelValue',
-        normalizeInventorySnapshot({ cells: cells.value, equipped: equipped.value })
+        normalizeInventorySnapshot({
+          cells: cells.value,
+          equipped: equipped.value,
+          coins: coins.value,
+        })
       )
     },
     { deep: true }
@@ -409,15 +369,37 @@ export function useInventoryPanel(props, emit) {
     for (const key of Object.keys(equipped.value)) {
       equipped.value[key] = null
     }
+    coins.value = 0
+  }
+
+  function addCopper(amount) {
+    coins.value = Math.max(0, coins.value + amount)
+  }
+
+  function addItem(slot, rarity) {
+    const freeIdx = cells.value.indexOf(null)
+    if (freeIdx === -1) return
+    // Системные предметы (ключ и т.п.) — не генерируются через lootGenerator
+    const systemDef = SYSTEM_ITEMS[slot]
+    if (systemDef) {
+      cells.value[freeIdx] = { ...systemDef }
+      return
+    }
+    const ilvl = props.generationLevel ?? 1
+    const item = generateItem(slot, ilvl, Math.random, rarity)
+    cells.value[freeIdx] = item
   }
 
   return {
     cells,
     equipped,
+    coins,
+    coinDisplay,
     drag,
     dragOverBag,
     tooltip,
     tooltipStyle,
+    compareItem,
     EQUIP_SLOTS,
     isTwoHanded,
     translateSlot,
@@ -439,6 +421,8 @@ export function useInventoryPanel(props, emit) {
     showTooltipForItem,
     hideTooltip,
     clearAll,
+    addCopper,
+    addItem,
     onPanelDrop,
   }
 }

@@ -46,11 +46,18 @@ export function useScenarioSelectionFlow({
     loadingId.value = null
   }
 
-  async function selectScenario(scenario) {
+  async function selectScenario(scenario, { skipReset = false } = {}) {
     loadingId.value = scenario.id
     loadError.value = ''
     try {
       await tokensStore.fetchTokens()
+      // При старте новой игры сбрасываем AI-состояние НПС (attitudeScore, dialogHistory,
+      // behaviorNotes, eventLog) до дефолта. contextNotes (память персонажа) при этом
+      // сохраняется, т.к. авто-суммаризатор пишет её в defaultPlacedTokens тоже.
+      // skipReset = true передаётся только из resumeSession — там снапшот уже восстановлен.
+      if (!skipReset && auth.role === 'admin') {
+        await scenariosStore.resetScenario(scenario.id).catch(() => {})
+      }
       const full = await scenariosStore.fetchScenario(scenario.id)
       gameStore.setCellSize(full.cellSize ?? 60)
       gameStore.setGridOffset(full.gridOffsetX ?? 0, full.gridOffsetY ?? 0)
@@ -112,7 +119,7 @@ export function useScenarioSelectionFlow({
     gameStore.setActiveCampaign(campaign)
     setActiveSessionName(session.name)
     await gameSessionsStore.restoreSession(sessionId)
-    await selectScenario(scenario)
+    await selectScenario(scenario, { skipReset: true })
     loadingId.value = null
   }
 

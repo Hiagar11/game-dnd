@@ -26,6 +26,18 @@
         rows="3"
         @input="$emit('update:locationDescription', $event.target.value)"
       />
+      <p class="save-popup__hint save-popup__hint--location">
+        Контекст карты для НПС
+        <span class="save-popup__hint-note">(что персонажи знают о месте)</span>
+      </p>
+      <textarea
+        class="save-popup__textarea"
+        :value="mapContext"
+        placeholder="В подземелье спрятан ключ от сундука. Стражник у ворот знает дорогу..."
+        maxlength="1000"
+        rows="3"
+        @input="$emit('update:mapContext', $event.target.value)"
+      />
       <p v-if="error" class="save-popup__error">{{ error }}</p>
     </div>
     <div class="save-popup__actions">
@@ -51,11 +63,18 @@
     visible: { type: Boolean, required: true },
     modelValue: { type: String, default: '' },
     locationDescription: { type: String, default: '' },
+    mapContext: { type: String, default: '' },
     saving: { type: Boolean, default: false },
     error: { type: String, default: '' },
   })
 
-  const emit = defineEmits(['update:modelValue', 'update:locationDescription', 'save', 'close'])
+  const emit = defineEmits([
+    'update:modelValue',
+    'update:locationDescription',
+    'update:mapContext',
+    'save',
+    'close',
+  ])
 
   const { playHover, playClick } = useSound()
 

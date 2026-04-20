@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import { PhBackpack, PhMagicWand, PhRobot, PhScroll } from '@phosphor-icons/vue'
+import { PhBackpack, PhMagicWand, PhRobot, PhScroll, PhTree } from '@phosphor-icons/vue'
 
 export function useTokenEditMeta({ props, isPlacedMode, isEditMode, saving, form, previewSrc }) {
   const isNpcType = computed(() => props.tokenType === 'npc')
@@ -15,6 +15,7 @@ export function useTokenEditMeta({ props, isPlacedMode, isEditMode, saving, form
   const tabs = computed(() => [
     { id: 'stats', label: 'Характеристики', icon: PhScroll },
     { id: 'inventory', label: 'Инвентарь', icon: PhBackpack },
+    { id: 'tree', label: 'Развитие', icon: PhTree },
     { id: 'abilities', label: 'Способности', icon: PhMagicWand },
     ...(isNpcType.value ? [{ id: 'personality', label: 'Личность ИИ', icon: PhRobot }] : []),
   ])
@@ -24,9 +25,9 @@ export function useTokenEditMeta({ props, isPlacedMode, isEditMode, saving, form
   const canSave = computed(
     () =>
       !saving.value &&
-      (isEditMode.value
-        ? form.value.name.length > 0
-        : form.value.name.length > 0 && previewSrc.value !== null)
+      (isPlacedMode.value || isEditMode.value
+        ? form.value.npcName.length > 0
+        : form.value.npcName.length > 0 && previewSrc.value !== null)
   )
 
   return {

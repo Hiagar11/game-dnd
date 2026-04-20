@@ -4,6 +4,7 @@
     class="game-view"
     :class="{ 'game-view--combat': gameStore.combatMode }"
     @mousemove="onMouseMove"
+    @mousedown="onGameMouseDown"
     @contextmenu="onContextMenu"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
@@ -42,12 +43,17 @@
           :width="mapSize.width"
           :height="mapSize.height"
           @door-transition="onDoorTransition"
+          @container-loot="onOpenLoot"
         />
         <GameFog
+          :key="selectedScenario?.id"
           :width="mapSize.width"
           :height="mapSize.height"
           :hidden="auth.role === 'admin' && !gameStore.fogEnabled"
         />
+        <GameAbilityProjectile />
+        <GameAbilityImpact />
+        <GameMeleeSlash />
       </div>
 
       <GameMenu @mouseenter="onMenuEnter" @mouseleave="onMenuLeave" />
@@ -76,6 +82,14 @@
       @skip="onSummarySkip"
     />
 
+    <!-- Попап памяти НПС при уходе с карты (через дверь / глобальную карту) -->
+    <GameSessionSummaryPopup
+      :visible="showMapLeaveSummary"
+      :npcs="mapLeaveSummaryNpcs"
+      @save="onMapLeaveMemorySave"
+      @skip="onMapLeaveMemorySkip"
+    />
+
     <!-- Боевой попап: появляется когда образована боевая пара -->
     <GameCombatPopup
       :visible="!!gameStore.combatPair"
@@ -84,11 +98,27 @@
 
     <!-- Попап подбора лута с земли — двойной инвентарь -->
     <GameLootPickupPopup :pile="lootPile" @close="lootPile = null" />
+
+    <!-- Глобальная карта — полноэкранный оверлей с анимацией колесницы -->
+    <GameGlobalMapOverlay
+      :phase="travel.phase.value"
+      :global-map="travel.globalMap.value"
+      :source-stop="travel.sourceStop.value"
+      :target-stop="travel.targetStop.value"
+      :chariot-progress="travel.chariotProgress.value"
+      :reachable-stops="travel.reachableStops.value"
+      :path-points="travel.pathPoints.value"
+      @confirm="travel.confirmTravel()"
+      @cancel="travel.cancelTravel()"
+      @choose="travel.chooseDestination($event)"
+      @enter-complete="travel.onEnterComplete()"
+      @exit-complete="travel.onExitComplete()"
+    />
   </div>
 </template>
 
 <script setup>
-  import { ref } from 'vue'
+  import { ref, inject } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useSocket } from '../composables/useSocket'
   import {
@@ -105,6 +135,9 @@
   import GameGrid from '../components/GameGrid.vue'
   import GameRangeOverlay from '../components/GameRangeOverlay.vue'
   import GameFog from '../components/GameFog.vue'
+  import GameAbilityProjectile from '../components/GameAbilityProjectile.vue'
+  import GameAbilityImpact from '../components/GameAbilityImpact.vue'
+  import GameMeleeSlash from '../components/GameMeleeSlash.vue'
   import GameTokens from '../components/GameTokens.vue'
   import GameGroundLoot from '../components/GameGroundLoot.vue'
   import GameMenu from '../components/GameMenu.vue'
@@ -127,6 +160,9 @@
   import { useGameViewMountLifecycle } from '../composables/useGameViewMountLifecycle'
   import { useGameViewRefs } from '../composables/useGameViewRefs'
   import { useGameViewStores } from '../composables/useGameViewStores'
+  import { useGlobalMapTravel } from '../composables/useGlobalMapTravel'
+  import { useGlobalMapsStore } from '../stores/globalMaps'
+  import GameGlobalMapOverlay from '../components/GameGlobalMapOverlay.vue'
 
   const { viewRef, mapRef, canvasRef, mapSize } = useGameViewRefs()
 
@@ -137,10 +173,16 @@
 
   const { onDragOver, onDragLeave, onDrop } = useTokenDrop(offsetX, offsetY)
   const { close: closeContextMenu } = useTokenContextMenu()
+
+  function onGameMouseDown(e) {
+    if (e.button !== 2) return
+    gameStore.selectPlacedToken(null)
+  }
   const { playHover, playClick, playNext } = useSound()
 
   const { auth, gameStore, tokensStore, scenariosStore, campaignsStore, gameSessionsStore } =
     useGameViewStores()
+  const globalMapsStore = useGlobalMapsStore()
   const { connect, getSocket } = useSocket()
 
   // Флаг: открыта ли активная сессия трансляции для зрителей
@@ -243,21 +285,94 @@
     getSocket,
   })
 
-  const { onDoorTransition } = useDoorTransition({
+  // ─── Память НПС при уходе с карты ────────────────────────────────────────
+  const showMapLeaveSummary = ref(false)
+  const mapLeaveSummaryNpcs = ref([])
+  const mapLeaveResolve = ref(null)
+
+  async function onMapLeaveMemorySave(saves) {
+    const socket = getSocket()
+    if (socket && saves.length > 0) {
+      const savesWithUid = saves
+        .map((s) => {
+          const npc = mapLeaveSummaryNpcs.value.find((n) => n.tokenId === s.tokenId)
+          return { scenarioId: npc?.scenarioId, uid: npc?.npcUid, contextNotes: s.notes }
+        })
+        .filter((s) => s.scenarioId && s.uid)
+      await new Promise((resolve) =>
+        socket.emit('npc:save:memory', { saves: savesWithUid }, resolve)
+      )
+    }
+    showMapLeaveSummary.value = false
+    mapLeaveResolve.value?.()
+    mapLeaveResolve.value = null
+  }
+
+  function onMapLeaveMemorySkip() {
+    showMapLeaveSummary.value = false
+    mapLeaveResolve.value?.()
+    mapLeaveResolve.value = null
+  }
+
+  const selectScenarioForMap = async (scenario) => {
+    mapSize.value = { width: 0, height: 0 }
+    // При смене карты — предлагаем сохранить память NPC с текущей локации
+    if (sessionActive.value && auth.role === 'admin') {
+      await new Promise((resolve) => {
+        const socket = getSocket()
+        if (!socket) {
+          resolve()
+          return
+        }
+        socket.emit('npc:map:summary', (res) => {
+          if (res?.ok && res.npcs?.length > 0) {
+            mapLeaveSummaryNpcs.value = res.npcs.map((npc) => {
+              const placed = gameStore.placedTokens.find((t) => t.uid === npc.npcUid)
+              return { ...npc, src: placed?.src ?? null }
+            })
+            mapLeaveResolve.value = resolve
+            showMapLeaveSummary.value = true
+          } else {
+            resolve()
+          }
+        })
+        setTimeout(resolve, 8000)
+      })
+    }
+    await selectScenario(scenario)
+  }
+
+  const { onDoorTransition, placeBufferAroundDoor, centerOnToken } = useDoorTransition({
     scenariosStore,
     gameStore,
-    selectScenario: async (scenario) => {
-      mapSize.value = { width: 0, height: 0 }
-      await selectScenario(scenario)
-    },
+    selectScenario: selectScenarioForMap,
     viewRef,
     offsetX,
     offsetY,
-    // Когда герой входит в дверь «выход в глоб. карту» — пока просто логируем.
-    // В будущем здесь переключение на глобальную карту.
     onGlobalMapExit: (payload) => {
-      console.info('[GlobalMapExit]', payload)
+      // Удаляем мёртвых NPC с текущей локации перед уходом (кроме захваченных)
+      const scenarioId = String(gameStore.currentScenario?.id ?? '')
+      if (scenarioId) {
+        const deadNpcs = gameStore.placedTokens.filter(
+          (t) => t.tokenType === 'npc' && !t.systemToken && !t.captured && (t.hp ?? 1) <= 0
+        )
+        const socket = getSocket()
+        for (const npc of deadNpcs) {
+          gameStore.removeToken(npc.uid)
+          socket?.emit('token:remove', { scenarioId, uid: npc.uid })
+        }
+      }
+      travel.initTravel(payload)
     },
+  })
+
+  const travel = useGlobalMapTravel({
+    globalMapsStore,
+    scenariosStore,
+    gameStore,
+    selectScenario: selectScenarioForMap,
+    centerOnDoor: centerOnToken,
+    placeBuffer: placeBufferAroundDoor,
   })
 
   const { onMapReady } = useMapReadyHandler({ canvasRef, mapSize, mapRef })
@@ -268,6 +383,9 @@
   function onOpenLoot(pile) {
     lootPile.value = pile
   }
+  // Регистрируем обработчик для вызова из GameRangeOverlay
+  const overlayOpenLoot = inject('overlayOpenLoot', ref(null))
+  overlayOpenLoot.value = onOpenLoot
 </script>
 
 <style scoped lang="scss">
