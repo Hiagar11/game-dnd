@@ -437,7 +437,18 @@ export async function summarizeEvent({ eventText, existingContext }) {
  * @param {{ npcName: string, personality: string, combatLog: Array }} params
  * @returns {Promise<string>} — новое поле personality
  */
-export async function rewritePersonalityAsCaptive({ npcName, personality, combatLog = [] }) {
+/**
+ * Генерирует запись в памяти сессии (contextNotes) для захваченного NPC.
+ * Описывает опыт пленения — кто бил, как чувствует себя персонаж.
+ * Personality NPC при этом НЕ изменяется.
+ *
+ * @param {object} params
+ * @param {string} params.npcName     — Имя NPC
+ * @param {string} params.personality — Черты характера (для контекста, не перезаписываются)
+ * @param {Array}  params.combatLog   — Лог боя
+ * @returns {Promise<string>} — краткая запись о пленении для contextNotes
+ */
+export async function generateCaptiveContextNote({ npcName, personality, combatLog = [] }) {
   const client = getClient()
 
   const combatSummary = []
@@ -463,29 +474,26 @@ export async function rewritePersonalityAsCaptive({ npcName, personality, combat
 
   const response = await client.chat.completions.create({
     model: 'gpt-4o-mini',
-    max_tokens: 250,
+    max_tokens: 200,
     messages: [
       {
         role: 'system',
         content:
-          `Ты — сценарист фэнтезийной ролевой игры. Тебе дают описание личности NPC по имени ${npcName} и лог боя, в котором его победили и взяли в плен. ` +
-          'Перепиши описание личности, сохранив исходные черты характера, но добавив: ' +
-          '1) Он помнит бой — кто именно его бил и как сильно. Может затаить злобу или уважение к конкретным героям. ' +
-          '2) Он теперь пленник — побеждён, связан и таскается на привязи с группой героев. Его ведут с собой как переходящий трофей по локациям и подземельям. ' +
-          '3) Его поведение изменилось: может быть подавлен, озлоблен, запуган или торговаться. Устал от бесконечной ходьбы под конвоем. ' +
-          '4) Сохрани ядро его характера (трус останется трусом, храбрец — дерзким даже в плену). ' +
-          'Напиши 2-4 предложения от третьего лица. Только текст описания, без JSON и вводных слов.',
+          `Ты — сценарист фэнтезийной ролевой игры. Составь краткую запись о пленении NPC ${npcName} — это сессионная память, а не описание личности. ` +
+          'Опиши: кто и как сильно бил, как ведёт себя пленник (подавлен, озлоблен, смирился, запуган). ' +
+          'Не копируй черты характера — только что произошло и как это сказалось на поведении сейчас. ' +
+          'Пиши от третьего лица, 2–3 предложения. Только текст, без вводных слов.',
       },
       {
         role: 'user',
         content:
-          `Исходная личность: ${personality || 'Обычный персонаж без особых черт.'}\n\n` +
-          `Бой: ${combatSummary.length ? combatSummary.join(' ') : 'Подробности боя неизвестны, но он был побеждён.'}`,
+          `Черты характера NPC: ${personality || 'Обычный персонаж без особых черт.'}\n\n` +
+          `Бой: ${combatSummary.length ? combatSummary.join(' ') : 'Персонаж захвачен без серьёзного боя.'}`,
       },
     ],
   })
 
-  return response.choices[0]?.message?.content?.trim() ?? personality
+  return response.choices[0]?.message?.content?.trim() ?? ''
 }
 
 /**

@@ -6,7 +6,7 @@ import {
   askNpc,
   summarizeDialog,
   summarizeEvent,
-  rewritePersonalityAsCaptive,
+  generateCaptiveContextNote,
   generateBattleCry,
 } from '../ai/npcChat.js'
 import {
@@ -342,17 +342,12 @@ export function setupSocket(io) {
           'opened',
           'locked',
         ]
-        // contextNotes живёт только в placedTokens (сессионная память) —
-        // в defaultPlacedTokens не пишем, чтобы сброс к эталону её стирал.
-        const SKIP_IN_DEFAULT = new Set(['contextNotes'])
+        // token:edit — только placedTokens (сессионное состояние).
+        // defaultPlacedTokens обновляется исключительно через scenario:persist-tokens (явное сохранение).
         const ptUpdate = {}
-        const defUpdate = {}
         for (const key of ALLOWED) {
           if (Object.prototype.hasOwnProperty.call(fields, key)) {
-            ptUpdate[`placedTokens.$[pt].${key}`] = fields[key] ?? null
-            if (!SKIP_IN_DEFAULT.has(key)) {
-              defUpdate[`defaultPlacedTokens.$[def].${key}`] = fields[key] ?? null
-            }
+            ptUpdate[`placedTokens.$.${key}`] = fields[key] ?? null
           }
         }
         if (Object.keys(ptUpdate).length === 0) {
@@ -361,8 +356,7 @@ export function setupSocket(io) {
         }
         await Scenario.findOneAndUpdate(
           { _id: scenarioId, 'placedTokens.uid': uid },
-          { $set: { ...ptUpdate, ...defUpdate } },
-          { arrayFilters: [{ 'pt.uid': uid }, { 'def.uid': uid }] }
+          { $set: ptUpdate }
         )
         ack?.({ ok: true })
       } catch {
@@ -417,8 +411,7 @@ export function setupSocket(io) {
           'abilities',
           'passiveAbilities',
         ]
-        const SKIP_IN_DEFAULT = new Set(['contextNotes'])
-
+        // При явном сохранении уровня все поля, включая contextNotes, записываются в defaultPlacedTokens
         for (const { uid, fields } of tokens) {
           if (!uid || !fields) continue
           const pt = scenario.placedTokens.find((t) => String(t.uid) === String(uid))
@@ -427,7 +420,7 @@ export function setupSocket(io) {
           for (const key of ALLOWED) {
             if (Object.prototype.hasOwnProperty.call(fields, key)) {
               pt[key] = fields[key] ?? null
-              if (def && !SKIP_IN_DEFAULT.has(key)) def[key] = fields[key] ?? null
+              if (def) def[key] = fields[key] ?? null
             }
           }
         }
@@ -1271,54 +1264,38 @@ export function setupSocket(io) {
     })
 
     // ─── Сохранение заметок НПС (contextNotes) ───────────────────────────────
-    // Событие: npc:save:notes { tokenId, contextNotes }
-    socket.on('npc:save:notes', async ({ tokenId, contextNotes }, ack) => {
-      if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
-      if (!tokenId) return ack?.({ ok: true })
-      try {
-        await Token.findByIdAndUpdate(tokenId, {
-          contextNotes: String(contextNotes ?? '').slice(0, 800),
-        })
-        ack?.({ ok: true })
-      } catch (err) {
-        ackError(ack, err.message)
-      }
+    // Событие: npc:save:notes — устаревший эндпоинт, оставлен для совместимости.
+    // Шаблон токена (Token) не изменяется — память хранится в placedTokens сценария.
+    // Используй npc:save:memory для сохранения contextNotes в Scenario.
+    socket.on('npc:save:notes', (_data, ack) => {
+      ack?.({ ok: true })
     })
 
-    // ─── Захват NPC — AI перезаписывает personality ──────────────────────────
+    // ─── Захват NPC — AI генерирует запись в память сессии (contextNotes) ────
     // Событие: npc:capture { scenarioId, uid, tokenId, npcName, combatLog }
+    // Personality NPC не изменяется — только contextNotes (сессионная память).
     socket.on('npc:capture', async ({ scenarioId, uid, tokenId, npcName, combatLog }, ack) => {
       if (role !== 'admin') return ackError(ack, 'Недостаточно прав')
       try {
         const tokenDoc = tokenId ? await Token.findById(tokenId).select('personality').lean() : null
-        const oldPersonality = tokenDoc?.personality ?? ''
+        const personality = tokenDoc?.personality ?? ''
 
-        const newPersonality = await rewritePersonalityAsCaptive({
+        // Генерируем запись о пленении для contextNotes — НЕ перезаписываем personality
+        const captiveNote = await generateCaptiveContextNote({
           npcName: npcName || 'Незнакомец',
-          personality: oldPersonality,
+          personality,
           combatLog: Array.isArray(combatLog) ? combatLog : [],
         })
 
-        // Обновляем personality в шаблоне токена (Token)
-        if (tokenId) {
-          await Token.findByIdAndUpdate(tokenId, { personality: newPersonality })
-        }
-
-        // Обновляем personality в placedTokens сценария
+        // Записываем только в placedTokens.contextNotes (сессионная память — не переживает перезагрузку без сохранения)
         if (scenarioId && uid) {
           await Scenario.findOneAndUpdate(
             { _id: scenarioId, 'placedTokens.uid': uid },
-            {
-              $set: {
-                'placedTokens.$[pt].personality': newPersonality,
-                'defaultPlacedTokens.$[def].personality': newPersonality,
-              },
-            },
-            { arrayFilters: [{ 'pt.uid': uid }, { 'def.uid': uid }] }
+            { $set: { 'placedTokens.$.contextNotes': captiveNote } }
           )
         }
 
-        ack?.({ ok: true, personality: newPersonality })
+        ack?.({ ok: true, contextNotes: captiveNote })
 
         // Записываем захват NPC в глобальную хронику кампании
         const session = sessions.get(socket.user.id)

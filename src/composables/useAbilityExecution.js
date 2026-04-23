@@ -98,7 +98,8 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
       const weaponAp = getActiveWeapon(token)?.apCost ?? 1
       cost = Math.max(cost, weaponAp)
     }
-    if (store.combatMode && (token.actionPoints ?? 0) < cost) return false
+    // Блокируем если не хватает AP (всегда, не только в бою)
+    if (cost > 0 && (token.actionPoints ?? 0) < cost) return false
 
     // Валидация цели
     const needsToken = ability.areaType === 'single'
@@ -112,14 +113,15 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
 
     executor(buildCtx(), token, target, ability)
 
-    // Тратим AP
-    if (store.combatMode) token.actionPoints -= cost
+    // Тратим AP (всегда, не только в бою)
+    if (cost > 0) token.actionPoints -= cost
 
     // Сброс pending
     store.pendingAbility = null
 
     // Автозавершение хода при исчерпании AP
-    if (store.combatMode && (token.actionPoints ?? 0) <= 0) {
+    // (skipAutoEndTurn: способность даёт MP — игрок должен успеть ими воспользоваться)
+    if (store.combatMode && (token.actionPoints ?? 0) <= 0 && !ability.skipAutoEndTurn) {
       store.endTurn()
     }
 

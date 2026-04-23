@@ -51,10 +51,13 @@
         <PhSneakerMove :size="11" weight="fill" class="token-info__mp-icon" />
         <TransitionGroup name="ap-dot" tag="div" class="token-info__ap">
           <span
-            v-for="i in DEFAULT_MP"
+            v-for="i in displayMp"
             :key="'mp' + i"
             class="token-info__ap-dot token-info__ap-dot--mp"
-            :class="{ 'token-info__ap-dot--used': i > (placed.movementPoints ?? DEFAULT_MP) }"
+            :class="{
+              'token-info__ap-dot--used': i > (placed.movementPoints ?? DEFAULT_MP),
+              'token-info__ap-dot--bonus': i > DEFAULT_MP,
+            }"
           />
         </TransitionGroup>
       </div>
@@ -104,6 +107,12 @@
     const hp = placed.value.hp ?? placed.value.maxHp ?? 10
     const max = placed.value.maxHp ?? 10
     return hpPercentFromValues(hp, max)
+  })
+
+  // Показываем бонусные точки MP выше DEFAULT_MP (например после Быстрого шага)
+  const displayMp = computed(() => {
+    if (!placed.value) return DEFAULT_MP
+    return Math.max(DEFAULT_MP, placed.value.movementPoints ?? 0)
   })
 </script>
 

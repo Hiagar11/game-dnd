@@ -11,8 +11,8 @@
 
 ### ⚔️ Сила (S ≥ 3)
 
-- [ ] `power_strike` — Силовой удар (active, 2AP, ×1.5 урон)
-- [ ] `shield_bash` — Удар щитом (active, 2AP, оглушение 1 ход)
+- [x] `power_strike` — Силовой удар (active, 2AP, ×1.5 урон)
+- [x] `shield_bash` — Удар щитом (active, 2AP, оглушение 1 ход)
 
 ### 🏹 Ловкость (A ≥ 3)
 

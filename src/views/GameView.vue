@@ -55,6 +55,7 @@
         <GameAbilityImpact />
         <GameMeleeSlash />
         <GameShieldBash />
+        <GameQuickStep />
       </div>
 
       <GameMenu @mouseenter="onMenuEnter" @mouseleave="onMenuLeave" />
@@ -140,6 +141,7 @@
   import GameAbilityImpact from '../components/GameAbilityImpact.vue'
   import GameMeleeSlash from '../components/GameMeleeSlash.vue'
   import GameShieldBash from '../components/GameShieldBash.vue'
+  import GameQuickStep from '../components/GameQuickStep.vue'
   import GameTokens from '../components/GameTokens.vue'
   import GameGroundLoot from '../components/GameGroundLoot.vue'
   import GameMenu from '../components/GameMenu.vue'

@@ -252,7 +252,54 @@ export function playShieldBash() {
     return
   }
   ensureCombatBuffers()
-} // ── Музыка главного меню ─────────────────────────────────────────
+}
+
+/**
+ * Быстрый шаг — синтетический звук через Web Audio API:
+ * быстрый свист с нарастанием частоты + lfo-пульс для ощущения движения.
+ */
+export function playQuickStep() {
+  const ctx = getAudioCtx()
+  if (!ctx) return
+
+  const now = ctx.currentTime
+  const duration = 0.35
+
+  // Основной осциллятор — sinusoidal sweep с 2200↑720 Гц (свист вниз)
+  const osc = ctx.createOscillator()
+  osc.type = 'sine'
+  osc.frequency.setValueAtTime(2200, now)
+  osc.frequency.exponentialRampToValueAtTime(720, now + duration)
+
+  // Второй осциллятор — добавляет воздушность (пильная гармоника)
+  const osc2 = ctx.createOscillator()
+  osc2.type = 'triangle'
+  osc2.frequency.setValueAtTime(1760, now)
+  osc2.frequency.exponentialRampToValueAtTime(580, now + duration)
+
+  // Фильтр высоких частот для плавности
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.setValueAtTime(1800, now)
+  filter.frequency.exponentialRampToValueAtTime(650, now + duration)
+  filter.Q.setValueAtTime(1.2, now)
+
+  // Огибание амплитуды: быстрый attack → плавный release
+  const gain = ctx.createGain()
+  gain.gain.setValueAtTime(0, now)
+  gain.gain.linearRampToValueAtTime(0.28, now + 0.018)
+  gain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+
+  osc.connect(filter)
+  osc2.connect(filter)
+  filter.connect(gain)
+  gain.connect(ctx.destination)
+
+  osc.start(now)
+  osc2.start(now)
+  osc.stop(now + duration)
+  osc2.stop(now + duration)
+}
 
 export function playMainMenuMusic() {
   hardStopBattleMusic()

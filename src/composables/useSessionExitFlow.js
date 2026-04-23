@@ -54,16 +54,8 @@ export function useSessionExitFlow({
 
   async function onSummaryConfirm(saves) {
     const socket = getSocket()
-    // Сохраняем contextNotes в шаблон токена (Token) — глобальная база памяти
-    await Promise.allSettled(
-      saves.map(
-        ({ tokenId, notes }) =>
-          new Promise((resolve) =>
-            socket?.emit('npc:save:notes', { tokenId, contextNotes: notes }, resolve)
-          )
-      )
-    )
-    // Также сохраняем в placedTokens и очищаем dialogHistory/behaviorNotes/eventLog
+    // Сохраняем contextNotes только в placedTokens сценария (шаблон Token не трогаем).
+    // При явном сохранении уровня persist-tokens запишет всё в defaultPlacedTokens.
     const memorySaves = saves
       .map((s) => {
         const npc = summaryNpcs.value.find((n) => n.tokenId === s.tokenId)

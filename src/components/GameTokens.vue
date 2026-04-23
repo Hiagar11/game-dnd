@@ -293,6 +293,20 @@
     getSocket()?.off('npc:memory:updated')
   })
 
+  // ── Всплывающий флоат «Оглушён» над токеном при пропуске хода ────────────
+  watch(
+    () => store.stunSkipInfo,
+    (info) => {
+      if (!info) return
+      const token = store.placedTokens.find((t) => t.uid === info.uid)
+      if (!token) return
+      const cs = store.cellSize
+      const x = (token.col + 1) * (cs / 2) + store.gridNormOX
+      const y = (token.row + 1) * (cs / 2) + store.gridNormOY
+      damageFloatRef.value?.spawn(info.uid, `⚡ ${info.reason}`, x, y, '#f59e0b')
+    }
+  )
+
   // ── XP-награда и левелап после боя ──────────────────────────────────────
   watch(
     () => store.lastXpReport,
@@ -449,7 +463,7 @@
       })
     }
 
-    // AI перезаписывает personality под пленника
+    // AI генерирует запись о пленении в contextNotes (personality не изменяется)
     socket?.emit(
       'npc:capture',
       {
@@ -460,8 +474,8 @@
         combatLog: npc.combatLog ?? [],
       },
       (res) => {
-        if (res?.ok && res.personality) {
-          store.editPlacedToken(npc.uid, { personality: res.personality })
+        if (res?.ok && res.contextNotes) {
+          store.editPlacedToken(npc.uid, { contextNotes: res.contextNotes })
         }
       }
     )

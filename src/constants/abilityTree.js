@@ -44,9 +44,12 @@ export const QUICK_STEP = {
   name: 'Быстрый шаг',
   description: '+3 MP на этот ход.',
   icon: 'run',
-  color: '#22c55e',
+  color: '#3b82f6',
   apCost: 1,
   type: 'active',
+  areaType: 'self',
+  // Ход не завершается автоматически при исчерпании AP — игрок должен спользоваться бонусным MP
+  skipAutoEndTurn: true,
   tier: 1,
   requirements: { strength: 0, agility: 3, intellect: 0, charisma: 0 },
   requiredAbilities: [],
