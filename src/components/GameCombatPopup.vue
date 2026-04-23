@@ -238,7 +238,7 @@
           <div class="combat-popup__combat-stats">
             <div class="combat-popup__csrow">
               <span class="combat-popup__cslabel">Уклонение</span>
-              <span class="combat-popup__csval">{{ calcEvasion(currentDefender) }}</span>
+              <span class="combat-popup__csval">{{ evasionOf(currentDefender) }}</span>
             </div>
             <div class="combat-popup__csrow">
               <span class="combat-popup__cslabel">Броня</span>
@@ -283,11 +283,17 @@
     isDualWielding,
     DUAL_WIELD_HIT_PENALTY,
   } from '../utils/combatFormulas'
+  import { getPassiveDerivedBonus } from '../utils/passiveBonuses'
   import { useCombatLogic } from '../composables/useCombatLogic'
 
   defineProps({ visible: { type: Boolean, default: false } })
 
   const emit = defineEmits(['close'])
+
+  // Уклонение с учётом пассивных способностей
+  function evasionOf(token) {
+    return calcEvasion(token) + getPassiveDerivedBonus(token?.passiveAbilities, 'evasion')
+  }
   const store = useGameStore()
 
   const heroToken = computed(() =>

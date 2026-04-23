@@ -61,6 +61,13 @@
         <span class="ability-bar__hint-name">{{ activeAbility.name }}</span>
         <span class="ability-bar__hint-desc">{{ activeAbility.description }}</span>
         <span class="ability-bar__hint-area"> Область: {{ activeAbility.areaLabel }} </span>
+        <span v-if="activeAbilityProfile" class="ability-bar__hint-area">
+          Тип: {{ getDeliveryLabel(activeAbilityProfile.delivery) }} /
+          {{ getDamageKindLabel(activeAbilityProfile.damageKind) }}
+        </span>
+        <span v-if="activeAbilityLineOfSight" class="ability-bar__hint-area">
+          {{ activeAbilityLineOfSight }}
+        </span>
       </div>
     </Transition>
   </div>
@@ -74,6 +81,12 @@
   import { getSelectedNonSystemToken } from '../utils/tokenFilters'
   import { getActiveWeapon, hasShield } from '../utils/combatFormulas'
   import { getAbilityTreeById } from '../constants/abilityTree'
+  import {
+    getAbilityCombatProfile,
+    getDeliveryLabel,
+    getDamageKindLabel,
+    getLineOfSightLabel,
+  } from '../utils/abilityCombatProfile'
 
   // Слоты оружия ближнего боя
   const MELEE_SLOTS = new Set(['weapon', 'two_handed'])
@@ -146,6 +159,14 @@
     if (activeSlot.value == null) return null
     return slots.value[activeSlot.value] ?? null
   })
+
+  const activeAbilityProfile = computed(() =>
+    activeAbility.value ? getAbilityCombatProfile(activeAbility.value) : null
+  )
+
+  const activeAbilityLineOfSight = computed(() =>
+    activeAbilityProfile.value ? getLineOfSightLabel(activeAbilityProfile.value) : null
+  )
 
   function canUse(ability) {
     if (!placed.value) return true

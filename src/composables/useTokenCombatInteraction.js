@@ -19,6 +19,7 @@ import {
   rollOffhandDamage,
 } from '../utils/combatFormulas'
 import { getCurrentScenarioId } from '../utils/scenario'
+import { getPassiveDerivedBonus } from '../utils/passiveBonuses'
 
 export function useTokenCombatInteraction({ store, damageFloatRef, getSocket }) {
   const flashMap = ref(new Map())
@@ -55,7 +56,8 @@ export function useTokenCombatInteraction({ store, damageFloatRef, getSocket }) 
     // Магия всегда попадает; физ/дальний — d20 + шанс удара − уклонение
     const d20 = Math.floor(Math.random() * 20) + 1
     const hitBonus = calcCritChance(eStats)
-    const evasion = calcEvasion(dStats)
+    const evasion =
+      calcEvasion(dStats) + getPassiveDerivedBonus(defenderToken?.passiveAbilities, 'evasion')
     const hitPenalty = dualWield ? DUAL_WIELD_HIT_PENALTY : 0
     const total = d20 + hitBonus - evasion - hitPenalty
     const isHit = magic || total >= HIT_DC

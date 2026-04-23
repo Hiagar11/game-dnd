@@ -82,6 +82,7 @@ export function useGameTokenPresentation({
       'game-tokens__token--flash-miss': flashMap.value.get(placed.uid) === 'miss',
       'game-tokens__token--flash-slash': flashMap.value.get(placed.uid) === 'slash',
       'game-tokens__token--flash-bash': flashMap.value.get(placed.uid) === 'bash',
+      'game-tokens__token--flash-blood': flashMap.value.get(placed.uid) === 'blood',
       'game-tokens__token--flash-teleport': flashMap.value.get(placed.uid) === 'teleport',
       'game-tokens__token--active-turn': currentTurnUid.value === placed.uid,
       'game-tokens__token--ap-2':

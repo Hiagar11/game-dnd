@@ -6,6 +6,7 @@ import {
   isNonSystemToken,
   isTalkableNpcToken,
 } from '../utils/tokenFilters'
+import { getAbilityCombatProfile } from '../utils/abilityCombatProfile'
 
 const CONTAINER_TOKENS = new Set(['item', 'jar', 'bag'])
 
@@ -29,14 +30,17 @@ export function useTokenClickInteraction({
   async function onTokenClick(placed, event) {
     // ── Режим выбора цели способности ─────────────────────────────
     if (store.pendingAbility && abilityExec.needsTargetToken.value) {
+      const abilityProfile = getAbilityCombatProfile(store.pendingAbility)
+
       // Способность на нейтрального NPC в мирное время → агрессия + бой
       if (!store.combatMode && isNeutralNpcToken(placed) && !placed.systemToken) {
         placed.attitude = 'hostile'
         store.enterCombat(placed.uid, getVisibleKeys())
       }
 
-      // Ближний бой — сначала подойти к цели
-      if (store.pendingAbility.requiresMelee) {
+      // Ближний бой — сначала подойти к цели.
+      // Дальние/магические single-способности работают с места.
+      if (abilityProfile.requiresApproach) {
         const casterUid = store.pendingAbility.tokenUid
         const reached = await moveTowardTarget(casterUid, placed)
         if (!reached) {

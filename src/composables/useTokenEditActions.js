@@ -1,5 +1,6 @@
 import { normalizeInventorySnapshot } from '../utils/inventoryState'
 import { getCurrentScenarioId } from '../utils/scenario'
+import { normalizePassiveAbilityIds } from '../utils/passiveAbilities'
 
 export function useTokenEditActions({
   canSave,
@@ -49,7 +50,7 @@ export function useTokenEditActions({
           inventory: normalizeInventorySnapshot(inventoryModel.value),
           treeActivatedIds: localTreeIds?.value ?? [],
           abilities: localAbilities?.value ?? [],
-          passiveAbilities: localPassives?.value ?? [],
+          passiveAbilities: normalizePassiveAbilityIds(localPassives?.value ?? []),
         }
         store.editPlacedToken(props.placedUid, fields)
         // Изменения живут только в Pinia-сторе до сохранения сессии.

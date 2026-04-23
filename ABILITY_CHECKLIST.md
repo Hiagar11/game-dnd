@@ -16,12 +16,13 @@
 
 ### 🏹 Ловкость (A ≥ 3)
 
-- [ ] `quick_step` — Быстрый шаг (active, 1AP, +3 MP)
-- [ ] `dodge_roll` — Перекат (passive, +2 уклонение)
+- [x] `quick_step` — Быстрый шаг (active, 1AP, +3 MP)
+- [x] `dodge_roll` — Перекат (passive, +2 уклонение)
+
 
 ### 🔮 Интеллект (I ≥ 3)
 
-- [ ] `blood_bolt` — Кровавый снаряд (active, 2AP, d8+INT, кастер −2HP)
+- [x] `blood_bolt` — Кровавый снаряд (active, 2AP, d8+INT, кастер −2HP)
 - [ ] `mana_sense` — Чутьё маны (passive, +2 восприятие)
 
 ### 👑 Харизма (C ≥ 3)

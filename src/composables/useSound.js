@@ -13,6 +13,12 @@ const fistSound = new Audio('/sounds/fist.wav')
 const swordSound = new Audio('/sounds/sword.mp3')
 const whooshSound = new Audio('/sounds/whoosh.wav')
 const levelUpSound = new Audio('/sounds/success.wav')
+const bloodWhisperSound = new Audio('/sounds/blood-whisper.mp3')
+const magicImpactSound = new Audio('/sounds/magic-impact.mp3')
+bloodWhisperSound.preload = 'auto'
+bloodWhisperSound.load()
+magicImpactSound.preload = 'auto'
+magicImpactSound.load()
 
 // ── Web Audio API для мгновенного воспроизведения боевых звуков ────────────────
 // MP3 через new Audio() имеет задержку декодирования ~50-150мс.
@@ -75,6 +81,30 @@ function playBuffer(buffer, volume = 0.85) {
   gain.connect(ctx.destination)
   source.start(0)
 }
+
+function playTimedAudioLayer(
+  baseAudio,
+  { volume = 1, playbackRate = 1, startAt = 0, durationMs = 3000 } = {}
+) {
+  const audio = baseAudio.cloneNode(true)
+  audio.currentTime = startAt
+  audio.volume = volume
+  audio.playbackRate = playbackRate
+
+  // Без сохранения высоты тембр становится менее явно женским/мужским.
+  if ('preservesPitch' in audio) audio.preservesPitch = false
+  if ('mozPreservesPitch' in audio) audio.mozPreservesPitch = false
+  if ('webkitPreservesPitch' in audio) audio.webkitPreservesPitch = false
+
+  audio.play().catch(() => {})
+
+  window.setTimeout(() => {
+    audio.pause()
+    audio.currentTime = 0
+  }, durationMs)
+
+  return audio
+}
 const battleMusic = new Audio('/sounds/battle.mp3')
 const travelMusic = new Audio('/sounds/travel.mp3')
 const mainMenuMusic = new Audio('/sounds/main-menu.mp3')
@@ -94,6 +124,11 @@ travelMusic.volume = 0
 travelMusic.loop = true
 mainMenuMusic.volume = 0
 mainMenuMusic.loop = true
+bloodWhisperSound.volume = 0.8
+
+const BATTLE_MUSIC_VOLUME = 0.45
+// Во время каста музыка почти уходит в подложку, чтобы магия читалась отчётливо.
+const BATTLE_CAST_DUCK_VOLUME = Math.min(0.03, BATTLE_MUSIC_VOLUME * 0.06)
 
 // Универсальный фейдер для любого Audio-объекта
 function fadeAudio(audio, targetVol, durationMs, onDone) {
@@ -149,7 +184,25 @@ export function playBattleMusic() {
     battleMusic.currentTime = 0
     battleMusic.play().catch(() => {})
   }
-  battleFadeId = fadeAudio(battleMusic, 0.45, 2500, () => {
+  battleFadeId = fadeAudio(battleMusic, BATTLE_MUSIC_VOLUME, 2500, () => {
+    battleFadeId = null
+  })
+}
+
+// При касте временно опускаем громкость боевой музыки до 20% от нормы,
+// чтобы детали заклинания были хорошо слышны и не тонули в миксе.
+export function duckBattleMusic(durationMs = 220) {
+  if (battleMusic.paused) return
+  if (battleFadeId) clearInterval(battleFadeId)
+  battleFadeId = fadeAudio(battleMusic, BATTLE_CAST_DUCK_VOLUME, durationMs, () => {
+    battleFadeId = null
+  })
+}
+
+export function restoreBattleMusic(durationMs = 480) {
+  if (battleMusic.paused) return
+  if (battleFadeId) clearInterval(battleFadeId)
+  battleFadeId = fadeAudio(battleMusic, BATTLE_MUSIC_VOLUME, durationMs, () => {
     battleFadeId = null
   })
 }
@@ -254,6 +307,14 @@ export function playShieldBash() {
   ensureCombatBuffers()
 }
 
+function playTransient(baseAudio, { volume = null, playbackRate = 1 } = {}) {
+  const audio = baseAudio.cloneNode(true)
+  audio.currentTime = 0
+  if (volume != null) audio.volume = volume
+  audio.playbackRate = playbackRate
+  audio.play().catch(() => {})
+}
+
 /**
  * Быстрый шаг — синтетический звук через Web Audio API:
  * быстрый свист с нарастанием частоты + lfo-пульс для ощущения движения.
@@ -299,6 +360,74 @@ export function playQuickStep() {
   osc2.start(now)
   osc.stop(now + duration)
   osc2.stop(now + duration)
+}
+
+/**
+ * Кровавое заклинание: синтезированный магический шёпот.
+ * Розовый шум (1/f) → полосовой фильтр ~1100Hz → AM-модуляция 6.5Hz.
+ * Имитирует тихое скандирование заклинания без внешних аудиофайлов.
+ */
+export function playBloodCast() {
+  const castDurationMs = 3000
+
+  // Прямое layered-проигрывание надёжнее Web Audio-цепочки и лучше переживает
+  // браузерные ограничения autoplay. Используем один и тот же шёпот в 3 слоя.
+  playTimedAudioLayer(bloodWhisperSound, {
+    volume: 0.88,
+    playbackRate: 0.84,
+    startAt: 0.12,
+    durationMs: castDurationMs,
+  })
+
+  playTimedAudioLayer(bloodWhisperSound, {
+    volume: 0.3,
+    playbackRate: 0.7,
+    startAt: 0.18,
+    durationMs: castDurationMs,
+  })
+
+  window.setTimeout(() => {
+    playTimedAudioLayer(bloodWhisperSound, {
+      volume: 0.18,
+      playbackRate: 1.02,
+      startAt: 0.26,
+      durationMs: 1600,
+    })
+  }, 260)
+}
+
+/**
+ * Кровавый снаряд в полёте (свистящая струя).
+ */
+export function playBloodProjectile() {
+  playTransient(whooshSound, {
+    volume: 0.75,
+    playbackRate: 0.88,
+  })
+  playTransient(whooshSound, {
+    volume: 0.62,
+    playbackRate: 1.36,
+  })
+  playTransient(swordSound, {
+    volume: 0.34,
+    playbackRate: 0.75,
+  })
+}
+
+/**
+ * Попадание кровавой магии.
+ */
+export function playBloodImpact() {
+  playTransient(magicImpactSound, {
+    volume: 0.84,
+    playbackRate: 0.96,
+  })
+
+  // Лёгкий верхний слой добавляет магическую "искру" без эффекта рукопашного удара.
+  playTransient(magicImpactSound, {
+    volume: 0.24,
+    playbackRate: 1.16,
+  })
 }
 
 export function playMainMenuMusic() {

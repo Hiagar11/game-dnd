@@ -24,15 +24,26 @@
             +1
           </button>
           <span
-            v-if="primaryBonus(row.primary.key)"
+            v-if="primaryBonusFromItemsRace(row.primary.key)"
             class="stats-grid__bonus"
             :class="
-              primaryBonus(row.primary.key) > 0
+              primaryBonusFromItemsRace(row.primary.key) > 0
                 ? 'stats-grid__bonus--pos'
                 : 'stats-grid__bonus--neg'
             "
           >
-            {{ formatBonus(primaryBonus(row.primary.key)) }}
+            {{ formatBonus(primaryBonusFromItemsRace(row.primary.key)) }}
+          </span>
+          <span
+            v-if="primaryBonusFromPassives(row.primary.key)"
+            class="stats-grid__bonus stats-grid__bonus--passive"
+            :class="
+              primaryBonusFromPassives(row.primary.key) > 0
+                ? 'stats-grid__bonus--passive-pos'
+                : 'stats-grid__bonus--passive-neg'
+            "
+          >
+            {{ formatBonus(primaryBonusFromPassives(row.primary.key)) }}
           </span>
         </div>
       </div>
@@ -57,13 +68,26 @@
             {{ computeDerived(stat.key) }}
           </span>
           <span
-            v-if="derivedBonus(stat.key)"
+            v-if="derivedBonusFromItems(stat.key)"
             class="stats-grid__bonus"
             :class="
-              derivedBonus(stat.key) > 0 ? 'stats-grid__bonus--pos' : 'stats-grid__bonus--neg'
+              derivedBonusFromItems(stat.key) > 0
+                ? 'stats-grid__bonus--pos'
+                : 'stats-grid__bonus--neg'
             "
           >
-            {{ formatBonus(derivedBonus(stat.key)) }}
+            {{ formatBonus(derivedBonusFromItems(stat.key)) }}
+          </span>
+          <span
+            v-if="derivedBonusFromPassives(stat.key)"
+            class="stats-grid__bonus stats-grid__bonus--passive"
+            :class="
+              derivedBonusFromPassives(stat.key) > 0
+                ? 'stats-grid__bonus--passive-pos'
+                : 'stats-grid__bonus--passive-neg'
+            "
+          >
+            {{ formatBonus(derivedBonusFromPassives(stat.key)) }}
           </span>
         </div>
       </div>
@@ -81,18 +105,28 @@
   const props = defineProps({
     modelValue: { type: Object, required: true },
     inventory: { type: Object, default: null },
+    passiveAbilities: { type: Array, default: () => [] },
     statPoints: { type: Number, default: 0 },
   })
   const emit = defineEmits(['update:modelValue', 'spend-point'])
   const modelValueRef = toRef(props, 'modelValue')
   const inventoryRef = toRef(props, 'inventory')
+  const passiveAbilitiesRef = toRef(props, 'passiveAbilities')
 
-  const { totalStats, primaryBonus, directDerivedBonus } = useTokenGearBonuses({
+  const {
+    totalStats,
+    directDerivedBonus,
+    primaryBonusFromItemsRace,
+    primaryBonusFromPassives,
+    derivedBonusFromItems,
+    derivedBonusFromPassives,
+  } = useTokenGearBonuses({
     inventory: inventoryRef,
     modelValue: modelValueRef,
+    passiveAbilities: passiveAbilitiesRef,
   })
 
-  const { computeDerived, derivedBonus } = useTokenDerivedStats({
+  const { computeDerived } = useTokenDerivedStats({
     totalStats,
     modelValue: modelValueRef,
     directDerivedBonus,
@@ -265,6 +299,18 @@
 
   .stats-grid__bonus--neg {
     color: #f87171;
+  }
+
+  .stats-grid__bonus--passive {
+    font-weight: 800;
+  }
+
+  .stats-grid__bonus--passive-pos {
+    color: #38bdf8;
+  }
+
+  .stats-grid__bonus--passive-neg {
+    color: #fb7185;
   }
 
   /* ── Анимации ───────────────────────────────────────── */

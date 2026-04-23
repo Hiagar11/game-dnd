@@ -125,6 +125,7 @@
         <TokenStatsGrid
           v-model="form"
           :inventory="inventoryModel"
+          :passive-abilities="localPassives"
           :stat-points="form.statPoints ?? 0"
           @spend-point="onSpendPoint"
         />
@@ -346,6 +347,7 @@
   import { getRaceById } from '../constants/races'
   import { getAbilityTreeById, ABILITY_TREE } from '../constants/abilityTree'
   import { getHeroClass } from '../constants/heroClass'
+  import { normalizePassiveAbilityEntries } from '../utils/passiveAbilities'
 
   // ── Дебаг-флаг: true = все способности открыты в каталоге ─────
   const DEBUG_ALL_ABILITIES = true
@@ -502,7 +504,10 @@
       localAbilities.value = (token?.abilities ?? []).map((slot) =>
         slot?.id ? (getAbilityTreeById(slot.id) ?? slot) : slot
       )
-      localPassives.value = token?.passiveAbilities ? [...token.passiveAbilities] : []
+      localPassives.value = normalizePassiveAbilityEntries(
+        token?.passiveAbilities ?? [],
+        getAbilityTreeById
+      )
     },
     { immediate: true }
   )

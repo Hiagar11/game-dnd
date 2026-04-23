@@ -8,6 +8,7 @@ import {
   HIT_DC,
 } from '../../utils/combatFormulas'
 import { DEFAULT_AP } from '../../constants/combat'
+import { getPassiveDerivedBonus } from '../../utils/passiveBonuses'
 
 export const ABILITY_ID = 'shield_bash'
 
@@ -21,7 +22,7 @@ export function execute(ctx, caster, target, ability) {
   // Бросок попадания
   const d20 = Math.floor(Math.random() * 20) + 1
   const hitBonus = calcCritChance(eStats)
-  const evasion = calcEvasion(dStats)
+  const evasion = calcEvasion(dStats) + getPassiveDerivedBonus(target?.passiveAbilities, 'evasion')
   const total = d20 + hitBonus - evasion
 
   if (total < HIT_DC) {

@@ -670,6 +670,66 @@
   }
 }
 
+/* Кровавое попадание — окрашивание + стекающие потёки */
+.game-tokens__token--flash-blood {
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -4%;
+    border-radius: 6px;
+    background: linear-gradient(
+      to bottom,
+      rgb(185 28 28 / 0%) 0%,
+      rgb(220 38 38 / 45%) 35%,
+      rgb(127 29 29 / 50%) 68%,
+      rgb(127 29 29 / 0%) 100%
+    );
+    pointer-events: none;
+    animation: token-blood-drip 0.85s ease-out forwards;
+    mix-blend-mode: multiply;
+  }
+
+  .game-tokens__img {
+    animation: token-flash-blood 0.85s ease-out;
+  }
+}
+
+@keyframes token-flash-blood {
+  0% {
+    filter: brightness(1);
+  }
+
+  20% {
+    filter: brightness(2.8) sepia(1) saturate(7) hue-rotate(-14deg);
+    box-shadow: 0 0 24px 10px rgb(220 38 38 / 72%);
+  }
+
+  60% {
+    filter: brightness(1.9) sepia(1) saturate(5) hue-rotate(-18deg);
+  }
+
+  100% {
+    filter: brightness(1);
+  }
+}
+
+@keyframes token-blood-drip {
+  0% {
+    transform: translateY(-16%);
+    opacity: 0;
+  }
+
+  30% {
+    transform: translateY(0%);
+    opacity: 0.92;
+  }
+
+  100% {
+    transform: translateY(32%);
+    opacity: 0;
+  }
+}
+
 @keyframes token-shake {
   0%,
   100% {

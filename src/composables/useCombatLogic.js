@@ -22,6 +22,7 @@ import {
 } from '../utils/combatFormulas'
 import { hpPercentFromToken } from '../utils/hp'
 import { ADJACENT_2x2 } from './useTokenMove'
+import { getPassiveDerivedBonus } from '../utils/passiveBonuses'
 
 export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
   const phase = ref('idle')
@@ -130,7 +131,8 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
     const magic = isMagicWeapon(attackerToken)
     const dualWield = isDualWielding(attackerToken)
     const bonus = calcCritChance(eStats)
-    const evasion = calcEvasion(dStats)
+    const evasion =
+      calcEvasion(dStats) + getPassiveDerivedBonus(defenderToken?.passiveAbilities, 'evasion')
     const hitPenalty = dualWield ? DUAL_WIELD_HIT_PENALTY : 0
     const total = d20 + bonus - evasion - hitPenalty
     hitRoll.value = { d20, bonus, evasion, total, hitPenalty }

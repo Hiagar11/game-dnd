@@ -13,6 +13,14 @@ router.use(requireAuth)
  * Используется и в POST (создание), и в PATCH (обновление расстановки).
  */
 function normalizeTokenPayload(t) {
+  const passiveAbilities = Array.isArray(t.passiveAbilities)
+    ? [
+        ...new Set(
+          t.passiveAbilities.map((p) => (typeof p === 'string' ? p : p?.id)).filter(Boolean)
+        ),
+      ]
+    : []
+
   return {
     uid: String(t.uid),
     ...(t.systemToken
@@ -56,7 +64,7 @@ function normalizeTokenPayload(t) {
     // Дерево способностей и активные слоты
     treeActivatedIds: Array.isArray(t.treeActivatedIds) ? t.treeActivatedIds : [],
     abilities: Array.isArray(t.abilities) ? t.abilities : [],
-    passiveAbilities: Array.isArray(t.passiveAbilities) ? t.passiveAbilities : [],
+    passiveAbilities,
     // Контейнеры / визуал
     items: Array.isArray(t.items) ? t.items : undefined,
     opened: Boolean(t.opened),

@@ -2,8 +2,9 @@ import { computed } from 'vue'
 import { EQUIP_SLOT_KEYS } from '../constants/inventorySlots'
 import { DERIVED_ALIAS_MAP, DERIVED_MOD_KEYS, PRIMARY_KEYS } from '../constants/tokenStatKeys'
 import { getRaceById } from '../constants/races'
+import { getPassiveDerivedBonus, getPassivePrimaryBonus } from '../utils/passiveBonuses'
 
-export function useTokenGearBonuses({ inventory, modelValue }) {
+export function useTokenGearBonuses({ inventory, modelValue, passiveAbilities }) {
   const equippedItems = computed(() => {
     const equipped = inventory?.value?.equipped
     if (!equipped || typeof equipped !== 'object') return []
@@ -53,26 +54,54 @@ export function useTokenGearBonuses({ inventory, modelValue }) {
     return race?.bonuses ?? {}
   })
 
+  const passiveIds = computed(() => {
+    if (Array.isArray(passiveAbilities?.value)) return passiveAbilities.value
+    return modelValue.value?.passiveAbilities ?? []
+  })
+
+  const primaryBonusFromItemsRace = (key) =>
+    (gearBonuses.value[key] ?? 0) + (raceBonuses.value[key] ?? 0)
+
+  const primaryBonusFromPassives = (key) => getPassivePrimaryBonus(passiveIds.value, key)
+
+  const derivedBonusFromItems = (key) => gearBonuses.value[DERIVED_ALIAS_MAP[key] ?? key] ?? 0
+
+  const derivedBonusFromPassives = (key) => getPassiveDerivedBonus(passiveIds.value, key)
+
   const totalStats = computed(() => {
     const stats = modelValue.value
-    const rb = raceBonuses.value
     return {
       ...stats,
-      strength: (stats.strength ?? 0) + gearBonuses.value.strength + (rb.strength ?? 0),
-      agility: (stats.agility ?? 0) + gearBonuses.value.agility + (rb.agility ?? 0),
-      intellect: (stats.intellect ?? 0) + gearBonuses.value.intellect + (rb.intellect ?? 0),
-      charisma: (stats.charisma ?? 0) + gearBonuses.value.charisma + (rb.charisma ?? 0),
+      strength:
+        (stats.strength ?? 0) +
+        primaryBonusFromItemsRace('strength') +
+        primaryBonusFromPassives('strength'),
+      agility:
+        (stats.agility ?? 0) +
+        primaryBonusFromItemsRace('agility') +
+        primaryBonusFromPassives('agility'),
+      intellect:
+        (stats.intellect ?? 0) +
+        primaryBonusFromItemsRace('intellect') +
+        primaryBonusFromPassives('intellect'),
+      charisma:
+        (stats.charisma ?? 0) +
+        primaryBonusFromItemsRace('charisma') +
+        primaryBonusFromPassives('charisma'),
     }
   })
 
-  const primaryBonus = (key) => (gearBonuses.value[key] ?? 0) + (raceBonuses.value[key] ?? 0)
-  const directDerivedBonus = (key) => {
-    return gearBonuses.value[DERIVED_ALIAS_MAP[key] ?? key] ?? 0
-  }
+  const primaryBonus = (key) => primaryBonusFromItemsRace(key) + primaryBonusFromPassives(key)
+
+  const directDerivedBonus = (key) => derivedBonusFromItems(key) + derivedBonusFromPassives(key)
 
   return {
     totalStats,
     primaryBonus,
     directDerivedBonus,
+    primaryBonusFromItemsRace,
+    primaryBonusFromPassives,
+    derivedBonusFromItems,
+    derivedBonusFromPassives,
   }
 }

@@ -9,6 +9,7 @@ import {
   calcCritDamage,
   HIT_DC,
 } from '../../utils/combatFormulas'
+import { getPassiveDerivedBonus } from '../../utils/passiveBonuses'
 
 /** Автоматическая регистрация: ID способностей, обслуживаемых этим экзекьютором */
 export const ABILITY_ID = 'power_strike'
@@ -24,7 +25,7 @@ export function execute(ctx, caster, target, ability) {
   // Бросок попадания: d20 + hitBonus − evasion
   const d20 = Math.floor(Math.random() * 20) + 1
   const hitBonus = calcCritChance(eStats)
-  const evasion = calcEvasion(dStats)
+  const evasion = calcEvasion(dStats) + getPassiveDerivedBonus(target?.passiveAbilities, 'evasion')
   const total = d20 + hitBonus - evasion
 
   if (total < HIT_DC) {

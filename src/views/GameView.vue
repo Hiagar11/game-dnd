@@ -56,6 +56,8 @@
         <GameMeleeSlash />
         <GameShieldBash />
         <GameQuickStep />
+        <GameBloodCastRunes />
+        <GameBloodImpact />
       </div>
 
       <GameMenu @mouseenter="onMenuEnter" @mouseleave="onMenuLeave" />
@@ -142,6 +144,8 @@
   import GameMeleeSlash from '../components/GameMeleeSlash.vue'
   import GameShieldBash from '../components/GameShieldBash.vue'
   import GameQuickStep from '../components/GameQuickStep.vue'
+  import GameBloodCastRunes from '../components/GameBloodCastRunes.vue'
+  import GameBloodImpact from '../components/GameBloodImpact.vue'
   import GameTokens from '../components/GameTokens.vue'
   import GameGroundLoot from '../components/GameGroundLoot.vue'
   import GameMenu from '../components/GameMenu.vue'

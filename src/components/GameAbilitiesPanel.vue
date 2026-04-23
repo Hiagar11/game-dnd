@@ -118,6 +118,15 @@
               >
                 Пассивная
               </span>
+              <span v-if="selectedProfile?.delivery" class="abilities-panel__tag">
+                {{ getDeliveryLabel(selectedProfile.delivery) }}
+              </span>
+              <span v-if="selectedProfile?.damageKind" class="abilities-panel__tag">
+                {{ getDamageKindLabel(selectedProfile.damageKind) }}
+              </span>
+              <span v-if="selectedLineOfSightLabel" class="abilities-panel__tag">
+                {{ selectedLineOfSightLabel }}
+              </span>
             </div>
           </div>
         </Transition>
@@ -129,6 +138,12 @@
 <script setup>
   import { ref, computed } from 'vue'
   import { ABILITY_TARGET_MAP } from '../constants/abilityTree'
+  import {
+    getAbilityCombatProfile,
+    getDeliveryLabel,
+    getDamageKindLabel,
+    getLineOfSightLabel,
+  } from '../utils/abilityCombatProfile'
 
   const ACTIVE_COUNT = 6
   const PASSIVE_COUNT = 3
@@ -196,6 +211,14 @@
     const url = `https://api.iconify.design/game-icons/${ability.icon}.svg`
     return { maskImage: `url('${url}')`, backgroundColor: ability.color || '#e2e8f0' }
   }
+
+  const selectedProfile = computed(() =>
+    selectedAbility.value ? getAbilityCombatProfile(selectedAbility.value) : null
+  )
+
+  const selectedLineOfSightLabel = computed(() =>
+    selectedProfile.value ? getLineOfSightLabel(selectedProfile.value) : null
+  )
 
   // ── Drag from library ──────────────────────────────────────────
   function onAbilityDragStart(event, ability) {

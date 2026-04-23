@@ -1,6 +1,7 @@
 import { ref, nextTick, onUnmounted } from 'vue'
 import { useGameStore } from '../stores/game'
 import { useScenariosStore } from '../stores/scenarios'
+import { normalizePassiveAbilityIds } from '../utils/passiveAbilities'
 
 function buildTokensPayload(placedTokens, includeHidden = false) {
   return placedTokens.map((t) => ({
@@ -37,7 +38,7 @@ function buildTokensPayload(placedTokens, includeHidden = false) {
     // Дерево способностей и активные слоты
     treeActivatedIds: t.treeActivatedIds ?? [],
     abilities: t.abilities ?? [],
-    passiveAbilities: t.passiveAbilities ?? [],
+    passiveAbilities: normalizePassiveAbilityIds(t.passiveAbilities ?? []),
     // Боевые статусы
     stunned: !!t.stunned,
     captured: !!t.captured,
