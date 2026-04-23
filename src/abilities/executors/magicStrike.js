@@ -1,5 +1,5 @@
 import { getEffectiveStats, calcMagicResist, calcMagicPen } from '../../utils/combatFormulas'
-import { duckBattleMusic, restoreBattleMusic } from '../../composables/useSound'
+import { duckBattleMusic, restoreBattleMusic, playBloodCast } from '../../composables/useSound'
 
 /** Магические удары — кровавый снаряд, гравитационный удар, кровавое иссушение */
 export const ABILITY_IDS = ['blood_bolt', 'gravity_bolt', 'blood_leech']
@@ -71,6 +71,9 @@ export function execute(ctx, caster, target, ability) {
     spendBloodCost(ctx, caster.uid)
     duckBattleMusic(160)
 
+    // Шёпот начинается немедленно, руны появляются с задержкой — как будто звук их призывает
+    playBloodCast()
+
     setTimeout(() => {
       const liveCaster = ctx.store.placedTokens.find((t) => t.uid === caster.uid) ?? caster
       ctx.triggerVfx('bloodCast', {
@@ -78,7 +81,7 @@ export function execute(ctx, caster, target, ability) {
         row: liveCaster.row,
         color,
       })
-    }, CAST_START_MS)
+    }, CAST_START_MS + 500)
 
     setTimeout(() => {
       const liveCaster = ctx.store.placedTokens.find((t) => t.uid === caster.uid) ?? caster

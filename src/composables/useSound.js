@@ -15,10 +15,17 @@ const whooshSound = new Audio('/sounds/whoosh.wav')
 const levelUpSound = new Audio('/sounds/success.wav')
 const bloodWhisperSound = new Audio('/sounds/blood-whisper.mp3')
 const magicImpactSound = new Audio('/sounds/magic-impact.mp3')
+// Звук вылета кровавого снаряда: тёмная магия (основной слой) + магическое эхо полёта
+const bloodProjectileLaunchSound = new Audio('/sounds/blood-projectile-launch.mp3')
+const bloodProjectileWhooshSound = new Audio('/sounds/blood-projectile-whoosh.mp3')
 bloodWhisperSound.preload = 'auto'
 bloodWhisperSound.load()
 magicImpactSound.preload = 'auto'
 magicImpactSound.load()
+bloodProjectileLaunchSound.preload = 'auto'
+bloodProjectileLaunchSound.load()
+bloodProjectileWhooshSound.preload = 'auto'
+bloodProjectileWhooshSound.load()
 
 // ── Web Audio API для мгновенного воспроизведения боевых звуков ────────────────
 // MP3 через new Audio() имеет задержку декодирования ~50-150мс.
@@ -105,9 +112,144 @@ function playTimedAudioLayer(
 
   return audio
 }
-const battleMusic = new Audio('/sounds/battle.mp3')
-const travelMusic = new Audio('/sounds/travel.mp3')
+const BATTLE_TRACKS = [
+  { src: '/sounds/battle-1.mp3', gain: 0.92 },
+  { src: '/sounds/battle-2.mp3', gain: 0.82 },
+  { src: '/sounds/battle-3.mp3', gain: 0.95 },
+  { src: '/sounds/battle-4.mp3', gain: 0.93 },
+  { src: '/sounds/battle-5.mp3', gain: 0.86 },
+  { src: '/sounds/battle-6.mp3', gain: 0.84 },
+]
+
+// Midnight Forest, Fantasy Medieval Ambient, Medieval city/tavern ambient,
+// Warm/Bright Fantasy Ambient, Fantasy RPG Exploration V2, Medieval Inn
+const TRAVEL_TRACKS = [
+  { src: '/sounds/travel-1.mp3', gain: 0.9 },
+  { src: '/sounds/travel-2.mp3', gain: 0.88 },
+  { src: '/sounds/travel-3.mp3', gain: 0.92 },
+  { src: '/sounds/travel-4.mp3', gain: 0.95 },
+  { src: '/sounds/travel-5.mp3', gain: 0.85 },
+  { src: '/sounds/travel-6.mp3', gain: 0.88 },
+]
+
+const BATTLE_FALLBACK_TRACK = '/sounds/battle.mp3'
+const TRAVEL_FALLBACK_TRACK = '/sounds/travel.mp3'
+
+const battleMusic = new Audio(BATTLE_TRACKS[0].src)
+const travelMusic = new Audio(TRAVEL_TRACKS[0].src)
 const mainMenuMusic = new Audio('/sounds/main-menu.mp3')
+
+let lastBattleTrackIndex = 0
+let currentBattleTrackGain = BATTLE_TRACKS[0].gain
+let battleTrackPool = []
+
+let lastTravelTrackIndex = 0
+let currentTravelTrackGain = TRAVEL_TRACKS[0].gain
+let travelTrackPool = []
+
+function rebuildBattleTrackPool() {
+  const candidates = []
+  for (let i = 0; i < BATTLE_TRACKS.length; i++) {
+    if (BATTLE_TRACKS.length > 1 && i === lastBattleTrackIndex) continue
+    candidates.push(i)
+  }
+
+  // Fisher-Yates shuffle, чтобы пройтись по всем трекам без «залипания» одного.
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+  }
+
+  battleTrackPool = candidates
+}
+
+function pickRandomBattleTrackIndex() {
+  if (BATTLE_TRACKS.length <= 1) return 0
+  if (battleTrackPool.length === 0) rebuildBattleTrackPool()
+  return battleTrackPool.shift()
+}
+
+function switchBattleTrack() {
+  const nextIndex = pickRandomBattleTrackIndex()
+  lastBattleTrackIndex = nextIndex
+  currentBattleTrackGain = BATTLE_TRACKS[nextIndex].gain
+  battleMusic.src = BATTLE_TRACKS[nextIndex].src
+  battleMusic.load()
+}
+
+function rebuildTravelTrackPool() {
+  const candidates = []
+  for (let i = 0; i < TRAVEL_TRACKS.length; i++) {
+    if (TRAVEL_TRACKS.length > 1 && i === lastTravelTrackIndex) continue
+    candidates.push(i)
+  }
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[candidates[i], candidates[j]] = [candidates[j], candidates[i]]
+  }
+  travelTrackPool = candidates
+}
+
+function pickRandomTravelTrackIndex() {
+  if (TRAVEL_TRACKS.length <= 1) return 0
+  if (travelTrackPool.length === 0) rebuildTravelTrackPool()
+  return travelTrackPool.shift()
+}
+
+function switchTravelTrack() {
+  const nextIndex = pickRandomTravelTrackIndex()
+  lastTravelTrackIndex = nextIndex
+  currentTravelTrackGain = TRAVEL_TRACKS[nextIndex].gain
+  travelMusic.src = TRAVEL_TRACKS[nextIndex].src
+  travelMusic.load()
+}
+
+function getTravelMusicTargetVolume() {
+  return Math.min(1, 0.4 * currentTravelTrackGain)
+}
+
+function getBattleMusicBaseTargetVolume() {
+  return Math.min(1, BATTLE_MUSIC_VOLUME * currentBattleTrackGain)
+}
+
+// Когда боевой трек закончился — сразу переключаемся на следующий случайный
+battleMusic.addEventListener('ended', () => {
+  switchBattleTrack()
+  battleMusic.volume = getBattleMusicBaseTargetVolume()
+  battleMusic.play().catch(() => {})
+})
+
+battleMusic.addEventListener('error', () => {
+  // Профилактика: если кастомный трек недоступен, откатываемся на стандартный battle.mp3.
+  currentBattleTrackGain = 1
+  battleMusic.src = BATTLE_FALLBACK_TRACK
+  battleMusic.load()
+  battleMusic.volume = 0
+  battleMusic.currentTime = 0
+  battleMusic.play().catch(() => {})
+})
+
+// Когда мирный трек закончился — плавно переходим к следующему
+travelMusic.addEventListener('ended', () => {
+  if (travelFadeId) clearInterval(travelFadeId)
+  switchTravelTrack()
+  travelMusic.volume = 0
+  travelMusic.currentTime = 0
+  travelMusic.play().catch(() => {})
+  travelFadeId = fadeAudio(travelMusic, getTravelMusicTargetVolume(), 1200, () => {
+    travelFadeId = null
+  })
+})
+
+travelMusic.addEventListener('error', () => {
+  // Профилактика: если трек недоступен, откатываемся на стандартный travel.mp3.
+  currentTravelTrackGain = 1
+  travelMusic.src = TRAVEL_FALLBACK_TRACK
+  travelMusic.load()
+  travelMusic.volume = 0
+  travelMusic.currentTime = 0
+  travelMusic.play().catch(() => {})
+})
 
 // volume: от 0 (тихо) до 1 (максимум)
 hoverSound.volume = 0.3
@@ -119,9 +261,8 @@ swordSound.volume = 0.85
 whooshSound.volume = 0.75
 levelUpSound.volume = 0.9
 battleMusic.volume = 0
-battleMusic.loop = true
+// loop отключён: при окончании трека ended-обработчик переключает на следующий
 travelMusic.volume = 0
-travelMusic.loop = true
 mainMenuMusic.volume = 0
 mainMenuMusic.loop = true
 bloodWhisperSound.volume = 0.8
@@ -180,11 +321,12 @@ export function playBattleMusic() {
   hardStopMainMenuMusic()
   if (battleFadeId) clearInterval(battleFadeId)
   if (battleMusic.paused) {
+    switchBattleTrack()
     battleMusic.volume = 0
     battleMusic.currentTime = 0
     battleMusic.play().catch(() => {})
   }
-  battleFadeId = fadeAudio(battleMusic, BATTLE_MUSIC_VOLUME, 2500, () => {
+  battleFadeId = fadeAudio(battleMusic, getBattleMusicBaseTargetVolume(), 2500, () => {
     battleFadeId = null
   })
 }
@@ -194,15 +336,20 @@ export function playBattleMusic() {
 export function duckBattleMusic(durationMs = 220) {
   if (battleMusic.paused) return
   if (battleFadeId) clearInterval(battleFadeId)
-  battleFadeId = fadeAudio(battleMusic, BATTLE_CAST_DUCK_VOLUME, durationMs, () => {
-    battleFadeId = null
-  })
+  battleFadeId = fadeAudio(
+    battleMusic,
+    Math.min(BATTLE_CAST_DUCK_VOLUME, getBattleMusicBaseTargetVolume() * 0.12),
+    durationMs,
+    () => {
+      battleFadeId = null
+    }
+  )
 }
 
 export function restoreBattleMusic(durationMs = 480) {
   if (battleMusic.paused) return
   if (battleFadeId) clearInterval(battleFadeId)
-  battleFadeId = fadeAudio(battleMusic, BATTLE_MUSIC_VOLUME, durationMs, () => {
+  battleFadeId = fadeAudio(battleMusic, getBattleMusicBaseTargetVolume(), durationMs, () => {
     battleFadeId = null
   })
 }
@@ -222,11 +369,12 @@ export function playTravelMusic() {
   hardStopMainMenuMusic()
   if (travelFadeId) clearInterval(travelFadeId)
   if (travelMusic.paused) {
+    switchTravelTrack()
     travelMusic.volume = 0
     travelMusic.currentTime = 0
     travelMusic.play().catch(() => {})
   }
-  travelFadeId = fadeAudio(travelMusic, 0.4, 2500, () => {
+  travelFadeId = fadeAudio(travelMusic, getTravelMusicTargetVolume(), 2500, () => {
     travelFadeId = null
   })
 }
@@ -375,14 +523,14 @@ export function playBloodCast() {
   playTimedAudioLayer(bloodWhisperSound, {
     volume: 0.88,
     playbackRate: 0.84,
-    startAt: 0.12,
+    startAt: 0,
     durationMs: castDurationMs,
   })
 
   playTimedAudioLayer(bloodWhisperSound, {
     volume: 0.3,
     playbackRate: 0.7,
-    startAt: 0.18,
+    startAt: 0.06,
     durationMs: castDurationMs,
   })
 
@@ -390,27 +538,27 @@ export function playBloodCast() {
     playTimedAudioLayer(bloodWhisperSound, {
       volume: 0.18,
       playbackRate: 1.02,
-      startAt: 0.26,
+      startAt: 0.1,
       durationMs: 1600,
     })
   }, 260)
 }
 
 /**
- * Кровавый снаряд в полёте (свистящая струя).
+ * Кровавый снаряд в полёте.
+ * Слой 1: тёмная магия (низкий, давящий выброс энергии).
+ * Слой 2: магическое эхо полёта (лёгкий хвост свиста).
  */
 export function playBloodProjectile() {
-  playTransient(whooshSound, {
-    volume: 0.75,
-    playbackRate: 0.88,
+  // Основной звук запуска — тёмная тяжёлая магия
+  playTransient(bloodProjectileLaunchSound, {
+    volume: 0.82,
+    playbackRate: 0.92,
   })
-  playTransient(whooshSound, {
-    volume: 0.62,
-    playbackRate: 1.36,
-  })
-  playTransient(swordSound, {
-    volume: 0.34,
-    playbackRate: 0.75,
+  // Лёгкий хвост полёта поверх — добавляет ощущение скорости снаряда
+  playTransient(bloodProjectileWhooshSound, {
+    volume: 0.45,
+    playbackRate: 1.08,
   })
 }
 

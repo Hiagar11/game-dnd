@@ -4,6 +4,8 @@
     Запускается через store.abilityVfx = { type: 'bloodImpact', col, row, color }
   -->
   <div v-if="impact" class="blood-impact" :style="posStyle">
+    <!-- Шокволна вокруг токена — быстрое красное кольцо, обозначающее урон -->
+    <div class="blood-impact__shockwave" :style="impactStyle" />
     <div class="blood-impact__flash" :style="impactStyle" />
     <div class="blood-impact__ring blood-impact__ring--outer" :style="impactStyle" />
     <div class="blood-impact__ring blood-impact__ring--inner" :style="impactStyle" />
@@ -92,6 +94,34 @@
     inset: 20%;
     border-width: 1px;
     animation: blood-ring-inner 0.44s ease-out forwards;
+  }
+
+  /* Шокволна — расширяется от токена наружу быстрым кольцом */
+  .blood-impact__shockwave {
+    position: absolute;
+    inset: 20%;
+    border-radius: 50%;
+    border: 3px solid var(--blood-impact, #dc2626);
+    box-shadow:
+      0 0 18px 6px rgb(220 38 38 / 80%),
+      inset 0 0 12px 2px rgb(220 38 38 / 40%);
+    animation: blood-shockwave 0.42s ease-out forwards;
+  }
+
+  @keyframes blood-shockwave {
+    0% {
+      transform: scale(0.3);
+      opacity: 1;
+    }
+
+    60% {
+      opacity: 0.9;
+    }
+
+    100% {
+      transform: scale(2.6);
+      opacity: 0;
+    }
   }
 
   @keyframes blood-flash {

@@ -94,8 +94,6 @@
 <script setup>
   import { computed, watch } from 'vue'
   import { useGameStore } from '../stores/game'
-  import { playBloodCast } from '../composables/useSound'
-
   const store = useGameStore()
   const CAST_DURATION_MS = 3000
 
@@ -150,7 +148,6 @@
 
   watch(cast, (v) => {
     if (!v) return
-    playBloodCast()
     setTimeout(() => {
       if (store.abilityVfx?.type === 'bloodCast') store.abilityVfx = null
     }, CAST_DURATION_MS)
