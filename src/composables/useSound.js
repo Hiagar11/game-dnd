@@ -13,11 +13,25 @@ const fistSound = new Audio('/sounds/fist.wav')
 const swordSound = new Audio('/sounds/sword.mp3')
 const whooshSound = new Audio('/sounds/whoosh.wav')
 const levelUpSound = new Audio('/sounds/success.wav')
+const INSPIRE_SOUND_OPTIONS = {
+  1: '/sounds/inspire-option-1.mp3',
+  2: '/sounds/inspire-option-2.mp3',
+  3: '/sounds/inspire-option-3.mp3',
+  4: '/sounds/inspire-option-4.mp3',
+  5: '/sounds/inspire-option-5.mp3',
+  6: '/sounds/inspire-option-6.mp3',
+}
+// Выбери нужный звук воодушевления: 1..6
+const INSPIRE_SOUND_ID = 1
+const INSPIRE_SOUND_SRC = INSPIRE_SOUND_OPTIONS[INSPIRE_SOUND_ID] ?? INSPIRE_SOUND_OPTIONS[1]
+const inspireSound = new Audio(INSPIRE_SOUND_SRC)
 const bloodWhisperSound = new Audio('/sounds/blood-whisper.mp3')
 const magicImpactSound = new Audio('/sounds/magic-impact.mp3')
 // Звук вылета кровавого снаряда: тёмная магия (основной слой) + магическое эхо полёта
 const bloodProjectileLaunchSound = new Audio('/sounds/blood-projectile-launch.mp3')
 const bloodProjectileWhooshSound = new Audio('/sounds/blood-projectile-whoosh.mp3')
+inspireSound.preload = 'auto'
+inspireSound.load()
 bloodWhisperSound.preload = 'auto'
 bloodWhisperSound.load()
 magicImpactSound.preload = 'auto'
@@ -87,6 +101,12 @@ function playBuffer(buffer, volume = 0.85) {
   source.connect(gain)
   gain.connect(ctx.destination)
   source.start(0)
+}
+
+function disablePitchPreserve(audio) {
+  if ('preservesPitch' in audio) audio.preservesPitch = false
+  if ('mozPreservesPitch' in audio) audio.mozPreservesPitch = false
+  if ('webkitPreservesPitch' in audio) audio.webkitPreservesPitch = false
 }
 
 function playTimedAudioLayer(
@@ -260,6 +280,7 @@ fistSound.volume = 0.8
 swordSound.volume = 0.85
 whooshSound.volume = 0.75
 levelUpSound.volume = 0.9
+inspireSound.volume = 0.88
 battleMusic.volume = 0
 // loop отключён: при окончании трека ended-обработчик переключает на следующий
 travelMusic.volume = 0
@@ -511,12 +532,10 @@ export function playQuickStep() {
 }
 
 /**
- * Воодушевление — короткий восходящий рог-фанфара.
- * Два осциллятора (прима + квинта) c пилообразной формой,
- * огибание: быстрый attack → sustain → мягкий release.
- * Звучит как воодушевляющий возглас «Вперёд!».
+ * Синтезированный fallback для воодушевления.
+ * Используется, если внешний аудиофайл недоступен.
  */
-export function playInspire() {
+function playInspireSynthFallback() {
   const ctx = getAudioCtx()
   if (!ctx) return
 
@@ -553,6 +572,42 @@ export function playInspire() {
     osc.start(now)
     osc.stop(now + 0.56)
   }
+}
+
+/**
+ * Воодушевление — проигрываем один из 6 выбранных внешних звуков.
+ * Смена варианта: константа INSPIRE_SOUND_ID (1..6) в начале файла.
+ */
+export function playInspire() {
+  const START_AT_SEC = 5.0 // начинаем с 5-й секунды трека
+  const STOP_AT_SEC = 9.0 // останавливаем на 9-й секунде трека
+  const TARGET_VOL = 0.5 // пиковая громкость (на 2-й секунде)
+  const TOTAL_SEC = STOP_AT_SEC - START_AT_SEC // 4 секунды
+
+  const audio = inspireSound.cloneNode(true)
+  audio.currentTime = START_AT_SEC
+  audio.playbackRate = 1
+  audio.volume = 0 // стартуем беззвучно
+  disablePitchPreserve(audio)
+
+  const onTimeUpdate = () => {
+    const t = audio.currentTime
+    if (t >= STOP_AT_SEC) {
+      audio.pause()
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+      return
+    }
+    const elapsed = t - START_AT_SEC
+    // Плавный нарост в начале: sin² даёт медленное нарастание у нуля,
+    // а затем симметричный спад — более мягкий старт чем чистый sin
+    audio.volume = Math.sin((Math.PI * elapsed) / TOTAL_SEC) ** 2 * TARGET_VOL
+  }
+
+  audio.addEventListener('timeupdate', onTimeUpdate)
+  audio.play().catch(() => {
+    audio.removeEventListener('timeupdate', onTimeUpdate)
+    playInspireSynthFallback()
+  })
 }
 
 /**
