@@ -16,7 +16,7 @@
     :class="[
       cursorInRange && !hoveredToken ? 'game-range-overlay--boot' : '',
       hoveredTokenCursorClass,
-      store.pendingAbility?.areaType === 'targeted' ? 'game-range-overlay--cursor-aoe' : '',
+      abilityCursorClass,
     ]"
     :style="{ width: `${width}px`, height: `${height}px` }"
     @mousemove="onMouseMove"
@@ -36,6 +36,7 @@
   import { buildReachableCells, findPath } from '../composables/useTokenMove'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import {
+    isAlliedToken,
     getSelectedNonSystemToken,
     isHeroToken,
     isHostileNpcToken,
@@ -107,6 +108,7 @@
    * CSS-класс курсора в зависимости от типа токена/кучки под мышью.
    */
   const hoveredTokenCursorClass = computed(() => {
+    if (store.pendingAbility) return ''
     if (hoveredPile.value) return 'game-range-overlay--cursor-open'
     const t = hoveredToken.value
     if (!t) return ''
@@ -114,7 +116,7 @@
     // Ctrl+наведение на нейтрального NPC → курсор агрессии
     if (ctrlHeld.value && isNeutralNpcToken(t) && isHeroToken(selectedToken.value))
       return 'game-range-overlay--cursor-aggro'
-    if (isTalkableNpcToken(t)) return 'game-range-overlay--cursor-talk'
+    if (!store.combatMode && isTalkableNpcToken(t)) return 'game-range-overlay--cursor-talk'
     if (t.systemToken === 'door' && (t.targetScenarioId || t.globalMapExit))
       return 'game-range-overlay--cursor-door'
     if (
@@ -123,6 +125,27 @@
     )
       return 'game-range-overlay--cursor-open'
     return ''
+  })
+
+  // Курсор способности:
+  // - targeted: прицел по всей карте (выбор центра AoE)
+  // - single: прицел только при наведении на токен
+  //   валидная цель -> обычный прицел, невалидная -> запрещающий курсор
+  const abilityCursorClass = computed(() => {
+    if (!store.pendingAbility) return ''
+    if (store.pendingAbility.areaType === 'targeted') return 'game-range-overlay--cursor-ability'
+
+    const hovered = hoveredToken.value
+    if (!hovered) return ''
+
+    const invalidTarget =
+      hovered.uid === store.pendingAbility.tokenUid ||
+      !!hovered.systemToken ||
+      (store.pendingAbility.allyOnly && !isAlliedToken(hovered))
+
+    return invalidTarget
+      ? 'game-range-overlay--cursor-ability-invalid'
+      : 'game-range-overlay--cursor-ability'
   })
 
   // true — идёт анимация ходьбы. Блокируем повторные клики в этот период.
@@ -387,9 +410,20 @@
       pointer;
   }
 
-  /* Курсор «прицел» — AoE-способность выбирает зону */
-  .game-range-overlay--cursor-aoe {
-    cursor: crosshair;
+  /* Курсор «прицел» — любая активная способность (single и targeted) */
+  .game-range-overlay--cursor-ability {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='10' fill='none' stroke='%23facc15' stroke-width='2.5' opacity='0.95'/%3E%3Cpath d='M20 5 v8 M20 27 v8 M5 20 h8 M27 20 h8' stroke='%23facc15' stroke-width='2.5' stroke-linecap='round' opacity='0.95'/%3E%3Ccircle cx='20' cy='20' r='2' fill='%23facc15'/%3E%3C/svg%3E")
+        20 20,
+      crosshair;
+  }
+
+  /* Курсор «запрещено» — наведение single-способности на невалидную цель */
+  .game-range-overlay--cursor-ability-invalid {
+    cursor:
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='11' fill='none' stroke='%23f87171' stroke-width='2.8' opacity='0.95'/%3E%3Cpath d='M12 28 L28 12' stroke='%23f87171' stroke-width='2.8' stroke-linecap='round' opacity='0.95'/%3E%3C/svg%3E")
+        20 20,
+      not-allowed;
   }
 
   /* Курсор «следы» — клетка в зоне хода */

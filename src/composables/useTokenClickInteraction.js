@@ -34,6 +34,34 @@ export function useTokenClickInteraction({
   onCaptureClick,
   emitDoorTransition,
 }) {
+  async function runQuickAttackFlow(attackerUid, defenderUid) {
+    if (!attackerUid || !defenderUid) return
+
+    const attacker = store.placedTokens.find((token) => token.uid === attackerUid)
+    const defender = store.placedTokens.find((token) => token.uid === defenderUid)
+    if (!attacker || !defender) return
+
+    if (!store.combatMode) {
+      // При обычном ЛКМ-ударе инициатор сразу начинает бой первым.
+      store.enterCombat(attackerUid, getVisibleKeys())
+    }
+
+    closeContextMenu()
+
+    const reached = await moveTowardTarget(attackerUid, defender)
+    if (!reached) {
+      store.endTurn()
+      return
+    }
+
+    const currentTurnUid = getCurrentTurnUid(store)
+    if (currentTurnUid && currentTurnUid !== attackerUid) return
+
+    const liveAttacker = store.placedTokens.find((token) => token.uid === attackerUid)
+    const liveDefender = store.placedTokens.find((token) => token.uid === defenderUid)
+    if (liveAttacker && liveDefender) runQuickAttack(liveAttacker, liveDefender)
+  }
+
   async function onTokenClick(placed, event) {
     // ── Режим выбора цели способности ─────────────────────────────
     if (store.pendingAbility && abilityExec.needsTargetToken.value) {
@@ -91,7 +119,7 @@ export function useTokenClickInteraction({
       return
     }
 
-    // Ctrl+клик — быстрая атака / агрессия против нейтрального
+    // Ctrl+клик — открыть боевой попап (ручной бой)
     if (event?.ctrlKey) {
       event.preventDefault()
       if (!selected) return
@@ -108,26 +136,14 @@ export function useTokenClickInteraction({
       // Нейтральный NPC становится враждебным → герой атакует первым
       if (isFirstStrike) placed.attitude = 'hostile'
 
-      if (!store.combatMode) {
-        // firstUid ходит первым: инициатор боя всегда открывает раунд.
-        const firstUid = selected.uid
-        store.enterCombat(firstUid, getVisibleKeys())
-      }
       closeContextMenu()
 
-      moveTowardTarget(selected.uid, placed).then((reached) => {
-        if (!reached) {
-          store.endTurn()
-          return
-        }
+      if (isHeroAttackingNpc || isFirstStrike) {
+        onAttackClick(placed)
+        return
+      }
 
-        const currentTurnUid = getCurrentTurnUid(store)
-        if (currentTurnUid && currentTurnUid !== selected.uid) return
-
-        const liveAttacker = store.placedTokens.find((token) => token.uid === selected.uid)
-        const liveDefender = store.placedTokens.find((token) => token.uid === placed.uid)
-        if (liveAttacker && liveDefender) runQuickAttack(liveAttacker, liveDefender)
-      })
+      onNpcAttackClick(placed)
       return
     }
 
@@ -146,16 +162,16 @@ export function useTokenClickInteraction({
         !placed.stunned &&
         isNpcReachable(placed)
       ) {
-        onAttackClick(placed)
+        await runQuickAttackFlow(selected.uid, placed.uid)
         return
       }
       // Атака враждебного НПС → герой
       if (isHeroToken(placed) && isHeroReachableByNpc(placed)) {
-        onNpcAttackClick(placed)
+        await runQuickAttackFlow(selected.uid, placed.uid)
         return
       }
       // Разговор: герой или НПС → нейтральный/дружественный НПС
-      if (isTalkableNpcToken(placed) && isNpcReachable(placed)) {
+      if (!store.combatMode && isTalkableNpcToken(placed) && isNpcReachable(placed)) {
         onTalkClick(placed)
         return
       }

@@ -35,6 +35,8 @@ export function useGameTokenPresentation({
   function tokenClasses(placed) {
     const selectedToken = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
     const selectedIsHero = isHeroToken(selectedToken)
+    const abilityMode = !props.viewerMode && !!store.pendingAbility
+
     return {
       'game-tokens__token--selected': store.selectedPlacedUid === placed.uid,
       'game-tokens__token--viewer-selected':
@@ -49,16 +51,16 @@ export function useGameTokenPresentation({
       'game-tokens__token--neutral':
         isNpcToken(placed) && !isHostileNpcToken(placed) && !isFriendlyNpcToken(placed),
       'game-tokens__token--cursor-attack':
-        !props.viewerMode &&
+        !abilityMode &&
         ((selectedIsHero &&
           isHostileNpcToken(placed) &&
           !placed.stunned &&
           isNpcReachable(placed)) ||
           (isHeroToken(placed) && isHeroReachableByNpc(placed))),
       'game-tokens__token--cursor-talk':
-        !props.viewerMode && isTalkableNpcToken(placed) && isNpcReachable(placed),
+        !abilityMode && !store.combatMode && isTalkableNpcToken(placed) && isNpcReachable(placed),
       'game-tokens__token--cursor-capture':
-        !props.viewerMode && placed.stunned && !placed.captured && isNpcReachable(placed),
+        !abilityMode && placed.stunned && !placed.captured && isNpcReachable(placed),
       'game-tokens__token--stunned': !!placed.stunned && !placed.captured,
       'game-tokens__token--dead':
         !placed.stunned && !placed.captured && isNpcToken(placed) && (placed.hp ?? 1) <= 0,
@@ -68,17 +70,9 @@ export function useGameTokenPresentation({
       'game-tokens__token--poisoned': placed.activeEffects?.some((e) => e.id === 'poison'),
       'game-tokens__token--chilled': placed.activeEffects?.some((e) => e.id === 'chilled'),
       'game-tokens__token--ability-target':
-        !props.viewerMode &&
-        !!store.pendingAbility &&
-        store.pendingAbility.areaType === 'single' &&
-        placed.uid !== store.pendingAbility.tokenUid &&
-        !placed.systemToken &&
-        // allyOnly: подсвечиваем только союзников как допустимые цели
-        (!store.pendingAbility.allyOnly ||
-          placed.tokenType === 'hero' ||
-          (placed.tokenType === 'npc' && placed.attitude === 'friendly')),
+        abilityMode && placed.uid !== store.pendingAbility.tokenUid && !placed.systemToken,
       'game-tokens__token--cursor-door':
-        !props.viewerMode &&
+        !abilityMode &&
         placed.systemToken === 'door' &&
         !!(placed.targetScenarioId || placed.globalMapExit) &&
         isNonSystemSelected.value,
@@ -97,7 +91,7 @@ export function useGameTokenPresentation({
       'game-tokens__token--ap-0':
         currentTurnUid.value === placed.uid && (placed.actionPoints ?? 0) <= 0,
       'game-tokens__token--cursor-open':
-        !props.viewerMode &&
+        !abilityMode &&
         (placed.systemToken === 'item' ||
           placed.systemToken === 'jar' ||
           placed.systemToken === 'bag') &&

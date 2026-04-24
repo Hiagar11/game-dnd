@@ -28,6 +28,8 @@ export function useTokenDialogInteraction({
     getSocket()?.emit('npc:event', { scenarioId, uid: npcUid, text })
   }
   async function onTalkClick(npc) {
+    if (store.combatMode) return
+
     const hero = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
     if (!hero) return
 
@@ -254,6 +256,8 @@ export function useTokenDialogInteraction({
   }
 
   function onDialogSend(uid, playerText) {
+    if (store.combatMode) return
+
     const npc = store.placedTokens.find((t) => t.uid === uid)
     if (!npc) return
     addPlayerMessage(uid, playerText)

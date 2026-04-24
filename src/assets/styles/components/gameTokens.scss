@@ -9,6 +9,17 @@
 }
 
 /*
+  Режим выбора цели способности: принудительно показываем курсор-прицел.
+  !important нужен, чтобы прицел всегда побеждал курсоры диалога/атаки/двери.
+*/
+.game-tokens--ability-mode > .game-tokens__token:not(.game-tokens__token--ability-target) {
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='10' fill='none' stroke='%23facc15' stroke-width='2.5' opacity='0.95'/%3E%3Cpath d='M20 5 v8 M20 27 v8 M5 20 h8 M27 20 h8' stroke='%23facc15' stroke-width='2.5' stroke-linecap='round' opacity='0.95'/%3E%3Ccircle cx='20' cy='20' r='2' fill='%23facc15'/%3E%3C/svg%3E")
+      20 20,
+    crosshair !important;
+}
+
+/*
     Р’С‹РґРµР»РµРЅРёРµ РЅР° СЃС‚РѕСЂРѕРЅРµ Р·СЂРёС‚РµР»СЏ вЂ” РїСѓР»СЊСЃРёСЂСѓСЋС‰РµРµ Р·РµР»С‘РЅРѕРµ РєРѕР»СЊС†Рѕ.
     РћС‚Р»РёС‡Р°РµС‚СЃСЏ РѕС‚ admin-РІС‹РґРµР»РµРЅРёСЏ (РІСЂР°С‰Р°СЋС‰РёР№СЃСЏ РіСЂР°РґРёРµРЅС‚) С‡С‚РѕР±С‹ РІРёР·СѓР°Р»СЊРЅРѕ
     СЂР°Р·РіСЂР°РЅРёС‡РёС‚СЊ В«РІС‹Р±СЂР°Р» РјР°СЃС‚РµСЂВ» Рё В«РІС‹Р±СЂР°Р» РёРіСЂРѕРєВ».
@@ -298,7 +309,10 @@
 
 /* Курсор «цель способности» — крестик прицела */
 .game-tokens__token--ability-target {
-  cursor: crosshair;
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='10' fill='none' stroke='%23facc15' stroke-width='2.5' opacity='0.95'/%3E%3Cpath d='M20 5 v8 M20 27 v8 M5 20 h8 M27 20 h8' stroke='%23facc15' stroke-width='2.5' stroke-linecap='round' opacity='0.95'/%3E%3Ccircle cx='20' cy='20' r='2' fill='%23facc15'/%3E%3C/svg%3E")
+      20 20,
+    crosshair !important;
   outline: 2px solid rgb(250 204 21 / 50%);
   outline-offset: -2px;
   border-radius: var(--radius-full);

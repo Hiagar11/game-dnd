@@ -1,7 +1,10 @@
 ﻿<template>
   <div
     class="game-tokens"
-    :class="{ 'game-tokens--ctrl': ctrlHeld && heroSelected }"
+    :class="{
+      'game-tokens--ctrl': ctrlHeld && heroSelected,
+      'game-tokens--ability-mode': !!store.pendingAbility,
+    }"
     :style="{ width: `${width}px`, height: `${height}px` }"
     @contextmenu.prevent="onMapRightClick"
   >
@@ -218,6 +221,17 @@
     prependMessages,
     triggerAttitudeArrow,
   } = useNpcDialog(store)
+
+  watch(
+    () => store.combatMode,
+    (isCombat) => {
+      if (!isCombat) return
+      // Во время боя диалоги недоступны — закрываем все открытые пузыри.
+      for (const uid of dialogBubbles.value.keys()) {
+        closeBubble(uid)
+      }
+    }
+  )
 
   const { flashMap, flashToken, runQuickAttack } = useTokenCombatInteraction({
     store,
