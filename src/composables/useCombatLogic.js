@@ -101,11 +101,22 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
     damageRoll.value = null
   }
 
+  function getCurrentTurnUid() {
+    const order = store.initiativeOrder ?? []
+    const currentIndex = store.currentInitiativeIndex ?? 0
+    return order[currentIndex]?.uid ?? null
+  }
+
   async function onPunch(asNpc = false) {
     if (phase.value !== 'idle' || !heroToken.value || !npcToken.value) return
     npcIsAttacking.value = asNpc
     const attackerToken = asNpc ? npcToken.value : heroToken.value
     const defenderToken = asNpc ? heroToken.value : npcToken.value
+
+    if (store.combatMode) {
+      const currentTurnUid = getCurrentTurnUid()
+      if (currentTurnUid && currentTurnUid !== attackerToken.uid) return
+    }
 
     // Ближняя атака — проверяем смежность
     const isAdjacent = ADJACENT_2x2.some(

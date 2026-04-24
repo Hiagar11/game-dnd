@@ -188,8 +188,14 @@
   background: rgb(96 165 250 / 70%);
 }
 
+/* Бонусная точка AP (выше DEFAULT_AP, например после Воодушевления) */
+.token-info__ap-dot--ap-bonus {
+  background: rgb(250 204 21 / 95%);
+  box-shadow: 0 0 5px 1px rgb(251 191 36 / 75%);
+}
+
 /* Бонусные точки MP (выше DEFAULT_MP, например после Быстрого шага) */
-.token-info__ap-dot--bonus {
+.token-info__ap-dot--mp-bonus {
   background: rgb(147 197 253 / 90%);
   box-shadow: 0 0 4px 1px rgb(59 130 246 / 60%);
 }

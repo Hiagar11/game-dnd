@@ -22,6 +22,7 @@ const VISIBILITY_RADIUS = 6
  */
 export function useGameCombat(placedTokens, selectedPlacedUid) {
   const combatMode = ref(false)
+  const justExitedCombat = ref(false) // флаг для предотвращения повторного входа сразу после выхода
   // Массив { uid, initiative, name, src, tokenType, attitude } — отсортирован по убыванию инициативы.
   const initiativeOrder = ref([])
   const currentInitiativeIndex = ref(0) // индекс текущего участника в initiativeOrder
@@ -40,6 +41,13 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     combatPair.value = heroUid && npcUid ? { heroUid, npcUid, npcInitiated } : null
   }
 
+  function applyTurnStartResources(token) {
+    if (!token) return
+    token.actionPoints = DEFAULT_AP + (token.bonusAp ?? 0)
+    token.bonusAp = 0
+    token.movementPoints = DEFAULT_MP
+  }
+
   /** Проверяет, находится ли токен в зоне видимости хотя бы одного героя */
   function isTokenVisible(token) {
     const heroes = getHeroTokens(placedTokens.value)
@@ -55,7 +63,8 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     return placedTokens.value
       .filter((t) => {
         if (t.systemToken || t.uid === excludeUid) return false
-        // Нейтральные NPC в бой не вступают
+        // Нейтральные NPC в бой не вступают.
+        // Враждебные и союзные NPC участвуют в порядке инициативы.
         if (isNpcToken(t) && getNpcAttitude(t) === 'neutral') return false
         // Если передана карта видимости — включаем только видимых токенов
         if (visibleKeys && !visibleKeys.has(`${t.col}:${t.row}`)) return false
@@ -74,11 +83,14 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
 
   /**
    * Войти в боевой режим.
-   * @param {string|null} firstUid — uid токена, который начал бой (встаёт ПОСЛЕДНИМ в инициативу).
+   * @param {string|null} firstUid — uid токена, который начал бой (встаёт ПЕРВЫМ в инициативу).
    * @param {Set<string>|null} visibleKeys — Set «col:row» видимых клеток; если null — все токены.
    */
   function enterCombat(firstUid = null, visibleKeys = null) {
     if (combatMode.value) return
+
+    // Защита от повторного входа сразу после выхода из боя
+    if (justExitedCombat.value) return
 
     // ── Автолевелинг NPC: масштабируем статы враждебных NPC до уровня группы ──
     const heroesForAutoLevel = getHeroTokens(placedTokens.value)
@@ -128,9 +140,9 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     if (firstUid) {
       const t = placedTokens.value.find((e) => e.uid === firstUid)
       if (t) {
-        order.push({
+        order.unshift({
           uid: t.uid,
-          initiative: 0, // гарантированно последний
+          initiative: 21, // инициатор всегда первый, вне d20
           name: t.name,
           src: t.src,
           tokenType: t.tokenType ?? 'npc',
@@ -143,6 +155,14 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     combatRound.value = 1
     enemyHiddenTurns.value = {}
     combatMode.value = true
+
+    // Если бой стартует на уже воодушевлённом токене, бонусный AP должен стать
+    // реальным очком действия сразу, а не ждать следующего endTurn().
+    const currentUid = initiativeOrder.value[0]?.uid
+    const currentToken = placedTokens.value.find((t) => t.uid === currentUid)
+    applyTurnStartResources(currentToken)
+    // Автоматически переключаем выбор на первый токен в очереди инициативы
+    selectedPlacedUid.value = currentUid ?? null
   }
 
   // Последний XP-отчёт — массив { uid, xpGained, newXp, oldLevel, newLevel }
@@ -190,6 +210,12 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
       t.actionPoints = DEFAULT_AP
       t.movementPoints = DEFAULT_MP
     }
+
+    // Установить флаг защиты от повторного входа
+    justExitedCombat.value = true
+    setTimeout(() => {
+      justExitedCombat.value = false
+    }, 300)
   }
 
   /** Проверка условия конца боя: нет живых активных врагов */
@@ -291,9 +317,18 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
       // Тик эффектов (яд наносит урон, истёкшие снимаются)
       tickTokenEffects(nextToken)
 
-      nextToken.actionPoints = DEFAULT_AP
-      nextToken.movementPoints = DEFAULT_MP
+      applyTurnStartResources(nextToken)
       selectedPlacedUid.value = nextUid
+
+      // Если текущий ход перешёл к участнику боевой пары, оставляем попап открытым.
+      // Если ход перешёл к кому-то вне пары — закрываем попап.
+      if (combatPair.value) {
+        const isCombatPairParticipant =
+          nextUid === combatPair.value.heroUid || nextUid === combatPair.value.npcUid
+        if (!isCombatPairParticipant) {
+          combatPair.value = null
+        }
+      }
     }
   }
 

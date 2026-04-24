@@ -128,6 +128,14 @@ export const useGameStore = defineStore('game', () => {
 
   // ─── Выбор токена на карте ────────────────────────────────────────────────────
   function selectPlacedToken(uid) {
+    // В боевом режиме выбор заблокирован: нельзя переключиться на другого токена.
+    // Фокус всегда остаётся на том, чей сейчас ход (управляется через endTurn/enterCombat).
+    if (combat.combatMode.value) {
+      const currentTurnUid = combat.initiativeOrder.value[combat.currentInitiativeIndex.value]?.uid
+      if (uid !== currentTurnUid) return
+      selectedPlacedUid.value = currentTurnUid ?? null
+      return
+    }
     selectedPlacedUid.value = selectedPlacedUid.value === uid ? null : uid
   }
 

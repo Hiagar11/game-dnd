@@ -242,6 +242,7 @@ export function useTokenDialogInteraction({
       if (initiateCombat) {
         setTimeout(() => {
           closeBubble(npc.uid)
+          // Только начинаем боевой режим, если он ещё не активен
           if (!store.combatMode) {
             store.enterCombat(npc.uid, getVisibleKeys?.() ?? null)
           }

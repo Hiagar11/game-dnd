@@ -51,11 +51,12 @@
             />
             <div class="combat-popup__ap-dots">
               <span
-                v-for="i in DEFAULT_AP"
+                v-for="i in displayAp(currentAttacker)"
                 :key="i"
                 class="combat-popup__ap-dot"
                 :class="{
                   'combat-popup__ap-dot--used': i > (currentAttacker.actionPoints ?? DEFAULT_AP),
+                  'combat-popup__ap-dot--bonus': i > DEFAULT_AP,
                 }"
               />
             </div>
@@ -222,11 +223,12 @@
             />
             <div class="combat-popup__ap-dots">
               <span
-                v-for="i in DEFAULT_AP"
+                v-for="i in displayAp(currentDefender)"
                 :key="i"
                 class="combat-popup__ap-dot"
                 :class="{
                   'combat-popup__ap-dot--used': i > (currentDefender.actionPoints ?? DEFAULT_AP),
+                  'combat-popup__ap-dot--bonus': i > DEFAULT_AP,
                 }"
               />
             </div>
@@ -319,6 +321,11 @@
     onPunch,
     onClose,
   } = useCombatLogic({ store, heroToken, npcToken, emitClose: () => emit('close') })
+
+  function displayAp(token) {
+    if (!token) return DEFAULT_AP
+    return Math.max(DEFAULT_AP, token.actionPoints ?? 0, DEFAULT_AP + (token.bonusAp ?? 0))
+  }
 
   // Синхронизируем combatLog NPC на сервер при закрытии popup
   const { getSocket } = useSocket()

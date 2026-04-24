@@ -261,6 +261,11 @@
   flex-shrink: 0;
 }
 
+.combat-popup__ap-dot--bonus {
+  background: rgb(253 224 71 / 95%);
+  box-shadow: 0 0 6px rgb(253 224 71 / 75%);
+}
+
 .combat-popup__ap-dot--used {
   background: rgb(255 255 255 / 15%);
   box-shadow: none;

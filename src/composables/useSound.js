@@ -511,6 +511,51 @@ export function playQuickStep() {
 }
 
 /**
+ * Воодушевление — короткий восходящий рог-фанфара.
+ * Два осциллятора (прима + квинта) c пилообразной формой,
+ * огибание: быстрый attack → sustain → мягкий release.
+ * Звучит как воодушевляющий возглас «Вперёд!».
+ */
+export function playInspire() {
+  const ctx = getAudioCtx()
+  if (!ctx) return
+
+  const now = ctx.currentTime
+
+  // Создаём 3 осциллятора: прима, квинта, октава — создают звук рога
+  const freqs = [
+    { base: 440, target: 660 }, // A4 → E5 (прима → квинта)
+    { base: 660, target: 880 }, // E5 → A5 (квинта → октава)
+    { base: 220, target: 330 }, // A3 → E4 (нижний регистр, телесность)
+  ]
+
+  const masterGain = ctx.createGain()
+  masterGain.gain.setValueAtTime(0, now)
+  masterGain.gain.linearRampToValueAtTime(0.3, now + 0.04)
+  masterGain.gain.setValueAtTime(0.3, now + 0.2)
+  masterGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55)
+  masterGain.connect(ctx.destination)
+
+  for (const { base, target } of freqs) {
+    const osc = ctx.createOscillator()
+    osc.type = 'sawtooth'
+    osc.frequency.setValueAtTime(base, now)
+    osc.frequency.exponentialRampToValueAtTime(target, now + 0.25)
+
+    // Небольшой фильтр ВЧ — убирает резкость пилы, оставляет «медный» тембр
+    const filter = ctx.createBiquadFilter()
+    filter.type = 'lowpass'
+    filter.frequency.setValueAtTime(2200, now)
+    filter.Q.setValueAtTime(0.8, now)
+
+    osc.connect(filter)
+    filter.connect(masterGain)
+    osc.start(now)
+    osc.stop(now + 0.56)
+  }
+}
+
+/**
  * Кровавое заклинание: синтезированный магический шёпот.
  * Розовый шум (1/f) → полосовой фильтр ~1100Hz → AM-модуляция 6.5Hz.
  * Имитирует тихое скандирование заклинания без внешних аудиофайлов.

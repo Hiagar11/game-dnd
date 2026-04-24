@@ -72,7 +72,11 @@ export function useGameTokenPresentation({
         !!store.pendingAbility &&
         store.pendingAbility.areaType === 'single' &&
         placed.uid !== store.pendingAbility.tokenUid &&
-        !placed.systemToken,
+        !placed.systemToken &&
+        // allyOnly: подсвечиваем только союзников как допустимые цели
+        (!store.pendingAbility.allyOnly ||
+          placed.tokenType === 'hero' ||
+          (placed.tokenType === 'npc' && placed.attitude === 'friendly')),
       'game-tokens__token--cursor-door':
         !props.viewerMode &&
         placed.systemToken === 'door' &&
@@ -84,6 +88,7 @@ export function useGameTokenPresentation({
       'game-tokens__token--flash-bash': flashMap.value.get(placed.uid) === 'bash',
       'game-tokens__token--flash-blood': flashMap.value.get(placed.uid) === 'blood',
       'game-tokens__token--flash-teleport': flashMap.value.get(placed.uid) === 'teleport',
+      'game-tokens__token--flash-inspire': flashMap.value.get(placed.uid) === 'inspire',
       'game-tokens__token--active-turn': currentTurnUid.value === placed.uid,
       'game-tokens__token--ap-2':
         currentTurnUid.value === placed.uid && (placed.actionPoints ?? 0) >= 2,
@@ -109,6 +114,8 @@ export function useGameTokenPresentation({
       'game-tokens__token--loot-glow':
         (placed.systemToken === 'bag' || !placed.opened) && !!bestRarityColor(placed.items),
       'game-tokens__token--locked': !!placed.locked,
+      // Воодушевлён — ожидает бонусный AP на следующем ходу
+      'game-tokens__token--inspired': !!(placed.bonusAp ?? 0),
     }
   }
 

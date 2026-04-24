@@ -424,7 +424,8 @@
         const zone = buildReachableCells(hero, store.walls, mp)
         const enemy = hostiles.find((npc) => zone.has(`${npc.col},${npc.row}`))
         if (enemy) {
-          store.enterCombat(enemy.uid, getVisibleKeys())
+          // Герой, который приблизился к врагу — это инициатор боя (ходит последним)
+          store.enterCombat(hero.uid, getVisibleKeys())
           return
         }
       }

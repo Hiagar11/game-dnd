@@ -364,6 +364,22 @@
   }
 }
 
+/* Воодушевлён — пульсирующий жёлтый контур: ждёт бонусный AP на следующем ходу */
+.game-tokens__token--inspired .game-tokens__img {
+  animation: inspired-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes inspired-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px #eab308) drop-shadow(0 0 8px #eab308);
+  }
+
+  50% {
+    filter: drop-shadow(0 0 8px #fde047) drop-shadow(0 0 18px #eab308);
+  }
+}
+
 /* Полуразмерный токен (1×2 суб-клетки) — без скругления, растягивается на всю высоту */
 .game-tokens__token--half-size .game-tokens__img {
   border-radius: 4px;
@@ -841,6 +857,40 @@
   100% {
     filter: brightness(1);
     transform: translateX(0) rotate(0) scale(1);
+  }
+}
+
+/* Воодушевление — жёлтое сияние + лёгкий подъём */
+.game-tokens__token--flash-inspire .game-tokens__img {
+  animation: token-flash-inspire 0.85s ease-out;
+}
+
+@keyframes token-flash-inspire {
+  0% {
+    filter: brightness(1);
+    transform: translateY(0) scale(1);
+  }
+
+  20% {
+    filter: brightness(2.5) sepia(1) saturate(6) hue-rotate(30deg);
+    transform: translateY(-5px) scale(1.07);
+    box-shadow: 0 0 26px 10px rgb(234 179 8 / 80%);
+  }
+
+  50% {
+    filter: brightness(2) sepia(1) saturate(5) hue-rotate(25deg);
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 0 18px 6px rgb(253 224 71 / 60%);
+  }
+
+  75% {
+    filter: brightness(1.4) sepia(0.5) saturate(3);
+    transform: translateY(-1px) scale(1.01);
+  }
+
+  100% {
+    filter: brightness(1);
+    transform: translateY(0) scale(1);
   }
 }
 

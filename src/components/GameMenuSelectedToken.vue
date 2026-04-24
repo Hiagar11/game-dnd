@@ -38,10 +38,13 @@
         <PhLightning :size="11" weight="fill" class="token-info__ap-icon" />
         <TransitionGroup name="ap-dot" tag="div" class="token-info__ap">
           <span
-            v-for="i in DEFAULT_AP"
+            v-for="i in displayAp"
             :key="'ap' + i"
             class="token-info__ap-dot"
-            :class="{ 'token-info__ap-dot--used': i > (placed.actionPoints ?? DEFAULT_AP) }"
+            :class="{
+              'token-info__ap-dot--used': i > (placed.actionPoints ?? DEFAULT_AP),
+              'token-info__ap-dot--ap-bonus': i > DEFAULT_AP,
+            }"
           />
         </TransitionGroup>
       </div>
@@ -56,7 +59,7 @@
             class="token-info__ap-dot token-info__ap-dot--mp"
             :class="{
               'token-info__ap-dot--used': i > (placed.movementPoints ?? DEFAULT_MP),
-              'token-info__ap-dot--bonus': i > DEFAULT_MP,
+              'token-info__ap-dot--mp-bonus': i > DEFAULT_MP,
             }"
           />
         </TransitionGroup>
@@ -107,6 +110,16 @@
     const hp = placed.value.hp ?? placed.value.maxHp ?? 10
     const max = placed.value.maxHp ?? 10
     return hpPercentFromValues(hp, max)
+  })
+
+  // Показываем бонусные точки AP выше DEFAULT_AP (например после Воодушевления)
+  const displayAp = computed(() => {
+    if (!placed.value) return DEFAULT_AP
+    return Math.max(
+      DEFAULT_AP,
+      placed.value.actionPoints ?? 0,
+      DEFAULT_AP + (placed.value.bonusAp ?? 0)
+    )
   })
 
   // Показываем бонусные точки MP выше DEFAULT_MP (например после Быстрого шага)

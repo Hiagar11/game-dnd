@@ -56,6 +56,7 @@
         <GameMeleeSlash />
         <GameShieldBash />
         <GameQuickStep />
+        <GameInspire />
         <GameBloodCastRunes />
         <GameBloodImpact />
       </div>
@@ -144,6 +145,7 @@
   import GameMeleeSlash from '../components/GameMeleeSlash.vue'
   import GameShieldBash from '../components/GameShieldBash.vue'
   import GameQuickStep from '../components/GameQuickStep.vue'
+  import GameInspire from '../components/GameInspire.vue'
   import GameBloodCastRunes from '../components/GameBloodCastRunes.vue'
   import GameBloodImpact from '../components/GameBloodImpact.vue'
   import GameTokens from '../components/GameTokens.vue'

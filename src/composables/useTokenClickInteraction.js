@@ -1,5 +1,6 @@
 import {
   getSelectedToken,
+  isAlliedToken,
   isHeroToken,
   isHostileNpcToken,
   isNeutralNpcToken,
@@ -9,6 +10,12 @@ import {
 import { getAbilityCombatProfile } from '../utils/abilityCombatProfile'
 
 const CONTAINER_TOKENS = new Set(['item', 'jar', 'bag'])
+
+function getCurrentTurnUid(store) {
+  const order = store.initiativeOrder ?? []
+  const currentIndex = store.currentInitiativeIndex ?? 0
+  return order[currentIndex]?.uid ?? null
+}
 
 export function useTokenClickInteraction({
   store,
@@ -30,12 +37,17 @@ export function useTokenClickInteraction({
   async function onTokenClick(placed, event) {
     // ── Режим выбора цели способности ─────────────────────────────
     if (store.pendingAbility && abilityExec.needsTargetToken.value) {
+      // Способность только на союзников — клик по враждебной/нейтральной цели игнорируется
+      if (store.pendingAbility.allyOnly && !isAlliedToken(placed)) return
+
       const abilityProfile = getAbilityCombatProfile(store.pendingAbility)
 
       // Способность на нейтрального NPC в мирное время → агрессия + бой
       if (!store.combatMode && isNeutralNpcToken(placed) && !placed.systemToken) {
+        const casterUid = store.pendingAbility.tokenUid
         placed.attitude = 'hostile'
-        store.enterCombat(placed.uid, getVisibleKeys())
+        // Инициатор агрессии становится первым в очереди боя.
+        store.enterCombat(casterUid, getVisibleKeys())
       }
 
       // Ближний бой — сначала подойти к цели.
@@ -97,8 +109,8 @@ export function useTokenClickInteraction({
       if (isFirstStrike) placed.attitude = 'hostile'
 
       if (!store.combatMode) {
-        // firstUid ходит последним: при first strike это NPC → герой идёт первым
-        const firstUid = isFirstStrike ? placed.uid : selected.uid
+        // firstUid ходит первым: инициатор боя всегда открывает раунд.
+        const firstUid = selected.uid
         store.enterCombat(firstUid, getVisibleKeys())
       }
       closeContextMenu()
@@ -108,6 +120,10 @@ export function useTokenClickInteraction({
           store.endTurn()
           return
         }
+
+        const currentTurnUid = getCurrentTurnUid(store)
+        if (currentTurnUid && currentTurnUid !== selected.uid) return
+
         const liveAttacker = store.placedTokens.find((token) => token.uid === selected.uid)
         const liveDefender = store.placedTokens.find((token) => token.uid === placed.uid)
         if (liveAttacker && liveDefender) runQuickAttack(liveAttacker, liveDefender)

@@ -113,6 +113,8 @@ export const INSPIRE = {
   color: '#eab308',
   apCost: 2,
   type: 'active',
+  areaType: 'single',
+  allyOnly: true,
   tier: 1,
   requirements: { strength: 0, agility: 0, intellect: 0, charisma: 3 },
   requiredAbilities: [],

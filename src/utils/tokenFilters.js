@@ -18,6 +18,10 @@ export function isFriendlyNpcToken(token) {
   return isNpcToken(token) && getNpcAttitude(token) === 'friendly'
 }
 
+export function isAlliedToken(token) {
+  return isHeroToken(token) || isFriendlyNpcToken(token)
+}
+
 export function isNeutralNpcToken(token) {
   return isNpcToken(token) && !token.captured && getNpcAttitude(token) === 'neutral'
 }

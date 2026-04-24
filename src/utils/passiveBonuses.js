@@ -8,6 +8,7 @@ import { normalizePassiveAbilityIds } from './passiveAbilities'
 
 export const PASSIVE_BONUS_MAP = {
   dodge_roll: { derived: { evasion: 2 } },
+  mana_sense: { derived: { perception: 2 } },
 }
 
 /**

@@ -11,6 +11,19 @@ export function useTokenAttackInteraction({
   closeContextMenu,
   getVisibleKeys,
 }) {
+  function syncCombatPairForCurrentTurn(heroUid, npcUid) {
+    const currentTurnUid = store.initiativeOrder?.[store.currentInitiativeIndex]?.uid ?? null
+    if (currentTurnUid === heroUid) {
+      store.setCombatPair(heroUid, npcUid)
+      return
+    }
+    if (currentTurnUid === npcUid) {
+      store.setCombatPair(heroUid, npcUid, true)
+      return
+    }
+    store.setCombatPair(null, null)
+  }
+
   async function onAttackClick(npc) {
     const hero = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
     if (!hero) return
@@ -23,8 +36,11 @@ export function useTokenAttackInteraction({
     )
     if (alreadyAdjacent) {
       closeContextMenu()
-      store.setCombatPair(heroUid, npcUid)
-      store.enterCombat(heroUid, getVisibleKeys())
+      // Если боевой режим уже активен — не переопределяем инициативу
+      if (!store.combatMode) {
+        store.enterCombat(heroUid, getVisibleKeys())
+      }
+      syncCombatPairForCurrentTurn(heroUid, npcUid)
       return
     }
 
@@ -75,8 +91,11 @@ export function useTokenAttackInteraction({
       return
     }
 
-    store.setCombatPair(heroUid, npcUid)
-    store.enterCombat(heroUid, getVisibleKeys())
+    // Если боевой режим уже активен — не переопределяем инициативу
+    if (!store.combatMode) {
+      store.enterCombat(heroUid, getVisibleKeys())
+    }
+    syncCombatPairForCurrentTurn(heroUid, npcUid)
   }
 
   async function onNpcAttackClick(hero) {
@@ -92,8 +111,12 @@ export function useTokenAttackInteraction({
     if (alreadyAdjacent) {
       store.selectPlacedToken(null)
       closeContextMenu()
-      store.setCombatPair(heroUid, npcUid, true)
-      store.enterCombat(npcUid, getVisibleKeys())
+      // Если боевой режим уже активен — не переопределяем инициативу!
+      // Просто синхронизируем боевую пару и продолжаем текущую инициативу.
+      if (!store.combatMode) {
+        store.enterCombat(npcUid, getVisibleKeys())
+      }
+      syncCombatPairForCurrentTurn(heroUid, npcUid)
       return
     }
 
@@ -140,8 +163,11 @@ export function useTokenAttackInteraction({
     )
     if (!arrived) return
 
-    store.setCombatPair(heroUid, npcUid, true)
-    store.enterCombat(npcUid, getVisibleKeys())
+    // Если боевой режим уже активен — не переопределяем инициативу
+    if (!store.combatMode) {
+      store.enterCombat(npcUid, getVisibleKeys())
+    }
+    syncCombatPairForCurrentTurn(heroUid, npcUid)
   }
 
   return {
