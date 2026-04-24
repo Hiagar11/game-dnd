@@ -47,6 +47,7 @@ describe('abilities/registry — автоматическая регистрац
     'blood-rain',
     'poison-cloud',
     'teleport',
+    'taunt',
   ]
 
   it.each(EXPECTED_IDS)('экзекьютор для "%s" зарегистрирован', (id) => {

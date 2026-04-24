@@ -25,6 +25,7 @@ const INSPIRE_SOUND_OPTIONS = {
 const INSPIRE_SOUND_ID = 1
 const INSPIRE_SOUND_SRC = INSPIRE_SOUND_OPTIONS[INSPIRE_SOUND_ID] ?? INSPIRE_SOUND_OPTIONS[1]
 const inspireSound = new Audio(INSPIRE_SOUND_SRC)
+const tauntCrySound = new Audio('/sounds/taunt-cry.mp3')
 const bloodWhisperSound = new Audio('/sounds/blood-whisper.mp3')
 const magicImpactSound = new Audio('/sounds/magic-impact.mp3')
 // Звук вылета кровавого снаряда: тёмная магия (основной слой) + магическое эхо полёта
@@ -32,6 +33,8 @@ const bloodProjectileLaunchSound = new Audio('/sounds/blood-projectile-launch.mp
 const bloodProjectileWhooshSound = new Audio('/sounds/blood-projectile-whoosh.mp3')
 inspireSound.preload = 'auto'
 inspireSound.load()
+tauntCrySound.preload = 'auto'
+tauntCrySound.load()
 bloodWhisperSound.preload = 'auto'
 bloodWhisperSound.load()
 magicImpactSound.preload = 'auto'
@@ -281,6 +284,7 @@ swordSound.volume = 0.85
 whooshSound.volume = 0.75
 levelUpSound.volume = 0.9
 inspireSound.volume = 0.88
+tauntCrySound.volume = 0.9
 battleMusic.volume = 0
 // loop отключён: при окончании трека ended-обработчик переключает на следующий
 travelMusic.volume = 0
@@ -607,6 +611,68 @@ export function playInspire() {
   audio.play().catch(() => {
     audio.removeEventListener('timeupdate', onTimeUpdate)
     playInspireSynthFallback()
+  })
+}
+
+/**
+ * Провокация: яростный крик из внешнего сэмпла.
+ * Берём первые 3 секунды и ведём громкость по кривой sin²:
+ * плавный вход -> пик -> плавное затухание.
+ */
+export function playTauntCry() {
+  const START_AT_SEC = 0.08
+  const STOP_AT_SEC = 3
+  const TARGET_VOL = 0.9
+  const TOTAL_SEC = STOP_AT_SEC - START_AT_SEC
+  const ATTACK_SEC = 0.7
+  const PEAK_SEC = 0.45
+
+  const audio = tauntCrySound.cloneNode(true)
+  audio.currentTime = START_AT_SEC
+  audio.playbackRate = 1
+  audio.volume = 0
+  disablePitchPreserve(audio)
+
+  const onTimeUpdate = () => {
+    const t = audio.currentTime
+    if (t >= STOP_AT_SEC) {
+      audio.pause()
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+      return
+    }
+    const elapsed = t - START_AT_SEC
+    if (elapsed <= ATTACK_SEC) {
+      // Фаза 1: плавный разгон громкости.
+      const attackProgress = elapsed / ATTACK_SEC
+      audio.volume = attackProgress ** 1.6 * TARGET_VOL
+      return
+    }
+
+    if (elapsed <= ATTACK_SEC + PEAK_SEC) {
+      // Фаза 2: пик крика — держим почти максимальную громкость с лёгкой пульсацией.
+      const peakProgress = (elapsed - ATTACK_SEC) / PEAK_SEC
+      const pulse = 0.95 + Math.sin(peakProgress * Math.PI * 3) * 0.05
+      audio.volume = TARGET_VOL * pulse
+      return
+    }
+
+    // Фаза 3: плавное затухание до тишины.
+    const decayProgress = (elapsed - ATTACK_SEC - PEAK_SEC) / (TOTAL_SEC - ATTACK_SEC - PEAK_SEC)
+    const clampedDecay = Math.max(0, Math.min(1, decayProgress))
+    const decayFade = Math.cos((Math.PI * clampedDecay) / 2) ** 2
+    audio.volume = decayFade * TARGET_VOL
+  }
+
+  audio.addEventListener('timeupdate', onTimeUpdate)
+  audio.play().catch(() => {
+    audio.removeEventListener('timeupdate', onTimeUpdate)
+    // Fallback: если mp3 не загрузился, используем прежний whoosh-подобный крик.
+    const cry = whooshSound.cloneNode(true)
+    cry.currentTime = 0
+    cry.volume = 0.82
+    cry.playbackRate = 0.78
+    disablePitchPreserve(cry)
+    cry.play().catch(() => {})
   })
 }
 

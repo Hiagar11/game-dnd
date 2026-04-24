@@ -7,7 +7,7 @@ import {
   isNonSystemToken,
   isTalkableNpcToken,
 } from '../utils/tokenFilters'
-import { getTauntEffect } from '../utils/stunMechanics'
+import { getForcedTauntTargetUid, isTauntAttackViolation } from '../utils/stunMechanics'
 import { getAbilityCombatProfile } from '../utils/abilityCombatProfile'
 
 const CONTAINER_TOKENS = new Set(['item', 'jar', 'bag'])
@@ -34,6 +34,7 @@ export function useTokenClickInteraction({
   getVisibleKeys,
   onCaptureClick,
   emitDoorTransition,
+  onTauntBlocked,
 }) {
   async function runQuickAttackFlow(attackerUid, defenderUid) {
     if (!attackerUid || !defenderUid) return
@@ -41,6 +42,12 @@ export function useTokenClickInteraction({
     const attacker = store.placedTokens.find((token) => token.uid === attackerUid)
     const defender = store.placedTokens.find((token) => token.uid === defenderUid)
     if (!attacker || !defender) return
+
+    // Провокация: атакующий под taunt может бить только провокатора
+    if (isTauntAttackViolation(attacker, defender, store.placedTokens)) {
+      onTauntBlocked?.(attacker)
+      return
+    }
 
     if (!store.combatMode) {
       // При обычном ЛКМ-ударе инициатор сразу начинает бой первым.
@@ -66,18 +73,28 @@ export function useTokenClickInteraction({
   async function onTokenClick(placed, event) {
     // ── Режим выбора цели способности ─────────────────────────────
     if (store.pendingAbility && abilityExec.needsTargetToken.value) {
+      const casterUid = store.pendingAbility.tokenUid
+      const caster = store.placedTokens.find((t) => t.uid === casterUid)
+
       // Способность только на союзников кастера — проверяем относительно его фракции
       if (store.pendingAbility.allyOnly) {
-        const casterUid = store.pendingAbility.tokenUid
-        const caster = store.placedTokens.find((t) => t.uid === casterUid)
         if (!caster || !isSameFaction(caster, placed)) return
       }
 
       const abilityProfile = getAbilityCombatProfile(store.pendingAbility)
 
+      // Провокация: атакующие single-способности можно направлять только в провокатора.
+      // Не трогаем бафы/поддержку (allyOnly) и небоевые способности без урона.
+      const forcedTauntTargetUid = getForcedTauntTargetUid(caster, store.placedTokens)
+      const isOffensiveAbility =
+        !store.pendingAbility.allyOnly && abilityProfile.damageKind !== 'none'
+      if (isOffensiveAbility && forcedTauntTargetUid && placed.uid !== forcedTauntTargetUid) {
+        onTauntBlocked?.(caster)
+        return
+      }
+
       // Способность на нейтрального NPC в мирное время → агрессия + бой
       if (!store.combatMode && isNeutralNpcToken(placed) && !placed.systemToken) {
-        const casterUid = store.pendingAbility.tokenUid
         placed.attitude = 'hostile'
         // Инициатор агрессии становится первым в очереди боя.
         store.enterCombat(casterUid, getVisibleKeys())
@@ -143,10 +160,18 @@ export function useTokenClickInteraction({
 
       closeContextMenu()
 
+      // Провокация должна работать симметрично: для героя и NPC под taunt.
+      if (isTauntAttackViolation(selected, placed, store.placedTokens)) {
+        onTauntBlocked?.(selected)
+        return
+      }
+
       // Провокация: NPC под таунтом может атаковать только провокатора
       if (isNpcAttackingHero) {
-        const taunt = getTauntEffect(selected)
-        if (taunt && placed.uid !== taunt.byUid) return
+        if (isTauntAttackViolation(selected, placed, store.placedTokens)) {
+          onTauntBlocked?.(selected)
+          return
+        }
       }
 
       if (isHeroAttackingNpc || isFirstStrike) {
@@ -179,8 +204,10 @@ export function useTokenClickInteraction({
       // Атака враждебного НПС → герой
       if (isHeroToken(placed) && isHeroReachableByNpc(placed)) {
         // Провокация: NPC под таунтом может атаковать только провокатора
-        const taunt = getTauntEffect(selected)
-        if (taunt && placed.uid !== taunt.byUid) return
+        if (isTauntAttackViolation(selected, placed, store.placedTokens)) {
+          onTauntBlocked?.(selected)
+          return
+        }
         await runQuickAttackFlow(selected.uid, placed.uid)
         return
       }

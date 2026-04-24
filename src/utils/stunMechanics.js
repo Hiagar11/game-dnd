@@ -53,3 +53,48 @@ export function getStunEffectName(token) {
   const stun = effects.find((e) => e.apPenalty && (e.remainingTurns ?? 0) > 0)
   return stun?.name ?? null
 }
+
+/**
+ * Возвращает активный эффект провокации или null.
+ * Если не null — токен обязан атаковать только byUid.
+ *
+ * @param {object} token
+ * @returns {{ byUid: string }|null}
+ */
+export function getTauntEffect(token) {
+  const effects = token?.activeEffects
+  if (!effects?.length) return null
+  return effects.find((e) => e.id === 'taunt' && (e.remainingTurns ?? 0) > 0) ?? null
+}
+
+/**
+ * Возвращает uid цели, которую атакующий обязан бить под провокацией.
+ * Если провокатор выбыл (не найден/HP=0) — ограничение снимается.
+ *
+ * @param {object} attacker
+ * @param {Array<object>} placedTokens
+ * @returns {string|null}
+ */
+export function getForcedTauntTargetUid(attacker, placedTokens = []) {
+  const taunt = getTauntEffect(attacker)
+  if (!taunt?.byUid) return null
+
+  const forcedTarget = placedTokens.find((t) => t.uid === taunt.byUid)
+  if (!forcedTarget || (forcedTarget.hp ?? 0) <= 0) return null
+
+  return forcedTarget.uid
+}
+
+/**
+ * true, если атакующий под провокацией пытается атаковать НЕ провокатора.
+ *
+ * @param {object} attacker
+ * @param {object} defender
+ * @param {Array<object>} placedTokens
+ * @returns {boolean}
+ */
+export function isTauntAttackViolation(attacker, defender, placedTokens = []) {
+  const forcedUid = getForcedTauntTargetUid(attacker, placedTokens)
+  if (!forcedUid) return false
+  return defender?.uid !== forcedUid
+}

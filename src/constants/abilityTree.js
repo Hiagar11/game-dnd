@@ -129,6 +129,10 @@ export const TAUNT = {
   apCost: 1,
   type: 'active',
   tier: 1,
+  areaType: 'single', // нужен выбор цели-токена
+  allyOnly: false, // применяется на врагов
+  delivery: 'ranged', // герой не подходит к цели
+  damageKind: 'none', // без урона
   requirements: { strength: 0, agility: 0, intellect: 0, charisma: 3 },
   requiredAbilities: [],
 }

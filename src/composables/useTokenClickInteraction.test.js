@@ -8,6 +8,7 @@ function buildDeps(store, abilityExec, options = {}) {
     onAttackClick = vi.fn(),
     onNpcAttackClick = vi.fn(),
     onTalkClick = vi.fn(),
+    onTauntBlocked = vi.fn(),
     isNpcReachable = vi.fn(() => false),
     isHeroReachableByNpc = vi.fn(() => false),
   } = options
@@ -27,6 +28,7 @@ function buildDeps(store, abilityExec, options = {}) {
     getVisibleKeys: vi.fn(() => new Set(['0:0', '1:0'])),
     onCaptureClick: vi.fn(),
     emitDoorTransition: vi.fn(),
+    onTauntBlocked,
   })
 }
 
@@ -265,5 +267,127 @@ describe('useTokenClickInteraction', () => {
 
     expect(onTalkClick).toHaveBeenCalledTimes(1)
     expect(onTalkClick).toHaveBeenCalledWith(friendlyNpc)
+  })
+
+  it('под провокацией блокирует offensive-способность по цели не-провокатору', async () => {
+    const caster = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      name: 'Hero',
+      activeEffects: [{ id: 'taunt', byUid: 'npc-1', remainingTurns: 2 }],
+    }
+    const provokerNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 1,
+      row: 0,
+      name: 'Provoker',
+      hp: 10,
+    }
+    const otherNpc = {
+      uid: 'npc-2',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 2,
+      row: 0,
+      name: 'Other',
+      hp: 10,
+    }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: {
+        id: 'powerStrike',
+        areaType: 'single',
+        tokenUid: caster.uid,
+        allyOnly: false,
+        damageKind: 'physical',
+      },
+      placedTokens: [caster, provokerNpc, otherNpc],
+      selectedPlacedUid: caster.uid,
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: true },
+      executeAbility: vi.fn(),
+    }
+
+    const onTauntBlocked = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, { onTauntBlocked })
+
+    await onTokenClick(otherNpc, null)
+
+    expect(onTauntBlocked).toHaveBeenCalledTimes(1)
+    expect(abilityExec.executeAbility).not.toHaveBeenCalled()
+  })
+
+  it('герой под провокацией не может сделать quick-атаку по не-провокатору', async () => {
+    const hero = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      name: 'Hero',
+      activeEffects: [{ id: 'taunt', byUid: 'npc-1', remainingTurns: 2 }],
+    }
+    const provokerNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 1,
+      row: 0,
+      name: 'Provoker',
+      hp: 10,
+    }
+    const otherNpc = {
+      uid: 'npc-2',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 2,
+      row: 0,
+      name: 'Other',
+      hp: 10,
+    }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: null,
+      placedTokens: [hero, provokerNpc, otherNpc],
+      selectedPlacedUid: hero.uid,
+      initiativeOrder: [{ uid: hero.uid }],
+      currentInitiativeIndex: 0,
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    const moveTowardTarget = vi.fn(() => Promise.resolve(true))
+    const runQuickAttack = vi.fn()
+    const onTauntBlocked = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, {
+      moveTowardTarget,
+      runQuickAttack,
+      onTauntBlocked,
+      isNpcReachable: vi.fn(() => true),
+    })
+
+    await onTokenClick(otherNpc, { ctrlKey: false })
+
+    expect(onTauntBlocked).toHaveBeenCalledTimes(1)
+    expect(moveTowardTarget).not.toHaveBeenCalled()
+    expect(runQuickAttack).not.toHaveBeenCalled()
   })
 })

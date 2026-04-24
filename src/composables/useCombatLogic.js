@@ -23,6 +23,7 @@ import {
 import { hpPercentFromToken } from '../utils/hp'
 import { ADJACENT_2x2 } from './useTokenMove'
 import { getPassiveDerivedBonus } from '../utils/passiveBonuses'
+import { isTauntAttackViolation } from '../utils/stunMechanics'
 
 export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
   const phase = ref('idle')
@@ -30,9 +31,11 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
   const damageRoll = ref(null)
   const rollingNumber = ref(1)
   const npcIsAttacking = ref(false)
+  const tauntHintText = ref(null)
 
   let punchGen = 0
   let rollingInterval = null
+  let tauntHintTimeout = null
 
   const currentAttacker = computed(() => (npcIsAttacking.value ? npcToken.value : heroToken.value))
   const currentDefender = computed(() => (npcIsAttacking.value ? heroToken.value : npcToken.value))
@@ -44,6 +47,7 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
   }))
 
   const resultText = computed(() => {
+    if (tauntHintText.value) return tauntHintText.value
     if (phase.value === 'hit' || phase.value === 'rolling-damage') {
       return hitRoll.value?.d20 === 20 ? 'Критический удар!' : 'Успех!'
     }
@@ -56,10 +60,23 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
   })
 
   const resultType = computed(() => {
+    if (tauntHintText.value) return 'miss'
     if (phase.value === 'miss') return 'miss'
     if (phase.value === 'done') return 'damage'
     return 'hit'
   })
+
+  function showTauntHint() {
+    if (tauntHintTimeout) {
+      clearTimeout(tauntHintTimeout)
+      tauntHintTimeout = null
+    }
+    tauntHintText.value = 'Под провокацией: цель фиксирована'
+    tauntHintTimeout = setTimeout(() => {
+      tauntHintText.value = null
+      tauntHintTimeout = null
+    }, 1400)
+  }
 
   watch(
     () => store.combatPair,
@@ -70,6 +87,7 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
         phase.value = 'idle'
         hitRoll.value = null
         damageRoll.value = null
+        tauntHintText.value = null
       }
       npcIsAttacking.value = pair?.npcInitiated ?? false
     }
@@ -112,6 +130,12 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
     npcIsAttacking.value = asNpc
     const attackerToken = asNpc ? npcToken.value : heroToken.value
     const defenderToken = asNpc ? heroToken.value : npcToken.value
+
+    // Провокация: под taunt атакующий обязан бить только провокатора
+    if (isTauntAttackViolation(attackerToken, defenderToken, store.placedTokens)) {
+      showTauntHint()
+      return
+    }
 
     if (store.combatMode) {
       const currentTurnUid = getCurrentTurnUid()
@@ -284,6 +308,10 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
   onBeforeUnmount(() => {
     punchGen++
     stopRolling()
+    if (tauntHintTimeout) {
+      clearTimeout(tauntHintTimeout)
+      tauntHintTimeout = null
+    }
   })
 
   return {

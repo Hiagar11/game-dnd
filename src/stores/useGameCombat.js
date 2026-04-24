@@ -257,6 +257,8 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     if (currToken) {
       currToken.actionPoints = 0
       currToken.movementPoints = 0
+      // Эффекты типа taunt живут "полный ход владельца" и тикают в конце его хода.
+      tickTurnBoundEffectsOnTurnEnd(currToken)
     }
 
     // Перейти к следующему
@@ -345,6 +347,9 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     for (const effect of token.activeEffects) {
       if (effect.remainingTurns == null) continue
 
+      // taunt уменьшается в конце хода владельца (см. tickTurnBoundEffectsOnTurnEnd)
+      if (effect.id === 'taunt') continue
+
       // Урон каждый ход (яд, кровотечение и т.д.)
       if (effect.damagePerTurn) {
         token.hp = Math.max(0, (token.hp ?? 0) - effect.damagePerTurn)
@@ -367,6 +372,25 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
       }
       token.activeEffects = token.activeEffects.filter((e) => e.id !== fx.id)
     }
+  }
+
+  /**
+   * Эффекты, чей таймер должен уменьшаться именно по завершении хода владельца.
+   * Для провокации это предотвращает off-by-one, когда второй ход "сгорает" до атаки.
+   */
+  function tickTurnBoundEffectsOnTurnEnd(token) {
+    if (!token?.activeEffects?.length) return
+
+    const expiredIds = []
+
+    for (const effect of token.activeEffects) {
+      if (effect.id !== 'taunt' || effect.remainingTurns == null) continue
+      effect.remainingTurns--
+      if (effect.remainingTurns <= 0) expiredIds.push(effect.id)
+    }
+
+    if (!expiredIds.length) return
+    token.activeEffects = token.activeEffects.filter((e) => !expiredIds.includes(e.id))
   }
 
   return {

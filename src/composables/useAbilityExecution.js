@@ -2,7 +2,7 @@ import { computed } from 'vue'
 import { useGameStore } from '../stores/game'
 import { getExecutor } from '../abilities/registry'
 import { getActiveWeapon } from '../utils/combatFormulas'
-import { playMiss } from './useSound'
+import { playMiss, playTauntCry } from './useSound'
 
 /**
  * Composable для исполнения способностей.
@@ -82,6 +82,7 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
         store.abilityVfx = { type, ...data }
       },
       playMiss,
+      playTauntCry,
     }
   }
 

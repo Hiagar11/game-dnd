@@ -20,17 +20,18 @@ import {
 } from '../utils/combatFormulas'
 import { getCurrentScenarioId } from '../utils/scenario'
 import { getPassiveDerivedBonus } from '../utils/passiveBonuses'
+import { isTauntAttackViolation } from '../utils/stunMechanics'
 
 export function useTokenCombatInteraction({ store, damageFloatRef, getSocket }) {
   const flashMap = ref(new Map())
 
-  function flashToken(uid, type) {
+  function flashToken(uid, type, durationMs = 600) {
     flashMap.value = new Map(flashMap.value).set(uid, type)
     setTimeout(() => {
       const next = new Map(flashMap.value)
       next.delete(uid)
       flashMap.value = next
-    }, 600)
+    }, durationMs)
   }
 
   /** Персистит combatLog NPC на сервер */
@@ -42,6 +43,21 @@ export function useTokenCombatInteraction({ store, damageFloatRef, getSocket }) 
   }
 
   function runQuickAttack(attackerToken, defenderToken) {
+    // Провокация: под taunt можно бить только провокатора
+    if (isTauntAttackViolation(attackerToken, defenderToken, store.placedTokens)) {
+      const hc = store.halfCell
+      const x = attackerToken.col * hc + store.gridNormOX + hc
+      const y = attackerToken.row * hc + store.gridNormOY + hc
+      damageFloatRef.value?.spawn(
+        attackerToken.uid,
+        'Под провокацией: цель фиксирована',
+        x,
+        y,
+        '#ef4444'
+      )
+      return
+    }
+
     const apCost = getAttackApCost(attackerToken)
     if (!store.spendActionPoint(attackerToken.uid, apCost)) {
       store.endTurn()

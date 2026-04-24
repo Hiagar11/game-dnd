@@ -293,4 +293,91 @@ describe('useGameCombat', () => {
     expect(combat.lastXpReport.value).toHaveLength(2)
     expect(combat.lastXpReport.value[0].xpGained).toBe(25)
   })
+
+  it('провокация тикает в конце хода владельца и держится 2 его хода', () => {
+    const placedTokens = ref([
+      hero('h1', { col: 0, row: 0 }),
+      hero('h2', {
+        col: 2,
+        row: 0,
+        activeEffects: [{ id: 'taunt', byUid: 'n1', remainingTurns: 2 }],
+      }),
+      npc('n1', { attitude: 'hostile', col: 1, row: 0 }),
+    ])
+    const selectedPlacedUid = ref(null)
+
+    const randomSpy = vi.spyOn(Math, 'random')
+    randomSpy.mockReturnValueOnce(0.9).mockReturnValueOnce(0.5)
+
+    const combat = useGameCombat(placedTokens, selectedPlacedUid)
+    combat.enterCombat('h1')
+
+    const tauntTurns = () =>
+      placedTokens.value.find((t) => t.uid === 'h2')?.activeEffects?.find((e) => e.id === 'taunt')
+        ?.remainingTurns
+
+    expect(tauntTurns()).toBe(2)
+
+    // Ход h1 -> следующий h2: на чужом ходе таунт не тикает
+    combat.endTurn()
+    expect(selectedPlacedUid.value).toBe('h2')
+    expect(tauntTurns()).toBe(2)
+
+    // Ход h2 завершился: первый тик taunt
+    combat.endTurn()
+    expect(selectedPlacedUid.value).toBe('n1')
+    expect(tauntTurns()).toBe(1)
+
+    // Ход n1 -> следующий h1: на чужом ходе таунт НЕ тикает
+    combat.endTurn()
+    expect(selectedPlacedUid.value).toBe('h1')
+    expect(tauntTurns()).toBe(1)
+
+    // Ход h1 -> следующий h2: на чужом ходе таунт не тикает
+    combat.endTurn()
+    expect(selectedPlacedUid.value).toBe('h2')
+    expect(tauntTurns()).toBe(1)
+
+    // Ход h2 завершился: второй тик, эффект снимается
+    combat.endTurn()
+    expect(selectedPlacedUid.value).toBe('n1')
+    expect(tauntTurns()).toBeUndefined()
+  })
+
+  it('оглушённый токен с taunt не теряет 2 стака за один пропуск хода', () => {
+    vi.useFakeTimers()
+    const placedTokens = ref([
+      hero('h1', { col: 0, row: 0 }),
+      hero('h2', {
+        col: 2,
+        row: 0,
+        stunned: true,
+        activeEffects: [{ id: 'taunt', byUid: 'n1', remainingTurns: 2, apPenalty: 3 }],
+      }),
+      npc('n1', { attitude: 'hostile', col: 1, row: 0 }),
+    ])
+    const selectedPlacedUid = ref(null)
+
+    const randomSpy = vi.spyOn(Math, 'random')
+    randomSpy.mockReturnValueOnce(0.9).mockReturnValueOnce(0.5)
+
+    const combat = useGameCombat(placedTokens, selectedPlacedUid)
+    combat.enterCombat('h1')
+
+    const tauntTurns = () =>
+      placedTokens.value.find((t) => t.uid === 'h2')?.activeEffects?.find((e) => e.id === 'taunt')
+        ?.remainingTurns
+
+    // h1 -> h2 (stunned): списания taunt пока нет
+    combat.endTurn()
+    // selectedPlacedUid для пропущенного хода не переключается на stunned-токен
+    expect(selectedPlacedUid.value).toBe('h1')
+    expect(tauntTurns()).toBe(2)
+
+    // После авто-пропуска хода h2 должен списаться ровно 1 стак taunt
+    vi.advanceTimersByTime(1200)
+    expect(tauntTurns()).toBe(1)
+
+    vi.useRealTimers()
+  })
 })

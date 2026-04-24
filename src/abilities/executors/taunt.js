@@ -9,30 +9,43 @@ export const ABILITY_ID = 'taunt'
  * Хранится как activeEffect { id: 'taunt', byUid, remainingTurns: 2 }.
  * Проверка при атаке — в useTokenClickInteraction.js (getTauntEffect).
  */
-export function execute(ctx, caster, target) {
+export function execute(ctx, caster, target, ability) {
   // Нельзя провоцировать союзника — цель должна быть врагом кастера
   if (!target || isSameFaction(caster, target)) return
 
   const live = ctx.store.placedTokens.find((t) => t.uid === target.uid)
+  const liveCaster = ctx.store.placedTokens.find((t) => t.uid === caster.uid)
   if (!live) return
 
   // Применяем эффект провокации: remainingTurns убывает в tickTokenEffects
   ctx.addEffect(target, {
     id: 'taunt',
     name: 'Провокация',
-    icon: 'target',
+    icon: ability?.icon ?? 'shouting',
     color: '#ef4444',
     remainingTurns: 2,
     byUid: caster.uid, // кастер — единственная допустимая цель атаки тонена
   })
 
-  ctx.flash(live.uid, 'taunt')
+  // Визуализация (4с):
+  // 1) 0-2с: кастер наполняется красной яростью
+  // 2) 2-4с: цель реагирует такой же красной анимацией
+  if (liveCaster) {
+    ctx.flash(liveCaster.uid, 'taunt', 2000)
+  }
+  ctx.playTauntCry?.()
+
+  setTimeout(() => {
+    ctx.flash(live.uid, 'taunt', 2000)
+  }, 2000)
 
   // Плавающий текст над целью
   if (ctx.damageFloat?.value) {
     const hc = ctx.store.cellSize / 2
     const cx = (live.col + 1) * hc + ctx.store.gridNormOX
     const cy = (live.row + 1) * hc + ctx.store.gridNormOY
-    ctx.damageFloat.value.spawn(live.uid, '⚑ Провокация', cx, cy, '#ef4444')
+    setTimeout(() => {
+      ctx.damageFloat.value?.spawn(live.uid, '⚑ Провокация', cx, cy, '#ef4444')
+    }, 2100)
   }
 }

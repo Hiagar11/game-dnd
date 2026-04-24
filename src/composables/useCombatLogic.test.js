@@ -76,4 +76,38 @@ describe('useCombatLogic', () => {
     expect(api.phase.value).toBe('idle')
     expect(emitClose).not.toHaveBeenCalled()
   })
+
+  it('не даёт NPC под провокацией атаковать не-провокатора', async () => {
+    const store = makeStore({
+      placedTokens: [
+        { uid: 'h1', hp: 10, tokenType: 'hero' },
+        { uid: 'h2', hp: 10, tokenType: 'hero' },
+        {
+          uid: 'n1',
+          hp: 10,
+          tokenType: 'npc',
+          activeEffects: [{ id: 'taunt', byUid: 'h2', remainingTurns: 2 }],
+        },
+      ],
+    })
+    const heroToken = ref({ uid: 'h1', col: 2, row: 0, actionPoints: 3, hp: 10, tokenType: 'hero' })
+    const npcToken = ref({
+      uid: 'n1',
+      col: 0,
+      row: 0,
+      actionPoints: 3,
+      hp: 10,
+      tokenType: 'npc',
+      activeEffects: [{ id: 'taunt', byUid: 'h2', remainingTurns: 2 }],
+    })
+    const emitClose = vi.fn()
+
+    const api = useCombatLogic({ store, heroToken, npcToken, emitClose })
+    await api.onPunch(true)
+
+    expect(store.spendActionPoint).not.toHaveBeenCalled()
+    expect(store.editPlacedToken).not.toHaveBeenCalled()
+    expect(api.phase.value).toBe('idle')
+    expect(api.resultText.value).toBe('Под провокацией: цель фиксирована')
+  })
 })

@@ -82,6 +82,13 @@
       <div v-if="placed.captured" class="game-tokens__captured-icon">⛓</div>
       <!-- Звёзды — оглушённый NPC -->
       <div v-if="placed.stunned && !placed.captured" class="game-tokens__stunned-icon">💫</div>
+      <!-- Метка провокации: одна красная иконка способности -->
+      <span
+        v-if="getTauntEffect(placed)"
+        class="game-tokens__taunt-icon"
+        :title="'Провокация'"
+        :style="tauntIconStyle(getTauntEffect(placed))"
+      />
       <!-- Кольцо выделения выбранного токена -->
       <div
         v-if="store.selectedPlacedUid === placed.uid && !placed.systemToken"
@@ -520,6 +527,7 @@
     getVisibleKeys,
     onCaptureClick,
     emitDoorTransition: (payload) => emit('door-transition', payload),
+    onTauntBlocked: showTauntBlockedHint,
   })
 
   // Регистрируем обработчики для вызова из GameRangeOverlay
@@ -593,6 +601,38 @@
     if (placed.halfSize) e.dataTransfer.setData('halfSize', '1')
     if (placed.quarterSize) e.dataTransfer.setData('quarterSize', '1')
     closeContextMenu()
+  }
+
+  function getTauntEffect(placed) {
+    const effects = placed?.activeEffects
+    if (!effects?.length) return null
+    return (
+      effects.find((effect) => effect.id === 'taunt' && (effect.remainingTurns ?? 0) > 0) ?? null
+    )
+  }
+
+  function tauntIconStyle(effect) {
+    const iconName = effect?.icon ?? 'shouting'
+    const url = `https://api.iconify.design/game-icons/${iconName}.svg`
+    return {
+      maskImage: `url('${url}')`,
+      WebkitMaskImage: `url('${url}')`,
+      maskRepeat: 'no-repeat',
+      WebkitMaskRepeat: 'no-repeat',
+      maskPosition: 'center',
+      WebkitMaskPosition: 'center',
+      maskSize: 'contain',
+      WebkitMaskSize: 'contain',
+      backgroundColor: '#ef4444',
+    }
+  }
+
+  function showTauntBlockedHint(attacker) {
+    if (!attacker) return
+    const cs = store.cellSize
+    const x = (attacker.col + 1) * (cs / 2) + store.gridNormOX
+    const y = (attacker.row + 1) * (cs / 2) + store.gridNormOY
+    damageFloatRef.value?.spawn(attacker.uid, 'Под провокацией: цель фиксирована', x, y, '#ef4444')
   }
 
   const combatIconPos = computed(() => {
