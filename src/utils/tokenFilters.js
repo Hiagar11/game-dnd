@@ -22,6 +22,22 @@ export function isAlliedToken(token) {
   return isHeroToken(token) || isFriendlyNpcToken(token)
 }
 
+/**
+ * Проверяет, что два токена на одной стороне.
+ * Герои и дружественные NPC — одна сторона;
+ * враждебные и нейтральные NPC — другая.
+ */
+export function isSameFaction(a, b) {
+  return isAlliedToken(a) === isAlliedToken(b)
+}
+
+/**
+ * Проверяет, что токен b является врагом токена a.
+ */
+export function isEnemyOf(a, b) {
+  return !isSameFaction(a, b)
+}
+
 export function isNeutralNpcToken(token) {
   return isNpcToken(token) && !token.captured && getNpcAttitude(token) === 'neutral'
 }

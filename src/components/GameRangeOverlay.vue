@@ -36,7 +36,7 @@
   import { buildReachableCells, findPath } from '../composables/useTokenMove'
   import { useTokenDrop } from '../composables/useTokenDrop'
   import {
-    isAlliedToken,
+    isSameFaction,
     getSelectedNonSystemToken,
     isHeroToken,
     isHostileNpcToken,
@@ -138,10 +138,15 @@
     const hovered = hoveredToken.value
     if (!hovered) return ''
 
+    // Находим кастера для релятивной проверки цели
+    const casterUid = store.pendingAbility.tokenUid
+    const caster = store.placedTokens.find((t) => t.uid === casterUid)
+
     const invalidTarget =
-      hovered.uid === store.pendingAbility.tokenUid ||
+      hovered.uid === casterUid ||
       !!hovered.systemToken ||
-      (store.pendingAbility.allyOnly && !isAlliedToken(hovered))
+      // allyOnly: цель должна быть союзником кастера (одна фракция)
+      (store.pendingAbility.allyOnly && (!caster || !isSameFaction(caster, hovered)))
 
     return invalidTarget
       ? 'game-range-overlay--cursor-ability-invalid'

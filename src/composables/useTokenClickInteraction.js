@@ -1,12 +1,13 @@
 import {
   getSelectedToken,
-  isAlliedToken,
+  isSameFaction,
   isHeroToken,
   isHostileNpcToken,
   isNeutralNpcToken,
   isNonSystemToken,
   isTalkableNpcToken,
 } from '../utils/tokenFilters'
+import { getTauntEffect } from '../utils/stunMechanics'
 import { getAbilityCombatProfile } from '../utils/abilityCombatProfile'
 
 const CONTAINER_TOKENS = new Set(['item', 'jar', 'bag'])
@@ -65,8 +66,12 @@ export function useTokenClickInteraction({
   async function onTokenClick(placed, event) {
     // ── Режим выбора цели способности ─────────────────────────────
     if (store.pendingAbility && abilityExec.needsTargetToken.value) {
-      // Способность только на союзников — клик по враждебной/нейтральной цели игнорируется
-      if (store.pendingAbility.allyOnly && !isAlliedToken(placed)) return
+      // Способность только на союзников кастера — проверяем относительно его фракции
+      if (store.pendingAbility.allyOnly) {
+        const casterUid = store.pendingAbility.tokenUid
+        const caster = store.placedTokens.find((t) => t.uid === casterUid)
+        if (!caster || !isSameFaction(caster, placed)) return
+      }
 
       const abilityProfile = getAbilityCombatProfile(store.pendingAbility)
 
@@ -138,6 +143,12 @@ export function useTokenClickInteraction({
 
       closeContextMenu()
 
+      // Провокация: NPC под таунтом может атаковать только провокатора
+      if (isNpcAttackingHero) {
+        const taunt = getTauntEffect(selected)
+        if (taunt && placed.uid !== taunt.byUid) return
+      }
+
       if (isHeroAttackingNpc || isFirstStrike) {
         onAttackClick(placed)
         return
@@ -167,6 +178,9 @@ export function useTokenClickInteraction({
       }
       // Атака враждебного НПС → герой
       if (isHeroToken(placed) && isHeroReachableByNpc(placed)) {
+        // Провокация: NPC под таунтом может атаковать только провокатора
+        const taunt = getTauntEffect(selected)
+        if (taunt && placed.uid !== taunt.byUid) return
         await runQuickAttackFlow(selected.uid, placed.uid)
         return
       }
