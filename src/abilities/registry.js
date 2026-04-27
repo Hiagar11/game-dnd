@@ -9,7 +9,10 @@ const modules = import.meta.glob('./executors/*.js', { eager: true })
 
 const EXECUTORS = {}
 
-for (const mod of Object.values(modules)) {
+for (const [path, mod] of Object.entries(modules)) {
+  // В рантайм-реестр не должны попадать unit-тесты экзекьюторов.
+  if (path.endsWith('.test.js')) continue
+
   const ids = mod.ABILITY_IDS ?? (mod.ABILITY_ID ? [mod.ABILITY_ID] : [])
   for (const id of ids) {
     EXECUTORS[id] = mod.execute

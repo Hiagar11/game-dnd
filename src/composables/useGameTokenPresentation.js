@@ -32,7 +32,7 @@ export function useGameTokenPresentation({
   flashMap,
   currentTurnUid,
 }) {
-  function tokenClasses(placed) {
+  function tokenClasses(placed, berserkVisionActive = false) {
     const selectedToken = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
     const selectedIsHero = isHeroToken(selectedToken)
     const abilityMode = !props.viewerMode && !!store.pendingAbility
@@ -45,11 +45,15 @@ export function useGameTokenPresentation({
         props.viewerMode && heroesStore.adminSelectedUid === placed.uid,
       'game-tokens__token--shaking': store.shakingTokenUid === placed.uid,
       'game-tokens__token--fog-hidden': fogHiddenKeys.value.has(`${placed.col}:${placed.row}`),
-      'game-tokens__token--hero': isHeroToken(placed),
-      'game-tokens__token--hostile': isHostileNpcToken(placed),
-      'game-tokens__token--friendly': isFriendlyNpcToken(placed),
+      // В режиме берсерка не показываем цветные рамки фракций
+      'game-tokens__token--hero': !berserkVisionActive && isHeroToken(placed),
+      'game-tokens__token--hostile': !berserkVisionActive && isHostileNpcToken(placed),
+      'game-tokens__token--friendly': !berserkVisionActive && isFriendlyNpcToken(placed),
       'game-tokens__token--neutral':
-        isNpcToken(placed) && !isHostileNpcToken(placed) && !isFriendlyNpcToken(placed),
+        !berserkVisionActive &&
+        isNpcToken(placed) &&
+        !isHostileNpcToken(placed) &&
+        !isFriendlyNpcToken(placed),
       'game-tokens__token--cursor-attack':
         !abilityMode &&
         ((selectedIsHero &&
@@ -81,6 +85,7 @@ export function useGameTokenPresentation({
       'game-tokens__token--flash-slash': flashMap.value.get(placed.uid) === 'slash',
       'game-tokens__token--flash-bash': flashMap.value.get(placed.uid) === 'bash',
       'game-tokens__token--flash-blood': flashMap.value.get(placed.uid) === 'blood',
+      'game-tokens__token--flash-aggro': flashMap.value.get(placed.uid) === 'aggro',
       'game-tokens__token--flash-taunt': flashMap.value.get(placed.uid) === 'taunt',
       'game-tokens__token--flash-teleport': flashMap.value.get(placed.uid) === 'teleport',
       'game-tokens__token--flash-inspire': flashMap.value.get(placed.uid) === 'inspire',

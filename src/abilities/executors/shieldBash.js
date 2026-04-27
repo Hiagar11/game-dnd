@@ -9,6 +9,8 @@ import {
 } from '../../utils/combatFormulas'
 import { DEFAULT_AP } from '../../constants/combat'
 import { getPassiveDerivedBonus } from '../../utils/passiveBonuses'
+import { applySingleTargetDamage } from '../utils/applySingleTargetDamage'
+import { getActiveDamageMult, getActiveEvasionMult } from '../utils/activeEffectBonuses'
 
 export const ABILITY_ID = 'shield_bash'
 
@@ -22,7 +24,10 @@ export function execute(ctx, caster, target, ability) {
   // Бросок попадания
   const d20 = Math.floor(Math.random() * 20) + 1
   const hitBonus = calcCritChance(eStats)
-  const evasion = calcEvasion(dStats) + getPassiveDerivedBonus(target?.passiveAbilities, 'evasion')
+  const evasion = Math.round(
+    (calcEvasion(dStats) + getPassiveDerivedBonus(target?.passiveAbilities, 'evasion')) *
+      getActiveEvasionMult(target)
+  )
   const total = d20 + hitBonus - evasion
 
   if (total < HIT_DC) {
@@ -51,16 +56,14 @@ export function execute(ctx, caster, target, ability) {
     dmg = Math.max(1, Math.round(dmg * critMult))
   }
 
+  // Ярость берсерка: +50% урон, если активен
+  dmg = Math.max(1, Math.round(dmg * getActiveDamageMult(caster)))
+
+  // Ярость берсерка: +50% урон, если активен
+  dmg = Math.max(1, Math.round(dmg * getActiveDamageMult(caster)))
+
   // Наносим урон
-  const live = ctx.store.placedTokens.find((t) => t.uid === target.uid)
-  if (live) {
-    const newHp = Math.max(0, (live.hp ?? 0) - dmg)
-    ctx.store.editPlacedToken(live.uid, { hp: newHp })
-    if (newHp === 0 && live.tokenType === 'npc') {
-      ctx.store.editPlacedToken(live.uid, { stunned: true })
-      ctx.store.checkCombatEnd()
-    }
-  }
+  applySingleTargetDamage(ctx, target.uid, dmg)
 
   // Оглушение на 1 ход (apPenalty = DEFAULT_AP → ход полностью пропускается)
   ctx.addEffect(target, {

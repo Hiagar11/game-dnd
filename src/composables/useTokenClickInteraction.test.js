@@ -390,4 +390,130 @@ describe('useTokenClickInteraction', () => {
     expect(moveTowardTarget).not.toHaveBeenCalled()
     expect(runQuickAttack).not.toHaveBeenCalled()
   })
+
+  it('в режиме targeted-способности клик по токену фиксирует клетку и кастует', async () => {
+    const hero = { uid: 'hero-1', tokenType: 'hero', col: 0, row: 0, name: 'Hero' }
+    const targetNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 6,
+      row: 8,
+      name: 'Target NPC',
+    }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: { id: 'cleave', areaType: 'targeted', tokenUid: hero.uid },
+      placedTokens: [hero, targetNpc],
+      selectedPlacedUid: hero.uid,
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    const { onTokenClick } = buildDeps(store, abilityExec)
+    await onTokenClick(targetNpc, null)
+
+    expect(abilityExec.executeAbility).toHaveBeenCalledTimes(1)
+    expect(abilityExec.executeAbility).toHaveBeenCalledWith({ col: 6, row: 8 })
+  })
+
+  it('в режиме targeted-способности по нейтралу только фиксирует клетку, а агрессию решает executor', async () => {
+    const hero = { uid: 'hero-1', tokenType: 'hero', col: 0, row: 0, name: 'Hero' }
+    const neutralNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'neutral',
+      col: 2,
+      row: 2,
+      name: 'Neutral NPC',
+    }
+
+    const store = {
+      combatMode: false,
+      pendingAbility: { id: 'cleave', areaType: 'targeted', tokenUid: hero.uid },
+      placedTokens: [hero, neutralNpc],
+      selectedPlacedUid: hero.uid,
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    const { onTokenClick } = buildDeps(store, abilityExec)
+    await onTokenClick(neutralNpc, null)
+
+    expect(neutralNpc.attitude).toBe('neutral')
+    expect(store.enterCombat).not.toHaveBeenCalled()
+    expect(abilityExec.executeAbility).toHaveBeenCalledWith({ col: 2, row: 2 })
+  })
+
+  it('в режиме ярости берсерка клик по цели в радиусе делает прыжок и быстрый удар', async () => {
+    const hero = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      actionPoints: 2,
+      activeEffects: [{ id: 'berserker_rage', remainingTurns: 2 }],
+    }
+    const hostileNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 2,
+      row: 2,
+      hp: 10,
+    }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: null,
+      placedTokens: [hero, hostileNpc],
+      selectedPlacedUid: hero.uid,
+      initiativeOrder: [{ uid: hero.uid }],
+      currentInitiativeIndex: 0,
+      walls: [],
+      moveToken: vi.fn((uid, col, row) => {
+        const token = store.placedTokens.find((t) => t.uid === uid)
+        if (token) {
+          token.col = col
+          token.row = row
+        }
+      }),
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    const runQuickAttack = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, { runQuickAttack })
+
+    await onTokenClick(hostileNpc, { ctrlKey: false })
+
+    expect(store.moveToken).toHaveBeenCalledTimes(1)
+    expect(runQuickAttack).toHaveBeenCalledTimes(1)
+    expect(runQuickAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: hero.uid }),
+      expect.objectContaining({ uid: hostileNpc.uid })
+    )
+  })
 })

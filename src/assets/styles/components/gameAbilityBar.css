@@ -175,6 +175,14 @@
   filter: grayscale(0.6);
 }
 
+.ability-bar__cell--rejected {
+  animation: ability-cell-rejected 0.36s ease;
+  border-color: rgb(248 113 113 / 75%);
+  box-shadow:
+    0 0 10px rgb(127 29 29 / 42%),
+    inset 0 0 10px rgb(248 113 113 / 16%);
+}
+
 /* ── Иконка способности ──────────────────────────────────────── */
 .ability-bar__icon {
   width: 28px;
@@ -208,6 +216,11 @@
   color: rgb(250 204 21 / 75%);
   line-height: 1;
   pointer-events: none;
+}
+
+.ability-bar__cost--insufficient {
+  color: rgb(248 113 113 / 96%);
+  text-shadow: 0 0 4px rgb(127 29 29 / 55%);
 }
 
 /* ── Подсказка (tooltip внизу) ───────────────────────────────── */
@@ -244,6 +257,13 @@
   letter-spacing: 0.03em;
 }
 
+.ability-bar__hint-warning {
+  font-size: 10px;
+  font-family: var(--font-ui);
+  color: rgb(248 113 113 / 92%);
+  letter-spacing: 0.02em;
+}
+
 /* ── Анимация подсказки ──────────────────────────────────────── */
 .ability-hint-enter-active {
   transition:
@@ -261,4 +281,30 @@
 .ability-hint-leave-to {
   opacity: 0;
   transform: translateY(6px);
+}
+
+@keyframes ability-cell-rejected {
+  0% {
+    transform: translateX(0);
+  }
+
+  18% {
+    transform: translateX(-2px) scale(1.02);
+  }
+
+  38% {
+    transform: translateX(2px) scale(1.02);
+  }
+
+  56% {
+    transform: translateX(-1px);
+  }
+
+  74% {
+    transform: translateX(1px);
+  }
+
+  100% {
+    transform: translateX(0);
+  }
 }

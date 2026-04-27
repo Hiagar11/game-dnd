@@ -176,6 +176,22 @@ describe('useGameCombat', () => {
     }
   })
 
+  it('в мирном режиме AP восстанавливаются по уровню токена', () => {
+    const placedTokens = ref([
+      hero('h1', { level: 1, actionPoints: 0, movementPoints: 0 }),
+      hero('h2', { level: 5, actionPoints: 0, movementPoints: 0 }),
+      npc('n1', { level: 8, actionPoints: 0, movementPoints: 0 }),
+    ])
+    const selectedPlacedUid = ref(null)
+    const combat = useGameCombat(placedTokens, selectedPlacedUid)
+
+    combat.endTurn()
+
+    expect(placedTokens.value.find((t) => t.uid === 'h1')?.actionPoints).toBe(2)
+    expect(placedTokens.value.find((t) => t.uid === 'h2')?.actionPoints).toBe(4)
+    expect(placedTokens.value.find((t) => t.uid === 'n1')?.actionPoints).toBe(5)
+  })
+
   it('в бою endTurn передаёт ход следующему и выбирает его', () => {
     const placedTokens = ref([
       hero('h1', { actionPoints: 2, movementPoints: 2, col: 0, row: 0 }),
@@ -201,6 +217,39 @@ describe('useGameCombat', () => {
     const nextUid = combat.initiativeOrder.value[combat.currentInitiativeIndex.value].uid
     const nextToken = placedTokens.value.find((token) => token.uid === nextUid)
     expect(selectedPlacedUid.value).toBe(nextUid)
+    expect(nextToken?.actionPoints).toBe(DEFAULT_AP)
+    expect(nextToken?.movementPoints).toBe(DEFAULT_MP)
+  })
+
+  it('после входа в бой с уже потраченными AP у инициатора ход сразу передаётся дальше', () => {
+    const placedTokens = ref([
+      hero('h1', { col: 0, row: 0, level: 4 }),
+      hero('h2', { col: 2, row: 0, level: 1 }),
+      npc('n1', { attitude: 'hostile', col: 1, row: 0, level: 1 }),
+    ])
+    const selectedPlacedUid = ref(null)
+
+    const randomSpy = vi.spyOn(Math, 'random')
+    randomSpy.mockReturnValueOnce(0.9).mockReturnValueOnce(0.5)
+
+    const combat = useGameCombat(placedTokens, selectedPlacedUid)
+    combat.enterCombat('h1')
+
+    const initiator = placedTokens.value.find((token) => token.uid === 'h1')
+    expect(initiator?.actionPoints).toBe(3)
+    expect(selectedPlacedUid.value).toBe('h1')
+
+    initiator.actionPoints = 0
+    initiator.movementPoints = 0
+
+    combat.endTurn()
+
+    expect(selectedPlacedUid.value).toBe('h2')
+    expect(combat.currentInitiativeIndex.value).toBe(1)
+    expect(initiator.actionPoints).toBe(0)
+    expect(initiator.movementPoints).toBe(0)
+
+    const nextToken = placedTokens.value.find((token) => token.uid === 'h2')
     expect(nextToken?.actionPoints).toBe(DEFAULT_AP)
     expect(nextToken?.movementPoints).toBe(DEFAULT_MP)
   })

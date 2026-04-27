@@ -101,6 +101,20 @@
         :draggable="!props.viewerMode && isContainerToken(placed)"
         @dragstart="isContainerToken(placed) && onContainerDragStart($event, placed)"
       />
+      <!-- Режим берсерка: скрытый враг показывается как "?" -->
+      <button
+        v-if="isBerserkObscured(placed)"
+        title="Скрытый враг — кликните для атаки"
+        :class="[
+          'game-tokens__berserk-question',
+          { 'game-tokens__berserk-question--fading': fadingQuestionUid === placed.uid },
+        ]"
+        type="button"
+        @click.stop="onBerserkQuestionClick()"
+        @keydown.enter.stop="onBerserkQuestionClick()"
+      >
+        ?
+      </button>
       <!-- HP-полоска в режиме боя -->
       <div
         v-if="store.combatMode && !placed.systemToken && (placed.maxHp ?? 0) > 0"
@@ -180,6 +194,11 @@
     getSelectedNonSystemToken,
     isHeroToken,
   } from '../utils/tokenFilters'
+  import {
+    isBerserkerVisionActive,
+    isInBerserkerVisionRadius,
+    BERSERKER_VISION_RADIUS,
+  } from '../utils/berserkerRageMode'
   import { playLevelUp } from '../composables/useSound'
   import { getCurrentScenarioId } from '../utils/scenario'
   import GameTokenContextMenu from './GameTokenContextMenu.vue'
@@ -205,6 +224,9 @@
 
   const damageFloatRef = ref(null)
   const tokenElMap = new Map()
+
+  // Отслеживаем, какой токен в режиме "?" сейчас фейдит при атаке
+  const fadingQuestionUid = ref(null)
 
   // Отслеживаем зажатый Ctrl для режима агрессии по нейтральным NPC
   const ctrlHeld = ref(false)
@@ -633,6 +655,86 @@
     const x = (attacker.col + 1) * (cs / 2) + store.gridNormOX
     const y = (attacker.row + 1) * (cs / 2) + store.gridNormOY
     damageFloatRef.value?.spawn(attacker.uid, 'Под провокацией: цель фиксирована', x, y, '#ef4444')
+  }
+
+  // ── Режим берсерка: проверка видимости токена ──────────────────────────────
+
+  /**
+   * Проверяет, должна ли токена быть скрыта в режиме берсерка (показываем "?")
+   * Токена видна если:
+   * - Режим берсерка активен (heroBerserkerVisionActive)
+   * - Это НЕ сам берсеркер (placed.uid !== berserkToken.uid)
+   * - Токена враждебна или нейтральна (не союзник)
+   * - Токена в пределах радиуса видения (BERSERKER_VISION_RADIUS)
+   * - Это не системный токен
+   */
+  const heroBerserkerVisionActive = computed(() => isBerserkerVisionActive(store))
+
+  function isBerserkObscured(placed) {
+    if (!heroBerserkerVisionActive.value) return false
+    if (placed.systemToken) return false
+
+    const selectedToken = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+    if (!selectedToken || placed.uid === selectedToken.uid) return false
+
+    // Только враждебные и нейтральные NPC скрыты под "?"
+    const isAlly =
+      selectedToken.tokenType === placed.tokenType && selectedToken.tokenType === 'hero'
+    if (isAlly) return false
+
+    return isInBerserkerVisionRadius(selectedToken, placed, BERSERKER_VISION_RADIUS)
+  }
+
+  /**
+   * Обработчик клика на "?" в режиме берсерка
+   * 1. Находит случайного врага из видимых
+   * 2. Наносит 1 урон
+   * 3. Показывает плавную фейд-анимацию (600ms)
+   * 4. Выходит из режима берсерка
+   */
+  function onBerserkQuestionClick() {
+    const selectedToken = store.placedTokens.find((t) => t.uid === store.selectedPlacedUid)
+    if (!selectedToken) return
+
+    // Находим видимых врагов (не самого берсеркера и не системные)
+    const visibleEnemies = store.placedTokens.filter((token) => {
+      if (token.uid === selectedToken.uid) return false
+      if (token.systemToken) return false
+      if (isBerserkObscured(token)) return true
+      return false
+    })
+
+    if (visibleEnemies.length === 0) return
+
+    // Выбираем случайного врага
+    const randomEnemy = visibleEnemies[Math.floor(Math.random() * visibleEnemies.length)]
+
+    // Начинаем фейд-анимацию для выбранного врага
+    fadingQuestionUid.value = randomEnemy.uid
+
+    // Отменяем фейд после 600ms
+    setTimeout(() => {
+      fadingQuestionUid.value = null
+    }, 600)
+
+    // Наносим урон после 300ms (во время фейда)
+    setTimeout(() => {
+      const victim = randomEnemy
+      if (victim && victim.hp !== undefined) {
+        victim.hp = Math.max(0, (victim.hp ?? victim.maxHp ?? 1) - 1)
+      }
+
+      // Показываем всплывающий урон
+      const cs = store.cellSize
+      const x = (victim.col + 1) * (cs / 2) + store.gridNormOX
+      const y = (victim.row + 1) * (cs / 2) + store.gridNormOY
+      damageFloatRef.value?.spawn(victim.uid, '1', x, y, '#ef4444')
+
+      // Выходим из режима берсерка после 300ms (чтобы урон успел отобразиться)
+      setTimeout(() => {
+        store.selectPlacedToken(null)
+      }, 300)
+    }, 300)
   }
 
   const combatIconPos = computed(() => {

@@ -9,8 +9,23 @@ import {
 } from '../utils/tokenFilters'
 import { getForcedTauntTargetUid, isTauntAttackViolation } from '../utils/stunMechanics'
 import { getAbilityCombatProfile } from '../utils/abilityCombatProfile'
+import {
+  BERSERKER_VISION_RADIUS,
+  hasBerserkerRageEffect,
+  isInBerserkerVisionRadius,
+} from '../utils/berserkerRageMode'
 
 const CONTAINER_TOKENS = new Set(['item', 'jar', 'bag'])
+const ADJACENT_DIRS = [
+  { dc: -1, dr: -1 },
+  { dc: 0, dr: -1 },
+  { dc: 1, dr: -1 },
+  { dc: -1, dr: 0 },
+  { dc: 1, dr: 0 },
+  { dc: -1, dr: 1 },
+  { dc: 0, dr: 1 },
+  { dc: 1, dr: 1 },
+]
 
 function getCurrentTurnUid(store) {
   const order = store.initiativeOrder ?? []
@@ -36,6 +51,62 @@ export function useTokenClickInteraction({
   emitDoorTransition,
   onTauntBlocked,
 }) {
+  function isBlockedCell(col, row, attackerUid, defenderUid) {
+    const wallBlocked = (store.walls ?? []).some((wall) => wall.col === col && wall.row === row)
+    if (wallBlocked) return true
+
+    return store.placedTokens.some((token) => {
+      if (!token || token.systemToken) return false
+      if (token.uid === attackerUid || token.uid === defenderUid) return false
+      return token.col === col && token.row === row
+    })
+  }
+
+  function pickBerserkJumpCell(attacker, defender) {
+    const candidates = ADJACENT_DIRS.map(({ dc, dr }) => ({
+      col: defender.col + dc,
+      row: defender.row + dr,
+      distance: Math.hypot(attacker.col - (defender.col + dc), attacker.row - (defender.row + dr)),
+    }))
+      .filter((cell) => !isBlockedCell(cell.col, cell.row, attacker.uid, defender.uid))
+      .sort((a, b) => a.distance - b.distance)
+
+    return candidates[0] ?? null
+  }
+
+  function getBerserkAttacker() {
+    if (!store.combatMode) return null
+    const currentTurnUid = getCurrentTurnUid(store)
+    if (!currentTurnUid || store.selectedPlacedUid !== currentTurnUid) return null
+
+    const attacker = store.placedTokens.find((token) => token.uid === currentTurnUid)
+    if (!attacker || !hasBerserkerRageEffect(attacker)) return null
+    if ((attacker.actionPoints ?? 0) <= 0) return null
+    return attacker
+  }
+
+  async function runBerserkJumpAttack(attacker, defender) {
+    if (!attacker || !defender) return
+
+    if (isTauntAttackViolation(attacker, defender, store.placedTokens)) {
+      onTauntBlocked?.(attacker)
+      return
+    }
+
+    closeContextMenu()
+
+    const landingCell = pickBerserkJumpCell(attacker, defender)
+    if (landingCell) {
+      store.moveToken(attacker.uid, landingCell.col, landingCell.row)
+    }
+
+    const liveAttacker = store.placedTokens.find((token) => token.uid === attacker.uid)
+    const liveDefender = store.placedTokens.find((token) => token.uid === defender.uid)
+    if (liveAttacker && liveDefender) {
+      runQuickAttack(liveAttacker, liveDefender)
+    }
+  }
+
   async function runQuickAttackFlow(attackerUid, defenderUid) {
     if (!attackerUid || !defenderUid) return
 
@@ -71,6 +142,13 @@ export function useTokenClickInteraction({
   }
 
   async function onTokenClick(placed, event) {
+    // ── Режим выбора клетки для targeted-способности ──────────────────
+    // Позволяем кликать прямо по токену: берем его текущую клетку как точку применения.
+    if (store.pendingAbility?.areaType === 'targeted') {
+      abilityExec.executeAbility({ col: placed.col, row: placed.row })
+      return
+    }
+
     // ── Режим выбора цели способности ─────────────────────────────
     if (store.pendingAbility && abilityExec.needsTargetToken.value) {
       const casterUid = store.pendingAbility.tokenUid
@@ -121,6 +199,19 @@ export function useTokenClickInteraction({
       }
 
       abilityExec.executeAbility(placed)
+      return
+    }
+
+    const berserkAttacker = getBerserkAttacker()
+    const canBerserkJumpAttack =
+      !!berserkAttacker &&
+      placed.uid !== berserkAttacker.uid &&
+      isNonSystemToken(placed) &&
+      !isSameFaction(berserkAttacker, placed) &&
+      isInBerserkerVisionRadius(berserkAttacker, placed, BERSERKER_VISION_RADIUS)
+
+    if (canBerserkJumpAttack) {
+      await runBerserkJumpAttack(berserkAttacker, placed)
       return
     }
 

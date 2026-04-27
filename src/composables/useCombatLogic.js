@@ -24,6 +24,7 @@ import { hpPercentFromToken } from '../utils/hp'
 import { ADJACENT_2x2 } from './useTokenMove'
 import { getPassiveDerivedBonus } from '../utils/passiveBonuses'
 import { isTauntAttackViolation } from '../utils/stunMechanics'
+import { getActiveDamageMult, getActiveEvasionMult } from '../abilities/utils/activeEffectBonuses'
 
 export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
   const phase = ref('idle')
@@ -166,8 +167,10 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
     const magic = isMagicWeapon(attackerToken)
     const dualWield = isDualWielding(attackerToken)
     const bonus = calcCritChance(eStats)
-    const evasion =
-      calcEvasion(dStats) + getPassiveDerivedBonus(defenderToken?.passiveAbilities, 'evasion')
+    const evasion = Math.round(
+      (calcEvasion(dStats) + getPassiveDerivedBonus(defenderToken?.passiveAbilities, 'evasion')) *
+        getActiveEvasionMult(defenderToken)
+    )
     const hitPenalty = dualWield ? DUAL_WIELD_HIT_PENALTY : 0
     const total = d20 + bonus - evasion - hitPenalty
     hitRoll.value = { d20, bonus, evasion, total, hitPenalty }
@@ -238,11 +241,15 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
     }
     const totalDmg = dmgTotal + offhandDmg
 
+    // Ярость берсерка: +50% урон если активна
+    const rageMult = getActiveDamageMult(attackerToken)
+    const finalDmg = rageMult !== 1 ? Math.max(1, Math.round(totalDmg * rageMult)) : totalDmg
+
     damageRoll.value = {
       d4: weaponRoll,
       bonus: 0,
       armor: reduction,
-      total: totalDmg,
+      total: finalDmg,
       magic,
       isCrit,
       blocked,
@@ -251,7 +258,7 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
 
     const liveDefender = asNpc ? heroToken.value : npcToken.value
     if (liveDefender) {
-      const newHp = Math.max(0, (liveDefender.hp ?? 0) - totalDmg)
+      const newHp = Math.max(0, (liveDefender.hp ?? 0) - finalDmg)
       store.editPlacedToken(liveDefender.uid, { hp: newHp })
 
       // Боевая память: NPC запоминает кто нанёс урон
@@ -260,7 +267,7 @@ export function useCombatLogic({ store, heroToken, npcToken, emitClose }) {
         const log = Array.isArray(liveDefender.combatLog) ? [...liveDefender.combatLog] : []
         log.push({
           attackerName: liveAttacker?.name ?? 'Неизвестный',
-          damage: totalDmg,
+          damage: finalDmg,
           hit: true,
         })
         store.editPlacedToken(liveDefender.uid, { combatLog: log })

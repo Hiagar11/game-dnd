@@ -2,7 +2,8 @@ import { computed } from 'vue'
 import { useGameStore } from '../stores/game'
 import { getExecutor } from '../abilities/registry'
 import { getActiveWeapon } from '../utils/combatFormulas'
-import { playMiss, playTauntCry } from './useSound'
+import { getBaseActionPoints } from '../utils/actionPoints'
+import { playMiss, playTauntCry, playCleaveStab, playCleaveCrack } from './useSound'
 
 /**
  * Composable для исполнения способностей.
@@ -68,8 +69,50 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
     }
   }
 
+  function enterCombatFromAbility(casterUid, actionPointsAfterCast = 0) {
+    if (store.combatMode || typeof store.enterCombat !== 'function') {
+      return { started: false, shouldAutoEndTurn: false }
+    }
+
+    store.enterCombat(casterUid)
+
+    const combatCaster = store.placedTokens.find((token) => token?.uid === casterUid)
+    if (!combatCaster) {
+      return { started: true, shouldAutoEndTurn: false }
+    }
+
+    combatCaster.actionPoints = Math.min(
+      combatCaster.actionPoints ?? actionPointsAfterCast,
+      actionPointsAfterCast
+    )
+
+    const shouldAutoEndTurn = (combatCaster.actionPoints ?? 0) <= 0
+    if (shouldAutoEndTurn) {
+      combatCaster.movementPoints = 0
+    }
+
+    return {
+      started: true,
+      shouldAutoEndTurn,
+      casterUid,
+    }
+  }
+
+  function completeCombatHandoff(handoff, ability) {
+    if (!handoff?.shouldAutoEndTurn || !store.combatMode || typeof store.endTurn !== 'function') {
+      return
+    }
+
+    if (ability?.skipAutoEndTurn) return
+
+    const currentUid = store.initiativeOrder?.[store.currentInitiativeIndex]?.uid ?? null
+    if (handoff.casterUid && currentUid && currentUid !== handoff.casterUid) return
+
+    store.endTurn()
+  }
+
   /** Контекст, передаваемый каждому экзекьютору */
-  function buildCtx() {
+  function buildCtx(executionState = { combatHandoffRequested: false }) {
     return {
       store,
       flash: flashTokenFn ?? (() => {}),
@@ -81,8 +124,15 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
       triggerVfx: (type, data) => {
         store.abilityVfx = { type, ...data }
       },
+      enterCombatFromAbility: (casterUid, actionPointsAfterCast = 0) => {
+        executionState.combatHandoffRequested = true
+        return enterCombatFromAbility(casterUid, actionPointsAfterCast)
+      },
+      completeCombatHandoff: (handoff, ability) => completeCombatHandoff(handoff, ability),
       playMiss,
       playTauntCry,
+      playCleaveStab,
+      playCleaveCrack,
     }
   }
 
@@ -93,14 +143,29 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
     const token = caster.value
     if (!token) return false
 
+    const consumeAllActionPoints = Boolean(ability.consumeAllActionPoints)
+    const forceEndTurn = Boolean(ability.forceEndTurn)
+
     // Стоимость AP (масштабируется от оружия для melee-способностей с weaponApScaling)
     let cost = ability.apCost ?? 1
     if (ability.weaponApScaling) {
       const weaponAp = getActiveWeapon(token)?.apCost ?? 1
       cost = Math.max(cost, weaponAp)
     }
-    // Блокируем если не хватает AP (всегда, не только в бою)
-    if (cost > 0 && (token.actionPoints ?? 0) < cost) return false
+
+    if (ability.requiresFullActionPoints) {
+      const fullActionPoints = getBaseActionPoints(token) + (token.bonusAp ?? 0)
+      const currentActionPoints = token.actionPoints ?? 0
+      if (token.spentActionPointsThisTurn) return false
+      if (currentActionPoints < fullActionPoints) return false
+    }
+
+    if (consumeAllActionPoints) {
+      // Вне боевого режима не проверяем AP (например, Ярость работает везде)
+      if (store.combatMode && (token.actionPoints ?? 0) <= 0) return false
+    } else if (cost > 0 && store.combatMode && (token.actionPoints ?? 0) < cost) {
+      return false
+    }
 
     // Валидация цели
     const needsToken = ability.areaType === 'single'
@@ -112,17 +177,29 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
     const executor = getExecutor(ability.id)
     if (!executor) return false
 
-    executor(buildCtx(), token, target, ability)
+    const executionState = { combatHandoffRequested: false }
+    executor(buildCtx(executionState), token, target, ability)
 
     // Тратим AP (всегда, не только в бою)
-    if (cost > 0) token.actionPoints -= cost
+    if (consumeAllActionPoints) {
+      token.actionPoints = 0
+      token.spentActionPointsThisTurn = true
+    } else if (cost > 0) {
+      token.actionPoints -= cost
+      token.spentActionPointsThisTurn = true
+    }
 
     // Сброс pending
     store.pendingAbility = null
 
     // Автозавершение хода при исчерпании AP
     // (skipAutoEndTurn: способность даёт MP — игрок должен успеть ими воспользоваться)
-    if (store.combatMode && (token.actionPoints ?? 0) <= 0 && !ability.skipAutoEndTurn) {
+    if (
+      store.combatMode &&
+      !executionState.combatHandoffRequested &&
+      ((token.actionPoints ?? 0) <= 0 || forceEndTurn) &&
+      !ability.skipAutoEndTurn
+    ) {
       store.endTurn()
     }
 

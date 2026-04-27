@@ -47,6 +47,7 @@
   import { TOKEN_MOVE_STEP_DELAY_MS } from '../constants/timing'
   import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
   import { sleep } from '../utils/async'
+  import { buildCleaveCells } from '../utils/cleavePattern'
 
   // Отслеживаем Ctrl для режима агрессии по нейтральным NPC
   const ctrlHeld = ref(false)
@@ -209,14 +210,28 @@
 
     // ── AoE-превью для targeted-способности ───────────────────────────────
     if (store.pendingAbility?.areaType === 'targeted') {
-      const size = store.pendingAbility.areaSize ?? 1
-      const cells = []
-      for (let dc = -size + 1; dc <= size; dc++) {
-        for (let dr = -size + 1; dr <= size; dr++) {
-          cells.push({ col: col + dc, row: row + dr })
+      if (store.pendingAbility.id === 'cleave' && selectedToken.value) {
+        const anchors = buildCleaveCells(selectedToken.value, { col, row })
+        const fullSquares = []
+        for (const anchor of anchors) {
+          // Для наглядности раскол рисуем полным квадратом цели (2x2 sub-cells),
+          // чтобы сразу было видно весь хитбокс потенциальной цели.
+          fullSquares.push(anchor)
+          fullSquares.push({ col: anchor.col + 1, row: anchor.row })
+          fullSquares.push({ col: anchor.col, row: anchor.row + 1 })
+          fullSquares.push({ col: anchor.col + 1, row: anchor.row + 1 })
         }
+        store.abilityPreviewCells = fullSquares
+      } else {
+        const size = store.pendingAbility.areaSize ?? 1
+        const cells = []
+        for (let dc = -size + 1; dc <= size; dc++) {
+          for (let dr = -size + 1; dr <= size; dr++) {
+            cells.push({ col: col + dc, row: row + dr })
+          }
+        }
+        store.abilityPreviewCells = cells
       }
-      store.abilityPreviewCells = cells
       store.setHoveredCell(null)
       store.setHoveredPath([])
       hoveredToken.value = null

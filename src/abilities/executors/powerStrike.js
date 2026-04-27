@@ -10,6 +10,8 @@ import {
   HIT_DC,
 } from '../../utils/combatFormulas'
 import { getPassiveDerivedBonus } from '../../utils/passiveBonuses'
+import { applySingleTargetDamage } from '../utils/applySingleTargetDamage'
+import { getActiveDamageMult, getActiveEvasionMult } from '../utils/activeEffectBonuses'
 
 /** Автоматическая регистрация: ID способностей, обслуживаемых этим экзекьютором */
 export const ABILITY_ID = 'power_strike'
@@ -25,7 +27,10 @@ export function execute(ctx, caster, target, ability) {
   // Бросок попадания: d20 + hitBonus − evasion
   const d20 = Math.floor(Math.random() * 20) + 1
   const hitBonus = calcCritChance(eStats)
-  const evasion = calcEvasion(dStats) + getPassiveDerivedBonus(target?.passiveAbilities, 'evasion')
+  const evasion = Math.round(
+    (calcEvasion(dStats) + getPassiveDerivedBonus(target?.passiveAbilities, 'evasion')) *
+      getActiveEvasionMult(target)
+  )
   const total = d20 + hitBonus - evasion
 
   if (total < HIT_DC) {
@@ -52,6 +57,12 @@ export function execute(ctx, caster, target, ability) {
   // Множитель Силового удара
   dmg = Math.max(1, Math.round(dmg * multiplier))
 
+  // Ярость берсерка: +50% урон, если активен
+  dmg = Math.max(1, Math.round(dmg * getActiveDamageMult(caster)))
+
+  // Ярость берсерка: +50% урон, если активен
+  dmg = Math.max(1, Math.round(dmg * getActiveDamageMult(caster)))
+
   // Шанс блока
   const blockChance = calcBlock(dStats) * 2
   if (Math.random() * 100 < blockChance) {
@@ -59,15 +70,7 @@ export function execute(ctx, caster, target, ability) {
   }
 
   // Наносим урон
-  const live = ctx.store.placedTokens.find((t) => t.uid === target.uid)
-  if (live) {
-    const newHp = Math.max(0, (live.hp ?? 0) - dmg)
-    ctx.store.editPlacedToken(live.uid, { hp: newHp })
-    if (newHp === 0 && live.tokenType === 'npc') {
-      ctx.store.editPlacedToken(live.uid, { stunned: true })
-      ctx.store.checkCombatEnd()
-    }
-  }
+  applySingleTargetDamage(ctx, target.uid, dmg)
 
   // Визуал: SVG-дуга меча + вспышка (звук привязан к анимации в GameMeleeSlash)
   const color = ability.color ?? '#ef4444'

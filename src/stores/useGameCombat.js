@@ -2,8 +2,9 @@
 // Используется как внутренний composable хранилища game.js.
 
 import { ref } from 'vue'
-import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
+import { DEFAULT_MP } from '../constants/combat'
 import { isStunned, getStunEffectName } from '../utils/stunMechanics'
+import { getBaseActionPoints } from '../utils/actionPoints'
 import {
   getHeroTokens,
   getHostileNpcTokens,
@@ -43,9 +44,10 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
 
   function applyTurnStartResources(token) {
     if (!token) return
-    token.actionPoints = DEFAULT_AP + (token.bonusAp ?? 0)
+    token.actionPoints = getBaseActionPoints(token) + (token.bonusAp ?? 0)
     token.bonusAp = 0
     token.movementPoints = DEFAULT_MP
+    token.spentActionPointsThisTurn = false
   }
 
   /** Проверяет, находится ли токен в зоне видимости хотя бы одного героя */
@@ -207,8 +209,9 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     enemyHiddenTurns.value = {}
     // Восстановить AP и MP всем токенам
     for (const t of placedTokens.value) {
-      t.actionPoints = DEFAULT_AP
+      t.actionPoints = getBaseActionPoints(t)
       t.movementPoints = DEFAULT_MP
+      t.spentActionPointsThisTurn = false
     }
 
     // Установить флаг защиты от повторного входа
@@ -241,7 +244,7 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
   function endTurn() {
     if (!combatMode.value) {
       for (const t of placedTokens.value) {
-        t.actionPoints = DEFAULT_AP
+        t.actionPoints = getBaseActionPoints(t)
         t.movementPoints = DEFAULT_MP
       }
       return
@@ -300,7 +303,7 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     const nextToken = placedTokens.value.find((t) => t.uid === nextUid)
     if (nextToken) {
       // Оглушённые/захваченные пропускают ход
-      if (isStunned(nextToken, DEFAULT_AP)) {
+      if (isStunned(nextToken, getBaseActionPoints(nextToken))) {
         nextToken.actionPoints = 0
         nextToken.movementPoints = 0
         // Уведомляем UI о пропуске хода

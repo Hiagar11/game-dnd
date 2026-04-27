@@ -42,8 +42,8 @@
             :key="'ap' + i"
             class="token-info__ap-dot"
             :class="{
-              'token-info__ap-dot--used': i > (placed.actionPoints ?? DEFAULT_AP),
-              'token-info__ap-dot--ap-bonus': i > DEFAULT_AP,
+              'token-info__ap-dot--used': i > currentActionPoints,
+              'token-info__ap-dot--ap-bonus': i > currentBaseAp,
             }"
           />
         </TransitionGroup>
@@ -72,7 +72,8 @@
   import { computed } from 'vue'
   import { PhHeart, PhStar, PhLightning, PhSneakerMove } from '@phosphor-icons/vue'
   import { useGameStore } from '../stores/game'
-  import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
+  import { DEFAULT_MP } from '../constants/combat'
+  import { getBaseActionPoints } from '../utils/actionPoints'
   import { hpPercentFromValues } from '../utils/hp'
   import { getSelectedNonSystemToken } from '../utils/tokenFilters'
   import { xpProgressPercent } from '../utils/xpFormula'
@@ -112,13 +113,23 @@
     return hpPercentFromValues(hp, max)
   })
 
-  // Показываем бонусные точки AP выше DEFAULT_AP (например после Воодушевления)
+  const currentBaseAp = computed(() => {
+    if (!placed.value) return 2
+    return getBaseActionPoints(placed.value)
+  })
+
+  const currentActionPoints = computed(() => {
+    if (!placed.value) return 0
+    return placed.value.actionPoints ?? 0
+  })
+
+  // Показываем бонусные точки AP выше базового AP токена (например после Воодушевления)
   const displayAp = computed(() => {
-    if (!placed.value) return DEFAULT_AP
+    if (!placed.value) return 2
     return Math.max(
-      DEFAULT_AP,
-      placed.value.actionPoints ?? 0,
-      DEFAULT_AP + (placed.value.bonusAp ?? 0)
+      currentBaseAp.value,
+      currentActionPoints.value,
+      currentBaseAp.value + (placed.value.bonusAp ?? 0)
     )
   })
 

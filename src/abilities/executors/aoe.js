@@ -1,3 +1,6 @@
+import { isNeutralNpcToken } from '../../utils/tokenFilters'
+import { applyMultiTargetDamage } from '../utils/applyMultiTargetDamage'
+
 /** AoE-способности — gravity-crush, gravity-well, blood-rain, poison-cloud */
 export const ABILITY_IDS = ['gravity-crush', 'gravity-well', 'blood-rain', 'poison-cloud']
 
@@ -42,7 +45,7 @@ export function execute(ctx, caster, targetCell, ability) {
     store.abilityImpact = { cells, color }
 
     // 3) Рассчитываем урон по всем токенам в зоне
-    applyAoeDamage(ctx, caster, cells, color)
+    applyAoeDamage(ctx, caster, cells, color, ability)
   }, 500)
 }
 
@@ -50,7 +53,7 @@ export function execute(ctx, caster, targetCell, ability) {
  * Находит все токены, чьи sub-cell-позиции попадают в зону AoE,
  * наносит урон и показывает DamageFloat.
  */
-function applyAoeDamage(ctx, casterToken, cells, color) {
+function applyAoeDamage(ctx, casterToken, cells, color, ability) {
   const { store } = ctx
   const hc = store.cellSize / 2
   const ox = store.gridNormOX
@@ -69,16 +72,35 @@ function applyAoeDamage(ctx, casterToken, cells, color) {
     return false
   })
 
-  const intellect = casterToken.intellect ?? 0
-  for (const t of hit) {
-    const roll = Math.floor(Math.random() * 6) + 1
-    const dmg = roll + intellect
-    t.hp = Math.max(0, (t.hp ?? 0) - dmg)
+  const liveCaster = store.placedTokens.find((t) => t.uid === casterToken.uid) ?? casterToken
+  const shouldEnterCombat = hit.some((target) => isNeutralNpcToken(target))
 
-    if (ctx.damageFloat?.value) {
-      const cx = (t.col + 1) * hc + ox
-      const cy = (t.row + 1) * hc + oy
-      ctx.damageFloat.value.spawn(t.uid, dmg, cx, cy, color)
+  for (const target of hit) {
+    if (isNeutralNpcToken(target)) {
+      target.attitude = 'hostile'
     }
   }
+
+  const combatHandoff = shouldEnterCombat
+    ? ctx.enterCombatFromAbility?.(liveCaster.uid, liveCaster.actionPoints ?? 0)
+    : null
+
+  const intellect = casterToken.intellect ?? 0
+  applyMultiTargetDamage(
+    ctx,
+    hit,
+    () => {
+      const roll = Math.floor(Math.random() * 6) + 1
+      return roll + intellect
+    },
+    ({ target, damage }) => {
+      if (ctx.damageFloat?.value) {
+        const cx = (target.col + 1) * hc + ox
+        const cy = (target.row + 1) * hc + oy
+        ctx.damageFloat.value.spawn(target.uid, damage, cx, cy, color)
+      }
+    }
+  )
+
+  ctx.completeCombatHandoff?.(combatHandoff, ability)
 }

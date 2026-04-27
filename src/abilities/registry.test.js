@@ -31,6 +31,7 @@ import { getExecutor } from './registry'
  */
 describe('abilities/registry — автоматическая регистрация', () => {
   const EXPECTED_IDS = [
+    'cleave',
     'power_strike',
     'shield_bash',
     'invisibility',

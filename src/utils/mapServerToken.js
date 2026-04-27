@@ -8,8 +8,9 @@
 // поэтому нужно обрабатывать оба случая — строка и объект.
 
 import { SYSTEM_TOKENS } from '../constants/systemTokens'
-import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
+import { DEFAULT_MP } from '../constants/combat'
 import { calcMaxHp } from './combatFormulas'
+import { getBaseActionPointsByLevel } from './actionPoints'
 import { normalizeInventorySnapshot } from './inventoryState'
 import { getNpcAttitude } from './tokenFilters'
 import { getAbilityTreeById } from '../constants/abilityTree'
@@ -64,6 +65,12 @@ export function mapServerToken(serverToken, clientTokens) {
   // Защищает от ситуации, когда tokensStore ещё не загружен или токен удалён.
   const tokenObj = tokenId && typeof tokenId === 'object' ? tokenId : null
   const fallbackSrc = tokenObj?.imagePath ? `${API}/${tokenObj.imagePath}` : ''
+  const level = serverToken.level ?? def?.level ?? tokenObj?.level ?? 1
+  const baseActionPoints = getBaseActionPointsByLevel(level)
+  const savedActionPoints = Number(serverToken.actionPoints)
+  const actionPoints = Number.isFinite(savedActionPoints)
+    ? Math.max(baseActionPoints, savedActionPoints)
+    : baseActionPoints
 
   return {
     uid,
@@ -91,7 +98,7 @@ export function mapServerToken(serverToken, clientTokens) {
     charisma: serverToken.charisma ?? def?.charisma ?? tokenObj?.stats?.charisma ?? 0,
     // Опыт и уровень — предпочитаем сохранённое переопределение в экземпляре
     xp: serverToken.xp ?? def?.xp ?? tokenObj?.xp ?? 0,
-    level: serverToken.level ?? def?.level ?? tokenObj?.level ?? 1,
+    level,
     statPoints: serverToken.statPoints ?? 0,
     autoLevel: serverToken.autoLevel ?? false,
     // HP: берём сохранённое override-значение или пересчитываем из характеристик по формуле
@@ -107,7 +114,7 @@ export function mapServerToken(serverToken, clientTokens) {
         serverToken.strength ?? def?.strength ?? tokenObj?.stats?.strength ?? 0,
         serverToken.agility ?? def?.agility ?? tokenObj?.stats?.agility ?? 0
       ),
-    actionPoints: serverToken.actionPoints ?? DEFAULT_AP,
+    actionPoints,
     movementPoints: serverToken.movementPoints ?? DEFAULT_MP,
     race: serverToken.race ?? def?.race ?? tokenObj?.race ?? '',
     inventory: normalizeInventorySnapshot(serverToken.inventory),

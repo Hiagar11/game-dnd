@@ -10,6 +10,7 @@ import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
 import { useTokensStore } from './tokens'
 import { mapServerToken } from '../utils/mapServerToken'
 import { calcMaxHp, getEffectiveStats } from '../utils/combatFormulas'
+import { getBaseActionPointsByLevel } from '../utils/actionPoints'
 import { createEmptyInventory } from '../utils/inventoryState'
 import { getNpcAttitude } from '../utils/tokenFilters'
 import { useGameCombat } from './useGameCombat'
@@ -157,6 +158,7 @@ export const useGameStore = defineStore('game', () => {
     const agi = def?.agility ?? 0
     const es = getEffectiveStats(def)
     const mhp = calcMaxHp(es.strength, es.agility)
+    const level = def?.level ?? 1
     placedTokens.value.push({
       uid,
       tokenId,
@@ -174,10 +176,10 @@ export const useGameStore = defineStore('game', () => {
       charisma: def?.charisma ?? 0,
       maxHp: mhp,
       hp: mhp,
-      actionPoints: DEFAULT_AP,
+      actionPoints: getBaseActionPointsByLevel(level),
       movementPoints: DEFAULT_MP,
       xp: def?.xp ?? 0,
-      level: def?.level ?? 1,
+      level,
       statPoints: 0,
       autoLevel: def?.tokenType === 'npc',
       race: def?.race ?? '',
@@ -241,6 +243,7 @@ export const useGameStore = defineStore('game', () => {
     const token = placedTokens.value.find((t) => t.uid === uid)
     if (!token || token.actionPoints < cost) return false
     token.actionPoints -= cost
+    if (cost > 0) token.spentActionPointsThisTurn = true
     return true
   }
 

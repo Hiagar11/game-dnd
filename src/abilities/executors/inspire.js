@@ -1,4 +1,4 @@
-import { isAlliedToken } from '../../utils/tokenFilters'
+import { isSameFaction } from '../../utils/tokenFilters'
 
 export const ABILITY_ID = 'inspire'
 
@@ -6,10 +6,11 @@ export const ABILITY_ID = 'inspire'
  * Воодушевление — союзник получает +1 AP.
  * Если сейчас ход цели — добавляем сразу.
  * Иначе — сохраняем в bonusAp, который применится при старте следующего хода цели.
- * Цель должна быть союзником (герой или friendly NPC).
+ * Цель должна быть на одной стороне с кастером (герой/friendly → герой/friendly,
+ * или враждебный NPC → враждебный NPC когда геймастер играет за врагов).
  */
 export function execute(ctx, caster, target) {
-  if (!target || !isAlliedToken(target)) return
+  if (!target || !caster || !isSameFaction(caster, target)) return
 
   const live = ctx.store.placedTokens.find((t) => t.uid === target.uid)
   if (!live) return

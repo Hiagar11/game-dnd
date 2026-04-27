@@ -1,5 +1,6 @@
 import { getEffectiveStats, calcMagicResist, calcMagicPen } from '../../utils/combatFormulas'
 import { duckBattleMusic, restoreBattleMusic, playBloodCast } from '../../composables/useSound'
+import { applySingleTargetDamage } from '../utils/applySingleTargetDamage'
 
 /** Магические удары — кровавый снаряд, гравитационный удар, кровавое иссушение */
 export const ABILITY_IDS = ['blood_bolt', 'gravity_bolt', 'blood_leech']
@@ -10,20 +11,6 @@ function cellCenter(store, col, row) {
     x: (col + 1) * hc + store.gridNormOX,
     y: (row + 1) * hc + store.gridNormOY,
   }
-}
-
-function applyMagicDamage(ctx, targetUid, dmg) {
-  const liveTarget = ctx.store.placedTokens.find((t) => t.uid === targetUid)
-  if (!liveTarget) return null
-
-  const newHp = Math.max(0, (liveTarget.hp ?? 0) - dmg)
-  ctx.store.editPlacedToken(liveTarget.uid, { hp: newHp })
-  if (newHp === 0 && liveTarget.tokenType === 'npc') {
-    ctx.store.editPlacedToken(liveTarget.uid, { stunned: true })
-    ctx.store.checkCombatEnd()
-  }
-
-  return liveTarget
 }
 
 function spendBloodCost(ctx, casterUid) {
@@ -102,9 +89,10 @@ export function execute(ctx, caster, target, ability) {
 
     setTimeout(
       () => {
-        const liveTarget = applyMagicDamage(ctx, target.uid, dmg)
+        const damageResult = applySingleTargetDamage(ctx, target.uid, dmg)
         restoreBattleMusic(1200)
-        if (!liveTarget) return
+        if (!damageResult?.target) return
+        const liveTarget = damageResult.target
         ctx.spawnDamage(liveTarget, dmg, color)
         ctx.flash(liveTarget.uid, 'blood')
         ctx.triggerVfx('bloodImpact', {
@@ -120,9 +108,9 @@ export function execute(ctx, caster, target, ability) {
   }
 
   // Обычные магические single-удары — мгновенное применение
-  const liveTarget = applyMagicDamage(ctx, target.uid, dmg)
-  if (liveTarget) {
-    ctx.spawnDamage(liveTarget, dmg, color)
+  const damageResult = applySingleTargetDamage(ctx, target.uid, dmg)
+  if (damageResult?.target) {
+    ctx.spawnDamage(damageResult.target, dmg, color)
   }
 
   // ── Побочные эффекты по типу заклинания ──

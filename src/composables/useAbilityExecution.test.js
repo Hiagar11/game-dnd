@@ -14,6 +14,9 @@ vi.mock('../abilities/registry', () => ({
 
 vi.mock('./useSound', () => ({
   playMiss: vi.fn(),
+  playTauntCry: vi.fn(),
+  playCleaveStab: vi.fn(),
+  playCleaveCrack: vi.fn(),
 }))
 
 import { useAbilityExecution } from './useAbilityExecution'
@@ -127,6 +130,182 @@ describe('useAbilityExecution', () => {
     expect(executor).not.toHaveBeenCalled()
     expect(caster.actionPoints).toBe(2)
     expect(mockStore.pendingAbility).not.toBeNull()
+  })
+
+  it('блокирует cleave при нехватке AP даже вне боя', () => {
+    const caster = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      actionPoints: 2,
+      col: 0,
+      row: 0,
+    }
+
+    mockStore = makeStore({
+      combatMode: false,
+      pendingAbility: {
+        id: 'cleave',
+        areaType: 'targeted',
+        apCost: 3,
+        tokenUid: caster.uid,
+      },
+      placedTokens: [caster],
+    })
+
+    const executor = vi.fn()
+    getExecutorMock.mockReturnValue(executor)
+
+    const api = useAbilityExecution(ref(null), vi.fn())
+    const ok = api.executeAbility({ col: 2, row: 2 })
+
+    expect(ok).toBe(false)
+    expect(executor).not.toHaveBeenCalled()
+    expect(caster.actionPoints).toBe(2)
+    expect(mockStore.pendingAbility).not.toBeNull()
+  })
+
+  it('consumeAllActionPoints: каст проходит при любом положительном AP, обнуляет AP и завершает ход', () => {
+    const caster = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      actionPoints: 10,
+      col: 0,
+      row: 0,
+    }
+
+    mockStore = makeStore({
+      combatMode: true,
+      pendingAbility: {
+        id: 'berserker_rage',
+        areaType: 'self',
+        apCost: 2,
+        consumeAllActionPoints: true,
+        forceEndTurn: true,
+        tokenUid: caster.uid,
+      },
+      placedTokens: [caster],
+    })
+
+    const executor = vi.fn()
+    getExecutorMock.mockReturnValue(executor)
+
+    const api = useAbilityExecution(ref(null), vi.fn())
+    const ok = api.executeAbility(null)
+
+    expect(ok).toBe(true)
+    expect(executor).toHaveBeenCalledTimes(1)
+    expect(caster.actionPoints).toBe(0)
+    expect(mockStore.pendingAbility).toBeNull()
+    expect(mockStore.endTurn).toHaveBeenCalledTimes(1)
+  })
+
+  it('requiresFullActionPoints: блокирует каст если AP уже тратились в этом ходу', () => {
+    const caster = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      level: 5,
+      actionPoints: 4,
+      spentActionPointsThisTurn: true,
+    }
+
+    mockStore = makeStore({
+      pendingAbility: {
+        id: 'berserker_rage',
+        areaType: 'self',
+        apCost: 2,
+        requiresFullActionPoints: true,
+        consumeAllActionPoints: true,
+        tokenUid: caster.uid,
+      },
+      placedTokens: [caster],
+    })
+
+    const executor = vi.fn()
+    getExecutorMock.mockReturnValue(executor)
+
+    const api = useAbilityExecution(ref(null), vi.fn())
+    const ok = api.executeAbility(null)
+
+    expect(ok).toBe(false)
+    expect(executor).not.toHaveBeenCalled()
+    expect(mockStore.pendingAbility).not.toBeNull()
+  })
+
+  it('requiresFullActionPoints: блокирует каст если AP ниже полного запаса', () => {
+    const caster = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      level: 5,
+      actionPoints: 3,
+      spentActionPointsThisTurn: false,
+    }
+
+    mockStore = makeStore({
+      pendingAbility: {
+        id: 'berserker_rage',
+        areaType: 'self',
+        apCost: 2,
+        requiresFullActionPoints: true,
+        consumeAllActionPoints: true,
+        tokenUid: caster.uid,
+      },
+      placedTokens: [caster],
+    })
+
+    const executor = vi.fn()
+    getExecutorMock.mockReturnValue(executor)
+
+    const api = useAbilityExecution(ref(null), vi.fn())
+    const ok = api.executeAbility(null)
+
+    expect(ok).toBe(false)
+    expect(executor).not.toHaveBeenCalled()
+  })
+
+  it('даёт экзекьютору общий handoff для старта боя способностью и автопередачи хода', () => {
+    const caster = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      actionPoints: 0,
+      movementPoints: 6,
+      col: 0,
+      row: 0,
+    }
+
+    mockStore = makeStore({
+      combatMode: false,
+      initiativeOrder: [{ uid: caster.uid }],
+      currentInitiativeIndex: 0,
+      pendingAbility: {
+        id: 'battle_opener',
+        areaType: 'targeted',
+        apCost: 0,
+        tokenUid: caster.uid,
+      },
+      placedTokens: [caster],
+      enterCombat: vi.fn(() => {
+        mockStore.combatMode = true
+        mockStore.initiativeOrder = [{ uid: caster.uid }]
+        mockStore.currentInitiativeIndex = 0
+        caster.actionPoints = 3
+        caster.movementPoints = 6
+      }),
+    })
+
+    const executor = vi.fn((ctx, token, target, ability) => {
+      const handoff = ctx.enterCombatFromAbility(token.uid, token.actionPoints ?? 0)
+      ctx.completeCombatHandoff(handoff, ability)
+    })
+    getExecutorMock.mockReturnValue(executor)
+
+    const api = useAbilityExecution(ref(null), vi.fn())
+    const ok = api.executeAbility({ col: 2, row: 2 })
+
+    expect(ok).toBe(true)
+    expect(mockStore.enterCombat).toHaveBeenCalledTimes(1)
+    expect(caster.actionPoints).toBe(0)
+    expect(caster.movementPoints).toBe(0)
+    expect(mockStore.endTurn).toHaveBeenCalledTimes(1)
   })
 
   it('валидирует цели для single и targeted', () => {

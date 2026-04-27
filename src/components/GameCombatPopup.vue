@@ -55,13 +55,14 @@
                 :key="i"
                 class="combat-popup__ap-dot"
                 :class="{
-                  'combat-popup__ap-dot--used': i > (currentAttacker.actionPoints ?? DEFAULT_AP),
-                  'combat-popup__ap-dot--bonus': i > DEFAULT_AP,
+                  'combat-popup__ap-dot--used':
+                    i > (currentAttacker.actionPoints ?? baseAp(currentAttacker)),
+                  'combat-popup__ap-dot--bonus': i > baseAp(currentAttacker),
                 }"
               />
             </div>
             <span class="combat-popup__stat-value">{{
-              currentAttacker.actionPoints ?? DEFAULT_AP
+              currentAttacker.actionPoints ?? baseAp(currentAttacker)
             }}</span>
           </div>
 
@@ -227,13 +228,14 @@
                 :key="i"
                 class="combat-popup__ap-dot"
                 :class="{
-                  'combat-popup__ap-dot--used': i > (currentDefender.actionPoints ?? DEFAULT_AP),
-                  'combat-popup__ap-dot--bonus': i > DEFAULT_AP,
+                  'combat-popup__ap-dot--used':
+                    i > (currentDefender.actionPoints ?? baseAp(currentDefender)),
+                  'combat-popup__ap-dot--bonus': i > baseAp(currentDefender),
                 }"
               />
             </div>
             <span class="combat-popup__stat-value">{{
-              currentDefender.actionPoints ?? DEFAULT_AP
+              currentDefender.actionPoints ?? baseAp(currentDefender)
             }}</span>
           </div>
 
@@ -285,6 +287,7 @@
     isDualWielding,
     DUAL_WIELD_HIT_PENALTY,
   } from '../utils/combatFormulas'
+  import { getBaseActionPoints } from '../utils/actionPoints'
   import { getPassiveDerivedBonus } from '../utils/passiveBonuses'
   import { useCombatLogic } from '../composables/useCombatLogic'
 
@@ -306,7 +309,6 @@
   )
 
   const {
-    DEFAULT_AP,
     phase,
     hitRoll,
     damageRoll,
@@ -322,9 +324,15 @@
     onClose,
   } = useCombatLogic({ store, heroToken, npcToken, emitClose: () => emit('close') })
 
+  function baseAp(token) {
+    if (!token) return 2
+    return getBaseActionPoints(token)
+  }
+
   function displayAp(token) {
-    if (!token) return DEFAULT_AP
-    return Math.max(DEFAULT_AP, token.actionPoints ?? 0, DEFAULT_AP + (token.bonusAp ?? 0))
+    if (!token) return 2
+    const tokenBaseAp = baseAp(token)
+    return Math.max(tokenBaseAp, token.actionPoints ?? 0, tokenBaseAp + (token.bonusAp ?? 0))
   }
 
   // Синхронизируем combatLog NPC на сервер при закрытии popup

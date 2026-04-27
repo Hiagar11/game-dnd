@@ -24,18 +24,24 @@ config({ path: path.join(__dirname, '.env') })
 const app = express()
 const httpServer = createServer(app)
 
+// ─── CORS Configuration ─────────────────────────────────────────────────────────
+// Парсим CLIENT_ORIGIN: может быть строка или список через запятую
+const CORS_ORIGIN = process.env.CLIENT_ORIGIN
+  ? process.env.CLIENT_ORIGIN.split(',').map((o) => o.trim())
+  : ['http://localhost:5173', 'http://localhost:5174']
+
 // ─── Socket.io ────────────────────────────────────────────────────────────────
-// CORS для Socket.io: разрешаем фронт (обычно Vite на :5173) и prod-домен
+// CORS для Socket.io: разрешаем фронт (обычно Vite на :5173 или :5174) и prod-домен
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173',
+    origin: CORS_ORIGIN,
     methods: ['GET', 'POST'],
   },
 })
 setupSocket(io)
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
-app.use(cors({ origin: process.env.CLIENT_ORIGIN ?? 'http://localhost:5173' }))
+app.use(cors({ origin: CORS_ORIGIN }))
 app.use(express.json())
 
 // Статика: раздаём загруженные изображения токенов

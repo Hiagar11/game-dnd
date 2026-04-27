@@ -2,7 +2,10 @@
   <div
     ref="viewRef"
     class="game-view"
-    :class="{ 'game-view--combat': gameStore.combatMode }"
+    :class="{
+      'game-view--combat': gameStore.combatMode,
+      'game-view--berserk': berserkVisionActive,
+    }"
     @mousemove="onMouseMove"
     @mousedown="onGameMouseDown"
     @contextmenu="onContextMenu"
@@ -35,30 +38,37 @@
         @mousedown="onMouseDown"
         @click="(gameStore.selectPlacedToken(null), closeContextMenu())"
       >
-        <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
-        <GameGrid :width="mapSize.width" :height="mapSize.height" />
-        <GameRangeOverlay :width="mapSize.width" :height="mapSize.height" />
-        <GameGroundLoot :width="mapSize.width" :height="mapSize.height" @open-loot="onOpenLoot" />
-        <GameTokens
-          :width="mapSize.width"
-          :height="mapSize.height"
-          @door-transition="onDoorTransition"
-          @container-loot="onOpenLoot"
-        />
-        <GameFog
-          :key="selectedScenario?.id"
-          :width="mapSize.width"
-          :height="mapSize.height"
-          :hidden="auth.role === 'admin' && !gameStore.fogEnabled"
-        />
-        <GameAbilityProjectile />
-        <GameAbilityImpact />
-        <GameMeleeSlash />
-        <GameShieldBash />
-        <GameQuickStep />
-        <GameInspire />
-        <GameBloodCastRunes />
-        <GameBloodImpact />
+        <!-- Обертка для дрожания в режиме берсерка: камера остается неподвижной -->
+        <div
+          class="game-view__map-content"
+          :class="{ 'game-view__map-content--berserk': berserkVisionActive }"
+        >
+          <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
+          <GameGrid :width="mapSize.width" :height="mapSize.height" />
+          <GameRangeOverlay :width="mapSize.width" :height="mapSize.height" />
+          <GameGroundLoot :width="mapSize.width" :height="mapSize.height" @open-loot="onOpenLoot" />
+          <GameTokens
+            :width="mapSize.width"
+            :height="mapSize.height"
+            @door-transition="onDoorTransition"
+            @container-loot="onOpenLoot"
+          />
+          <GameFog
+            :key="selectedScenario?.id"
+            :width="mapSize.width"
+            :height="mapSize.height"
+            :hidden="auth.role === 'admin' && !gameStore.fogEnabled"
+          />
+          <GameAbilityProjectile />
+          <GameAbilityImpact />
+          <GameMeleeSlash />
+          <GameCleaveRift />
+          <GameShieldBash />
+          <GameQuickStep />
+          <GameInspire />
+          <GameBloodCastRunes />
+          <GameBloodImpact />
+        </div>
       </div>
 
       <GameMenu @mouseenter="onMenuEnter" @mouseleave="onMenuLeave" />
@@ -123,7 +133,7 @@
 </template>
 
 <script setup>
-  import { ref, inject } from 'vue'
+  import { ref, inject, computed } from 'vue'
   import { useMapPan } from '../composables/useMapPan'
   import { useSocket } from '../composables/useSocket'
   import {
@@ -143,6 +153,7 @@
   import GameAbilityProjectile from '../components/GameAbilityProjectile.vue'
   import GameAbilityImpact from '../components/GameAbilityImpact.vue'
   import GameMeleeSlash from '../components/GameMeleeSlash.vue'
+  import GameCleaveRift from '../components/GameCleaveRift.vue'
   import GameShieldBash from '../components/GameShieldBash.vue'
   import GameQuickStep from '../components/GameQuickStep.vue'
   import GameInspire from '../components/GameInspire.vue'
@@ -172,6 +183,7 @@
   import { useGameViewStores } from '../composables/useGameViewStores'
   import { useGlobalMapTravel } from '../composables/useGlobalMapTravel'
   import { useGlobalMapsStore } from '../stores/globalMaps'
+  import { isBerserkerVisionActive } from '../utils/berserkerRageMode'
   import GameGlobalMapOverlay from '../components/GameGlobalMapOverlay.vue'
 
   const { viewRef, mapRef, canvasRef, mapSize } = useGameViewRefs()
@@ -192,6 +204,7 @@
 
   const { auth, gameStore, tokensStore, scenariosStore, campaignsStore, gameSessionsStore } =
     useGameViewStores()
+  const berserkVisionActive = computed(() => isBerserkerVisionActive(gameStore))
   const globalMapsStore = useGlobalMapsStore()
   const { connect, getSocket } = useSocket()
 
@@ -435,6 +448,42 @@
     }
   }
 
+  // Дрожащая анимация для режима берсерка (уменьшенная амплитуда)
+  @keyframes berserk-shake {
+    0%,
+    100% {
+      transform: translate(0, 0);
+    }
+
+    12% {
+      transform: translate(-0.8px, 0.6px);
+    }
+
+    25% {
+      transform: translate(0.9px, -0.4px);
+    }
+
+    37% {
+      transform: translate(-0.45px, 0.75px);
+    }
+
+    50% {
+      transform: translate(0.6px, -0.65px);
+    }
+
+    62% {
+      transform: translate(-0.8px, 0.45px);
+    }
+
+    75% {
+      transform: translate(0.65px, -0.55px);
+    }
+
+    87% {
+      transform: translate(-0.55px, 0.7px);
+    }
+  }
+
   /* ─── Игровое поле ────────────────────────────────────────────────────────── */
   .game-view__map {
     position: absolute;
@@ -442,6 +491,7 @@
     left: 0;
     z-index: var(--z-map);
     cursor: grab;
+    transition: filter 0.28s ease;
 
     &:active {
       cursor: grabbing;
@@ -456,6 +506,13 @@
       border: var(--map-border-size) solid transparent;
       border-image: url('/systemImage/border.jpg') var(--map-border-slice) round;
       clip-path: inset(0 round var(--map-border-radius));
+    }
+  }
+
+  // Содержимое карты: дрожит в режиме берсерка, но камера остается неподвижной
+  .game-view__map-content {
+    &--berserk {
+      animation: berserk-shake 0.3s linear infinite;
     }
   }
 

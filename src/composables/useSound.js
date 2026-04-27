@@ -11,7 +11,7 @@ const nextSound = new Audio('/sounds/next.wav')
 const successSound = new Audio('/sounds/success.wav')
 const fistSound = new Audio('/sounds/fist.wav')
 const swordSound = new Audio('/sounds/sword.mp3')
-const whooshSound = new Audio('/sounds/whoosh.wav')
+const whooshSound = new Audio('/sounds/miss-swosh.mp3')
 const levelUpSound = new Audio('/sounds/success.wav')
 const INSPIRE_SOUND_OPTIONS = {
   1: '/sounds/inspire-option-1.mp3',
@@ -26,6 +26,7 @@ const INSPIRE_SOUND_ID = 1
 const INSPIRE_SOUND_SRC = INSPIRE_SOUND_OPTIONS[INSPIRE_SOUND_ID] ?? INSPIRE_SOUND_OPTIONS[1]
 const inspireSound = new Audio(INSPIRE_SOUND_SRC)
 const tauntCrySound = new Audio('/sounds/taunt-cry.mp3')
+const cleaveCrackSound = new Audio('/sounds/cleave-crack.mp3')
 const bloodWhisperSound = new Audio('/sounds/blood-whisper.mp3')
 const magicImpactSound = new Audio('/sounds/magic-impact.mp3')
 // Звук вылета кровавого снаряда: тёмная магия (основной слой) + магическое эхо полёта
@@ -35,6 +36,8 @@ inspireSound.preload = 'auto'
 inspireSound.load()
 tauntCrySound.preload = 'auto'
 tauntCrySound.load()
+cleaveCrackSound.preload = 'auto'
+cleaveCrackSound.load()
 bloodWhisperSound.preload = 'auto'
 bloodWhisperSound.load()
 magicImpactSound.preload = 'auto'
@@ -78,7 +81,7 @@ function ensureCombatBuffers() {
     if (ctx.state === 'suspended') await ctx.resume()
     ;[swordBuffer, whooshBuffer, shieldBashBuffer] = await Promise.all([
       preloadBuffer('/sounds/sword.mp3'),
-      preloadBuffer('/sounds/whoosh.wav'),
+      preloadBuffer('/sounds/miss-swosh.mp3'),
       preloadBuffer('/sounds/shield-bash.mp3'),
     ])
   })()
@@ -285,6 +288,7 @@ whooshSound.volume = 0.75
 levelUpSound.volume = 0.9
 inspireSound.volume = 0.88
 tauntCrySound.volume = 0.9
+cleaveCrackSound.volume = 0.95
 battleMusic.volume = 0
 // loop отключён: при окончании трека ended-обработчик переключает на следующий
 travelMusic.volume = 0
@@ -674,6 +678,47 @@ export function playTauntCry() {
     disablePitchPreserve(cry)
     cry.play().catch(() => {})
   })
+}
+
+/**
+ * Раскол: фаза 1 — вонзание меча в землю.
+ * Делаем звук ниже и тяжелее обычного меча.
+ */
+export function playCleaveStab() {
+  const stab = swordSound.cloneNode(true)
+  stab.currentTime = 0
+  stab.volume = 0.92
+  stab.playbackRate = 0.74
+  disablePitchPreserve(stab)
+  stab.play().catch(() => {
+    playSword()
+  })
+}
+
+/**
+ * Раскол: фаза 2 — треск земли.
+ * Основной слой + короткий низкий хвост для «массы» удара.
+ */
+export function playCleaveCrack() {
+  const crack = cleaveCrackSound.cloneNode(true)
+  crack.currentTime = 0
+  crack.volume = 0.95
+  crack.playbackRate = 1
+  disablePitchPreserve(crack)
+  crack.play().catch(() => {
+    // Fallback, если файл не найден/не загрузился.
+    playBloodImpact()
+    playMiss()
+  })
+
+  const tail = cleaveCrackSound.cloneNode(true)
+  tail.currentTime = 0.04
+  tail.volume = 0.38
+  tail.playbackRate = 0.82
+  disablePitchPreserve(tail)
+  setTimeout(() => {
+    tail.play().catch(() => {})
+  }, 70)
 }
 
 /**
