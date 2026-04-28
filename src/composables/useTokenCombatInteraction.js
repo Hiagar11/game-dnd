@@ -165,22 +165,9 @@ export function useTokenCombatInteraction({ store, damageFloatRef, getSocket }) 
   /**
    * Удар в режиме ярости берсерка: гарантированно попадает и наносит
    * 90% от текущего HP цели, минуя d20, броню, крит и блок.
+   * Провокация игнорируется — берсерк не разбирает кого бить.
    */
   function runBerserkerAttack(attackerToken, defenderToken) {
-    if (isTauntAttackViolation(attackerToken, defenderToken, store.placedTokens)) {
-      const hc = store.halfCell
-      const x = attackerToken.col * hc + store.gridNormOX + hc
-      const y = attackerToken.row * hc + store.gridNormOY + hc
-      damageFloatRef.value?.spawn(
-        attackerToken.uid,
-        'Под провокацией: цель фиксирована',
-        x,
-        y,
-        '#ef4444'
-      )
-      return
-    }
-
     const apCost = getAttackApCost(attackerToken)
     // AP тратим, но переход хода берёт на себя caller (runBerserkJumpAttack):
     // он обязан endTurn после удара, чтобы снять ярость и передать ход.

@@ -776,4 +776,77 @@ describe('useTokenClickInteraction', () => {
     expect(exhaustion.apPenalty).toBeGreaterThanOrEqual(3)
     expect(exhaustion.remainingTurns).toBe(1)
   })
+
+  it('берсерк нивелирует провокацию: рандом не сужается до провокатора', async () => {
+    const taunter = {
+      uid: 'taunter-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 1,
+      row: 1,
+      hp: 10,
+    }
+    const hero = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      actionPoints: 2,
+      activeEffects: [
+        { id: 'berserker_rage', remainingTurns: 2 },
+        // Провокация заставляет героя бить только провокатора
+        { id: 'taunt', remainingTurns: 2, byUid: taunter.uid },
+      ],
+    }
+    const otherHostile = {
+      uid: 'other-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 2,
+      row: 2,
+      hp: 10,
+    }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: null,
+      placedTokens: [hero, taunter, otherHostile],
+      selectedPlacedUid: hero.uid,
+      initiativeOrder: [{ uid: hero.uid }],
+      currentInitiativeIndex: 0,
+      walls: [],
+      moveToken: vi.fn(),
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    // Пул [taunter, otherHostile] → floor(0.99 * 2) = 1 → otherHostile
+    // Если бы провокация работала, пул бы сузился до [taunter] и выпал бы taunter.
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.99)
+
+    const runBerserkerAttack = vi.fn()
+    const onTauntBlocked = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, {
+      runBerserkerAttack,
+      onTauntBlocked,
+    })
+
+    await onTokenClick(taunter, { ctrlKey: false })
+
+    expect(runBerserkerAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: hero.uid }),
+      expect.objectContaining({ uid: otherHostile.uid })
+    )
+    // Провокация не должна была заблокировать удар
+    expect(onTauntBlocked).not.toHaveBeenCalled()
+
+    randomSpy.mockRestore()
+  })
 })

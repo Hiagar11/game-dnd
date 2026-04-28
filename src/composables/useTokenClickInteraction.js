@@ -96,23 +96,16 @@ export function useTokenClickInteraction({
 
   /**
    * Выбирает случайную цель из всех видимых берсерку токенов
-   * (в радиусе вижения, любой фракции, кроме самого берсерка и системных).
-   * Если берсерк под провокацией — пул сужается до провокатора (если тот в радиусе).
+   * (в радиусе видимости, любой фракции, кроме самого берсерка и системных).
+   * Берсерк нивелирует провокацию: чистая ярость не разбирает кого бить.
    */
   function pickRandomBerserkVictim(attacker) {
-    const tauntUid = getForcedTauntTargetUid(attacker, store.placedTokens)
-
-    let pool = store.placedTokens.filter(
+    const pool = store.placedTokens.filter(
       (token) =>
         isNonSystemToken(token) &&
         token.uid !== attacker.uid &&
         isInBerserkerVisionRadius(attacker, token, BERSERKER_VISION_RADIUS)
     )
-
-    if (tauntUid) {
-      pool = pool.filter((token) => token.uid === tauntUid)
-    }
-
     if (!pool.length) return null
     return pool[Math.floor(Math.random() * pool.length)]
   }
@@ -144,14 +137,9 @@ export function useTokenClickInteraction({
     if (!attacker) return
 
     // Великий рандом: цель выбирается из всех видимых, клик — лишь триггер.
+    // Провокация в режиме ярости игнорируется — чистый берсерк не разбирает.
     const defender = pickRandomBerserkVictim(attacker)
-    if (!defender) {
-      // Под провокацией провокатор не в радиусе — нечего бить.
-      if (getForcedTauntTargetUid(attacker, store.placedTokens)) {
-        onTauntBlocked?.(attacker)
-      }
-      return
-    }
+    if (!defender) return
 
     closeContextMenu()
 
