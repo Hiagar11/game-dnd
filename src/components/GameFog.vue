@@ -52,19 +52,17 @@
       </mask>
 
       <!--
-        Маска затемнения: белый = оверлей виден (посещённые, но герой ушёл),
+        Маска затемнения: белый с blur = оверлей плавно появляется в explored-зоне,
         чёрный = прозрачно (текущие и совсем непосещённые).
+        Blur даёт мягкий переход explored→visible и explored→fog.
       -->
       <mask id="game-dim-mask" maskUnits="userSpaceOnUse">
         <rect x="0" y="0" :width="width" :height="height" fill="black" />
-        <rect
-          v-for="key in visitedNotCurrentList"
-          :key="key"
-          :x="getCol(key) * gameStore.halfCell + gameStore.gridNormOX"
-          :y="getRow(key) * gameStore.halfCell + gameStore.gridNormOY"
-          :width="gameStore.halfCell"
-          :height="gameStore.halfCell"
+        <path
+          v-if="visitedNotCurrentPath"
+          :d="visitedNotCurrentPath"
           fill="white"
+          filter="url(#game-fog-blur)"
         />
       </mask>
     </defs>
@@ -113,7 +111,7 @@
 
   const {
     currentCells,
-    visitedNotCurrentList,
+    visitedNotCurrentPath,
     visitedPath,
     blurRadius,
     getCol,

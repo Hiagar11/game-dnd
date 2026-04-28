@@ -177,6 +177,28 @@ export function useFogVisibility() {
     return result
   })
 
+  // ─── SVG-путь для dim-mask (GameFog: затемнение explored-зоны) ──────────
+  // Единый <path> с blur — плавный переход explored→fog и explored→visible.
+  const visitedNotCurrentPath = computed(() => {
+    visitedVersion.value
+    const curr = currentCells.value
+    if (visitedCells.size === 0) return ''
+
+    const hc = gameStore.halfCell
+    const ox = gameStore.gridNormOX
+    const oy = gameStore.gridNormOY
+    let d = ''
+
+    for (const key of visitedCells) {
+      if (curr.has(key)) continue
+      const col = parseInt(key.split(':')[0], 10)
+      const row = parseInt(key.split(':')[1], 10)
+      d += `M${col * hc + ox},${row * hc + oy}h${hc}v${hc}h${-hc}Z`
+    }
+
+    return d
+  })
+
   // ─── SVG-путь для fog-mask (GameFog: fog GIF маска) ─────────────────────
   // Единый <path> вместо N <rect> — минимум DOM-узлов.
   const visitedPath = computed(() => {
@@ -234,6 +256,7 @@ export function useFogVisibility() {
     currentCells,
     visitedNotCurrentList,
     visitedNotCurrentSet,
+    visitedNotCurrentPath,
     visitedPath,
     blurRadius,
     getCol,
