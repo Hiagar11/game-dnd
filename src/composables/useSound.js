@@ -32,6 +32,11 @@ const magicImpactSound = new Audio('/sounds/magic-impact.mp3')
 // Звук вылета кровавого снаряда: тёмная магия (основной слой) + магическое эхо полёта
 const bloodProjectileLaunchSound = new Audio('/sounds/blood-projectile-launch.mp3')
 const bloodProjectileWhooshSound = new Audio('/sounds/blood-projectile-whoosh.mp3')
+// Рывок: ярый крик в полёте + удар «по мячу» при приземлении.
+// Файлы пользователь добавит самостоятельно — пока могут отсутствовать,
+// проигрывание тогда тихо упадёт через .catch внутри play-обёртки.
+const rushScreamSound = new Audio('/sounds/rush-scream.mp3')
+const rushImpactSound = new Audio('/sounds/rush-impact.mp3')
 inspireSound.preload = 'auto'
 inspireSound.load()
 tauntCrySound.preload = 'auto'
@@ -46,6 +51,10 @@ bloodProjectileLaunchSound.preload = 'auto'
 bloodProjectileLaunchSound.load()
 bloodProjectileWhooshSound.preload = 'auto'
 bloodProjectileWhooshSound.load()
+rushScreamSound.preload = 'auto'
+rushScreamSound.load()
+rushImpactSound.preload = 'auto'
+rushImpactSound.load()
 
 // ── Web Audio API для мгновенного воспроизведения боевых звуков ────────────────
 // MP3 через new Audio() имеет задержку декодирования ~50-150мс.
@@ -810,6 +819,26 @@ export function stopMainMenuMusic() {
     menuFadeId = null
   })
 }
+
+/**
+ * Рывок: яростный крик в полёте. Короткий — звучит, пока герой летит к цели.
+ * .catch — на случай если файла ещё нет в public/sounds/.
+ */
+export function playRushScream() {
+  const audio = rushScreamSound.cloneNode(true)
+  audio.volume = 0.85
+  audio.play().catch(() => {})
+}
+
+/**
+ * Рывок: удар «по мячу» при приземлении на цель.
+ */
+export function playRushImpact() {
+  const audio = rushImpactSound.cloneNode(true)
+  audio.volume = 0.9
+  audio.play().catch(() => {})
+}
+
 export function useSound() {
   function playHover() {
     // currentTime = 0 — перематываем в начало перед каждым воспроизведением.

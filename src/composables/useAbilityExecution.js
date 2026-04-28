@@ -3,7 +3,14 @@ import { useGameStore } from '../stores/game'
 import { getExecutor } from '../abilities/registry'
 import { getActiveWeapon } from '../utils/combatFormulas'
 import { getBaseActionPoints } from '../utils/actionPoints'
-import { playMiss, playTauntCry, playCleaveStab, playCleaveCrack } from './useSound'
+import {
+  playMiss,
+  playTauntCry,
+  playCleaveStab,
+  playCleaveCrack,
+  playRushScream,
+  playRushImpact,
+} from './useSound'
 
 /**
  * Composable для исполнения способностей.
@@ -133,6 +140,8 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
       playTauntCry,
       playCleaveStab,
       playCleaveCrack,
+      playRushScream,
+      playRushImpact,
     }
   }
 

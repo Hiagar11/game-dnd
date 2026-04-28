@@ -17,6 +17,8 @@ vi.mock('./useSound', () => ({
   playTauntCry: vi.fn(),
   playCleaveStab: vi.fn(),
   playCleaveCrack: vi.fn(),
+  playRushScream: vi.fn(),
+  playRushImpact: vi.fn(),
 }))
 
 import { useAbilityExecution } from './useAbilityExecution'
