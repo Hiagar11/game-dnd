@@ -162,9 +162,69 @@ export function useTokenCombatInteraction({ store, damageFloatRef, getSocket }) 
     }
   }
 
+  /**
+   * Удар в режиме ярости берсерка: гарантированно попадает и наносит
+   * 90% от текущего HP цели, минуя d20, броню, крит и блок.
+   */
+  function runBerserkerAttack(attackerToken, defenderToken) {
+    if (isTauntAttackViolation(attackerToken, defenderToken, store.placedTokens)) {
+      const hc = store.halfCell
+      const x = attackerToken.col * hc + store.gridNormOX + hc
+      const y = attackerToken.row * hc + store.gridNormOY + hc
+      damageFloatRef.value?.spawn(
+        attackerToken.uid,
+        'Под провокацией: цель фиксирована',
+        x,
+        y,
+        '#ef4444'
+      )
+      return
+    }
+
+    const apCost = getAttackApCost(attackerToken)
+    // AP тратим, но переход хода берёт на себя caller (runBerserkJumpAttack):
+    // он обязан endTurn после удара, чтобы снять ярость и передать ход.
+    if (!store.spendActionPoint(attackerToken.uid, apCost)) return
+
+    flashToken(defenderToken.uid, 'hit')
+    playSuccess()
+
+    const liveDefender = store.placedTokens.find((t) => t.uid === defenderToken.uid)
+    if (liveDefender) {
+      const currentHp = liveDefender.hp ?? 0
+      const dmgTotal = Math.max(1, Math.floor(currentHp * 0.9))
+      const newHp = Math.max(0, currentHp - dmgTotal)
+      store.editPlacedToken(liveDefender.uid, { hp: newHp })
+
+      if (liveDefender.tokenType === 'npc') {
+        const log = Array.isArray(liveDefender.combatLog) ? [...liveDefender.combatLog] : []
+        log.push({
+          attackerName: attackerToken?.name ?? 'Неизвестный',
+          damage: dmgTotal,
+          hit: true,
+        })
+        store.editPlacedToken(liveDefender.uid, { combatLog: log })
+        syncCombatLog(liveDefender.uid, log)
+      }
+
+      if (newHp === 0 && liveDefender.tokenType === 'npc') {
+        store.editPlacedToken(liveDefender.uid, { stunned: true })
+        store.checkCombatEnd()
+      }
+
+      playFist()
+
+      const hc = store.halfCell
+      const x = defenderToken.col * hc + store.gridNormOX + hc
+      const y = defenderToken.row * hc + store.gridNormOY + hc
+      damageFloatRef.value?.spawn(defenderToken.uid, `-${dmgTotal}`, x, y, '#ef4444')
+    }
+  }
+
   return {
     flashMap,
     flashToken,
     runQuickAttack,
+    runBerserkerAttack,
   }
 }

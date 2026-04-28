@@ -43,8 +43,11 @@
           class="game-view__map-content"
           :class="{ 'game-view__map-content--berserk': berserkVisionActive }"
         >
-          <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
-          <GameGrid :width="mapSize.width" :height="mapSize.height" />
+          <!-- Фон карты: получает grayscale отдельно, чтобы токены оставались цветными -->
+          <div :class="{ 'game-view__map-bg--berserk': berserkVisionActive }">
+            <GameMap :map-src="selectedScenario.mapImageUrl" @ready="onMapReady" />
+            <GameGrid :width="mapSize.width" :height="mapSize.height" />
+          </div>
           <GameRangeOverlay :width="mapSize.width" :height="mapSize.height" />
           <GameGroundLoot :width="mapSize.width" :height="mapSize.height" @open-loot="onOpenLoot" />
           <GameTokens
@@ -509,11 +512,12 @@
     }
   }
 
-  // Содержимое карты: дрожит в режиме берсерка, но камера остается неподвижной
-  .game-view__map-content {
-    &--berserk {
-      animation: berserk-shake 0.3s linear infinite;
-    }
+  // Только фон карты трясётся и обесцвечивается — токены вне этого слоя, поэтому абсолютно неподвижны
+  .game-view__map-bg--berserk {
+    position: absolute;
+    inset: 0;
+    animation: berserk-shake 0.3s linear infinite;
+    filter: grayscale(0.85) brightness(0.75) sepia(0.15);
   }
 
   /* ─── Кнопка возврата ────────────────────────────────────────────────────── */

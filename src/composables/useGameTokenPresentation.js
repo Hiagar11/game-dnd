@@ -31,8 +31,10 @@ export function useGameTokenPresentation({
   isNonSystemSelected,
   flashMap,
   currentTurnUid,
+  berserkVisionActive,
 }) {
-  function tokenClasses(placed, berserkVisionActive = false) {
+  function tokenClasses(placed) {
+    const _berserk = berserkVisionActive?.value ?? false
     const selectedToken = getSelectedToken(store.placedTokens, store.selectedPlacedUid)
     const selectedIsHero = isHeroToken(selectedToken)
     const abilityMode = !props.viewerMode && !!store.pendingAbility
@@ -45,15 +47,16 @@ export function useGameTokenPresentation({
         props.viewerMode && heroesStore.adminSelectedUid === placed.uid,
       'game-tokens__token--shaking': store.shakingTokenUid === placed.uid,
       'game-tokens__token--fog-hidden': fogHiddenKeys.value.has(`${placed.col}:${placed.row}`),
-      // В режиме берсерка не показываем цветные рамки фракций
-      'game-tokens__token--hero': !berserkVisionActive && isHeroToken(placed),
-      'game-tokens__token--hostile': !berserkVisionActive && isHostileNpcToken(placed),
-      'game-tokens__token--friendly': !berserkVisionActive && isFriendlyNpcToken(placed),
+      // В режиме берсерка герои и NPC контр-трясутся, оставаясь на месте
+      'game-tokens__token--berserk-stable': _berserk && !placed.systemToken,
+      // Системные токены остаются серыми как фон карты
+      'game-tokens__token--berserk-gray': _berserk && !!placed.systemToken,
+      // У obscured-токенов outline: none !important перекрывает faction-цвет
+      'game-tokens__token--hero': isHeroToken(placed),
+      'game-tokens__token--hostile': isHostileNpcToken(placed),
+      'game-tokens__token--friendly': isFriendlyNpcToken(placed),
       'game-tokens__token--neutral':
-        !berserkVisionActive &&
-        isNpcToken(placed) &&
-        !isHostileNpcToken(placed) &&
-        !isFriendlyNpcToken(placed),
+        isNpcToken(placed) && !isHostileNpcToken(placed) && !isFriendlyNpcToken(placed),
       'game-tokens__token--cursor-attack':
         !abilityMode &&
         ((selectedIsHero &&
@@ -89,6 +92,7 @@ export function useGameTokenPresentation({
       'game-tokens__token--flash-taunt': flashMap.value.get(placed.uid) === 'taunt',
       'game-tokens__token--flash-teleport': flashMap.value.get(placed.uid) === 'teleport',
       'game-tokens__token--flash-inspire': flashMap.value.get(placed.uid) === 'inspire',
+      'game-tokens__token--flash-berserk-jump': flashMap.value.get(placed.uid) === 'berserk-jump',
       'game-tokens__token--active-turn': currentTurnUid.value === placed.uid,
       'game-tokens__token--ap-2':
         currentTurnUid.value === placed.uid && (placed.actionPoints ?? 0) >= 2,

@@ -434,17 +434,42 @@
   z-index: 1;
 }
 
-/* Режим берсерка: цели рядом становятся неузнаваемыми "?" */
+/* Режим берсерка: тёмный силуэт с пульсирующим кровавым свечением */
+.game-tokens__berserk-black {
+  position: absolute;
+  inset: 5%;
+  border-radius: var(--radius-full);
+  border: 2px solid rgb(160 50 50 / 70%);
+  background: radial-gradient(circle, #1a0000 20%, #2d0000 60%, #000 100%);
+  box-shadow: inset 0 0 14px rgb(140 30 30 / 50%);
+  animation: berserk-black-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes berserk-black-pulse {
+  0%,
+  100% {
+    box-shadow: inset 0 0 14px rgb(140 30 30 / 50%);
+    border-color: rgb(160 50 50 / 70%);
+  }
+
+  50% {
+    box-shadow: inset 0 0 22px rgb(170 40 40 / 70%);
+    border-color: rgb(180 60 60 / 90%);
+  }
+}
+
+/* Системные токены в режиме берсерка — серые как фон карты */
+.game-tokens__token--berserk-gray {
+  filter: grayscale(0.85) brightness(0.75) sepia(0.15);
+}
+
+/* Режим берсерка: курсор "?" на obscured-токенах */
 .game-tokens__token--berserk-obscured {
+  outline: none !important;
   cursor:
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='12' fill='none' stroke='%23ffffff' stroke-width='2.5' opacity='0.9'/%3E%3Ctext x='20' y='24' text-anchor='middle' font-size='16' fill='%23ffffff' font-family='Arial' font-weight='700'%3E%3F%3C/text%3E%3C/svg%3E")
       20 20,
     pointer !important;
-
-  .game-tokens__img {
-    filter: grayscale(1) brightness(0.15) contrast(1.25);
-    opacity: 0.32;
-  }
 }
 
 .game-tokens__berserk-question {
@@ -482,44 +507,10 @@
   }
 }
 
-/* Режим берсерка: токены дрожат инвертированно (остаются на месте на экране) */
-.game-tokens--berserk-mode .game-tokens__token .game-tokens__img {
-  animation: berserk-shake-inverse 0.3s linear infinite;
-}
 
-@keyframes berserk-shake-inverse {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-
-  12% {
-    transform: translate(0.8px, -0.6px);
-  }
-
-  25% {
-    transform: translate(-0.9px, 0.4px);
-  }
-
-  37% {
-    transform: translate(0.45px, -0.75px);
-  }
-
-  50% {
-    transform: translate(-0.6px, 0.65px);
-  }
-
-  62% {
-    transform: translate(0.8px, -0.45px);
-  }
-
-  75% {
-    transform: translate(-0.65px, 0.55px);
-  }
-
-  87% {
-    transform: translate(0.55px, -0.7px);
-  }
+/* Режим берсерка: токены в этом классе не двигаются (shake теперь только на фоне) */
+.game-tokens__token--berserk-stable {
+  /* намеренно пусто — класс оставлен для возможного расширения */
 }
 
 @keyframes berserk-question-pulse {
@@ -800,6 +791,38 @@
     transform: scale(1.2);
     opacity: 0.8;
     box-shadow: 0 0 24px 10px rgb(129 140 248 / 60%);
+  }
+
+  100% {
+    filter: brightness(1);
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Прыжок берсерка — красная вспышка + исчезновение/появление */
+.game-tokens__token--flash-berserk-jump .game-tokens__img {
+  animation: token-flash-berserk-jump 0.5s ease;
+}
+
+@keyframes token-flash-berserk-jump {
+  0% {
+    filter: brightness(1);
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  30% {
+    filter: brightness(2.5) sepia(1) saturate(8) hue-rotate(-30deg);
+    transform: scale(0.3);
+    opacity: 0.2;
+  }
+
+  60% {
+    filter: brightness(2) sepia(1) saturate(6) hue-rotate(-30deg);
+    transform: scale(1.25);
+    opacity: 0.85;
+    box-shadow: 0 0 24px 10px rgb(239 68 68 / 70%);
   }
 
   100% {

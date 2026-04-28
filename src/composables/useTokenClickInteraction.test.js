@@ -5,6 +5,8 @@ function buildDeps(store, abilityExec, options = {}) {
   const {
     moveTowardTarget = vi.fn(),
     runQuickAttack = vi.fn(),
+    runBerserkerAttack = vi.fn(),
+    flashToken = vi.fn(),
     onAttackClick = vi.fn(),
     onNpcAttackClick = vi.fn(),
     onTalkClick = vi.fn(),
@@ -19,6 +21,8 @@ function buildDeps(store, abilityExec, options = {}) {
     onContainerWalk: vi.fn(),
     moveTowardTarget,
     runQuickAttack,
+    runBerserkerAttack,
+    flashToken,
     closeContextMenu: vi.fn(),
     onAttackClick,
     onNpcAttackClick,
@@ -505,15 +509,265 @@ describe('useTokenClickInteraction', () => {
     }
 
     const runQuickAttack = vi.fn()
-    const { onTokenClick } = buildDeps(store, abilityExec, { runQuickAttack })
+    const runBerserkerAttack = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, {
+      runQuickAttack,
+      runBerserkerAttack,
+    })
 
     await onTokenClick(hostileNpc, { ctrlKey: false })
 
     expect(store.moveToken).toHaveBeenCalledTimes(1)
-    expect(runQuickAttack).toHaveBeenCalledTimes(1)
-    expect(runQuickAttack).toHaveBeenCalledWith(
+    expect(runQuickAttack).not.toHaveBeenCalled()
+    expect(runBerserkerAttack).toHaveBeenCalledTimes(1)
+    expect(runBerserkerAttack).toHaveBeenCalledWith(
       expect.objectContaining({ uid: hero.uid }),
       expect.objectContaining({ uid: hostileNpc.uid })
     )
+  })
+
+  it('берсерк-удар по нейтралу вне боя делает его враждебным и запускает бой', async () => {
+    const hero = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      activeEffects: [{ id: 'berserker_rage', remainingTurns: 2 }],
+    }
+    const neutralNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'neutral',
+      col: 2,
+      row: 2,
+      hp: 10,
+    }
+
+    const store = {
+      combatMode: false,
+      pendingAbility: null,
+      placedTokens: [hero, neutralNpc],
+      selectedPlacedUid: hero.uid,
+      initiativeOrder: [],
+      currentInitiativeIndex: 0,
+      walls: [],
+      moveToken: vi.fn((uid, col, row) => {
+        const token = store.placedTokens.find((t) => t.uid === uid)
+        if (token) {
+          token.col = col
+          token.row = row
+        }
+      }),
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    const runBerserkerAttack = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, { runBerserkerAttack })
+
+    await onTokenClick(neutralNpc, { ctrlKey: false })
+
+    expect(neutralNpc.attitude).toBe('hostile')
+    expect(store.enterCombat).toHaveBeenCalledTimes(1)
+    expect(store.enterCombat).toHaveBeenCalledWith(hero.uid, expect.any(Set))
+    expect(runBerserkerAttack).toHaveBeenCalledTimes(1)
+    expect(runBerserkerAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: hero.uid }),
+      expect.objectContaining({ uid: neutralNpc.uid })
+    )
+  })
+
+  it('берсерк выбирает случайную цель из всех видимых, игнорируя кликнутого', async () => {
+    const hero = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      actionPoints: 2,
+      activeEffects: [{ id: 'berserker_rage', remainingTurns: 2 }],
+    }
+    const clickedHostile = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 1,
+      row: 1,
+      hp: 10,
+    }
+    const otherNeutral = {
+      uid: 'npc-2',
+      tokenType: 'npc',
+      attitude: 'neutral',
+      col: 2,
+      row: 2,
+      hp: 10,
+    }
+    const allyHero = { uid: 'hero-2', tokenType: 'hero', col: 3, row: 3, hp: 10 }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: null,
+      placedTokens: [hero, clickedHostile, otherNeutral, allyHero],
+      selectedPlacedUid: hero.uid,
+      initiativeOrder: [{ uid: hero.uid }],
+      currentInitiativeIndex: 0,
+      walls: [],
+      moveToken: vi.fn((uid, col, row) => {
+        const token = store.placedTokens.find((t) => t.uid === uid)
+        if (token) {
+          token.col = col
+          token.row = row
+        }
+      }),
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    // Пул [clickedHostile, otherNeutral, allyHero] (без героя-кастера),
+    // floor(0.5 * 3) = 1 → otherNeutral
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+
+    const runBerserkerAttack = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, { runBerserkerAttack })
+
+    // Кликаем по hostile, но рандом должен выбрать neutral
+    await onTokenClick(clickedHostile, { ctrlKey: false })
+
+    expect(runBerserkerAttack).toHaveBeenCalledTimes(1)
+    expect(runBerserkerAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: hero.uid }),
+      expect.objectContaining({ uid: otherNeutral.uid })
+    )
+    // Нейтрал, ставший случайной жертвой, флипается в hostile
+    expect(otherNeutral.attitude).toBe('hostile')
+
+    randomSpy.mockRestore()
+  })
+
+  it('берсерк может рандомно ударить союзника (своего)', async () => {
+    const hero = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      actionPoints: 2,
+      activeEffects: [{ id: 'berserker_rage', remainingTurns: 2 }],
+    }
+    const allyHero = { uid: 'hero-2', tokenType: 'hero', col: 1, row: 1, hp: 10 }
+    const hostileNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 2,
+      row: 2,
+      hp: 10,
+    }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: null,
+      placedTokens: [hero, allyHero, hostileNpc],
+      selectedPlacedUid: hero.uid,
+      initiativeOrder: [{ uid: hero.uid }],
+      currentInitiativeIndex: 0,
+      walls: [],
+      moveToken: vi.fn(),
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    // Пул [allyHero, hostileNpc] → floor(0 * 2) = 0 → allyHero
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
+
+    const runBerserkerAttack = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, { runBerserkerAttack })
+
+    await onTokenClick(hostileNpc, { ctrlKey: false })
+
+    expect(runBerserkerAttack).toHaveBeenCalledWith(
+      expect.objectContaining({ uid: hero.uid }),
+      expect.objectContaining({ uid: allyHero.uid })
+    )
+
+    randomSpy.mockRestore()
+  })
+
+  it('после берсерк-удара эффект ярости снят и ход передаётся следующему', async () => {
+    const hero = {
+      uid: 'hero-1',
+      tokenType: 'hero',
+      col: 0,
+      row: 0,
+      actionPoints: 2,
+      activeEffects: [
+        { id: 'berserker_rage', remainingTurns: 2 },
+        { id: 'some_other_buff', remainingTurns: 5 },
+      ],
+    }
+    const hostileNpc = {
+      uid: 'npc-1',
+      tokenType: 'npc',
+      attitude: 'hostile',
+      col: 2,
+      row: 2,
+      hp: 10,
+    }
+
+    const store = {
+      combatMode: true,
+      pendingAbility: null,
+      placedTokens: [hero, hostileNpc],
+      selectedPlacedUid: hero.uid,
+      initiativeOrder: [{ uid: hero.uid }],
+      currentInitiativeIndex: 0,
+      walls: [],
+      moveToken: vi.fn(),
+      enterCombat: vi.fn(),
+      endTurn: vi.fn(),
+      setCombatPair: vi.fn(),
+      selectPlacedToken: vi.fn(),
+    }
+
+    const abilityExec = {
+      needsTargetToken: { value: false },
+      executeAbility: vi.fn(),
+    }
+
+    const runBerserkerAttack = vi.fn()
+    const flashToken = vi.fn()
+    const { onTokenClick } = buildDeps(store, abilityExec, { runBerserkerAttack, flashToken })
+
+    await onTokenClick(hostileNpc, { ctrlKey: false })
+
+    // Анимация запустилась
+    expect(flashToken).toHaveBeenCalledWith(hero.uid, 'berserk-jump', 500)
+
+    // Эффект ярости снят, остальные бафы целы
+    expect(hero.activeEffects.find((e) => e.id === 'berserker_rage')).toBeUndefined()
+    expect(hero.activeEffects.find((e) => e.id === 'some_other_buff')).toBeDefined()
+
+    // Ход форсированно передан
+    expect(store.endTurn).toHaveBeenCalledTimes(1)
   })
 })

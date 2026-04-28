@@ -40,6 +40,8 @@ export function useTokenClickInteraction({
   onContainerWalk,
   moveTowardTarget,
   runQuickAttack,
+  runBerserkerAttack,
+  flashToken,
   closeContextMenu,
   onAttackClick,
   onNpcAttackClick,
@@ -75,36 +77,98 @@ export function useTokenClickInteraction({
   }
 
   function getBerserkAttacker() {
-    if (!store.combatMode) return null
-    const currentTurnUid = getCurrentTurnUid(store)
-    if (!currentTurnUid || store.selectedPlacedUid !== currentTurnUid) return null
+    const selectedUid = store.selectedPlacedUid
+    if (!selectedUid) return null
 
-    const attacker = store.placedTokens.find((token) => token.uid === currentTurnUid)
+    const attacker = store.placedTokens.find((token) => token.uid === selectedUid)
     if (!attacker || !hasBerserkerRageEffect(attacker)) return null
-    if ((attacker.actionPoints ?? 0) <= 0) return null
+
+    // В бою — только в свой ход и с очками действия.
+    // Вне боя — достаточно того, что выбран сам кастер с активным эффектом.
+    if (store.combatMode) {
+      const currentTurnUid = getCurrentTurnUid(store)
+      if (selectedUid !== currentTurnUid) return null
+      if ((attacker.actionPoints ?? 0) <= 0) return null
+    }
+
     return attacker
   }
 
-  async function runBerserkJumpAttack(attacker, defender) {
-    if (!attacker || !defender) return
+  /**
+   * Выбирает случайную цель из всех видимых берсерку токенов
+   * (в радиусе вижения, любой фракции, кроме самого берсерка и системных).
+   * Если берсерк под провокацией — пул сужается до провокатора (если тот в радиусе).
+   */
+  function pickRandomBerserkVictim(attacker) {
+    const tauntUid = getForcedTauntTargetUid(attacker, store.placedTokens)
 
-    if (isTauntAttackViolation(attacker, defender, store.placedTokens)) {
-      onTauntBlocked?.(attacker)
+    let pool = store.placedTokens.filter(
+      (token) =>
+        isNonSystemToken(token) &&
+        token.uid !== attacker.uid &&
+        isInBerserkerVisionRadius(attacker, token, BERSERKER_VISION_RADIUS)
+    )
+
+    if (tauntUid) {
+      pool = pool.filter((token) => token.uid === tauntUid)
+    }
+
+    if (!pool.length) return null
+    return pool[Math.floor(Math.random() * pool.length)]
+  }
+
+  function removeBerserkerRageEffect(token) {
+    if (!token?.activeEffects?.length) return
+    token.activeEffects = token.activeEffects.filter((e) => e?.id !== 'berserker_rage')
+  }
+
+  async function runBerserkJumpAttack(attacker) {
+    if (!attacker) return
+
+    // Великий рандом: цель выбирается из всех видимых, клик — лишь триггер.
+    const defender = pickRandomBerserkVictim(attacker)
+    if (!defender) {
+      // Под провокацией провокатор не в радиусе — нечего бить.
+      if (getForcedTauntTargetUid(attacker, store.placedTokens)) {
+        onTauntBlocked?.(attacker)
+      }
       return
     }
 
     closeContextMenu()
 
+    // Нейтрал, попавший под удар, становится враждебным.
+    if (isNeutralNpcToken(defender)) {
+      defender.attitude = 'hostile'
+    }
+
+    // Удар вне боя сразу запускает бой — берсерк-инициатор ходит первым.
+    if (!store.combatMode) {
+      store.enterCombat(attacker.uid, getVisibleKeys())
+    }
+
     const landingCell = pickBerserkJumpCell(attacker, defender)
+
+    // Анимация прыжка: 500мс, на 30% (≈150мс) токен почти невидим — телепортируем.
+    flashToken?.(attacker.uid, 'berserk-jump', 500)
+    await new Promise((resolve) => setTimeout(resolve, 150))
     if (landingCell) {
       store.moveToken(attacker.uid, landingCell.col, landingCell.row)
     }
+    // Дожидаемся завершения анимации появления.
+    await new Promise((resolve) => setTimeout(resolve, 350))
 
     const liveAttacker = store.placedTokens.find((token) => token.uid === attacker.uid)
     const liveDefender = store.placedTokens.find((token) => token.uid === defender.uid)
     if (liveAttacker && liveDefender) {
-      runQuickAttack(liveAttacker, liveDefender)
+      runBerserkerAttack(liveAttacker, liveDefender)
     }
+
+    // После удара — снимаем ярость и форсируем переход хода независимо от AP.
+    if (liveAttacker) {
+      removeBerserkerRageEffect(liveAttacker)
+    }
+    store.endTurn()
   }
 
   async function runQuickAttackFlow(attackerUid, defenderUid) {
@@ -203,11 +267,12 @@ export function useTokenClickInteraction({
     }
 
     const berserkAttacker = getBerserkAttacker()
+    // Под яростью клик по любому не-системному токену в радиусе — триггер удара.
+    // Сама цель выбирается случайно внутри runBerserkJumpAttack.
     const canBerserkJumpAttack =
       !!berserkAttacker &&
       placed.uid !== berserkAttacker.uid &&
       isNonSystemToken(placed) &&
-      !isSameFaction(berserkAttacker, placed) &&
       isInBerserkerVisionRadius(berserkAttacker, placed, BERSERKER_VISION_RADIUS)
 
     if (canBerserkJumpAttack) {
