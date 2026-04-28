@@ -122,6 +122,24 @@ export function useTokenClickInteraction({
     token.activeEffects = token.activeEffects.filter((e) => e?.id !== 'berserker_rage')
   }
 
+  /**
+   * Истощение после ярости — пропуск ровно одного следующего хода.
+   * Большой apPenalty подхватывается isStunned() в useGameCombat и приводит
+   * к авто-skip с сообщением «Истощение после ярости». remainingTurns=1
+   * тикается до 0 в момент пропуска — следующий за ним ход уже нормальный.
+   */
+  function applyBerserkerExhaustion(token) {
+    if (!token) return
+    if (!token.activeEffects) token.activeEffects = []
+    token.activeEffects = token.activeEffects.filter((e) => e?.id !== 'berserker_exhausted')
+    token.activeEffects.push({
+      id: 'berserker_exhausted',
+      name: 'Истощение после ярости',
+      apPenalty: 99,
+      remainingTurns: 1,
+    })
+  }
+
   async function runBerserkJumpAttack(attacker) {
     if (!attacker) return
 
@@ -164,9 +182,11 @@ export function useTokenClickInteraction({
       runBerserkerAttack(liveAttacker, liveDefender)
     }
 
-    // После удара — снимаем ярость и форсируем переход хода независимо от AP.
+    // После удара — снимаем ярость, вешаем «истощение» (пропуск 1 хода)
+    // и форсируем переход хода независимо от AP.
     if (liveAttacker) {
       removeBerserkerRageEffect(liveAttacker)
+      applyBerserkerExhaustion(liveAttacker)
     }
     store.endTurn()
   }

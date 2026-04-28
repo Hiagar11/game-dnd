@@ -769,5 +769,11 @@ describe('useTokenClickInteraction', () => {
 
     // Ход форсированно передан
     expect(store.endTurn).toHaveBeenCalledTimes(1)
+
+    // Истощение: на следующий ход герой не сможет действовать (apPenalty стасит, remainingTurns=1)
+    const exhaustion = hero.activeEffects.find((e) => e.id === 'berserker_exhausted')
+    expect(exhaustion).toBeDefined()
+    expect(exhaustion.apPenalty).toBeGreaterThanOrEqual(3)
+    expect(exhaustion.remainingTurns).toBe(1)
   })
 })
