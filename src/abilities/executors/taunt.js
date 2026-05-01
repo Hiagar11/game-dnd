@@ -1,4 +1,5 @@
 import { isSameFaction } from '../../utils/tokenFilters'
+import { applyHostileAct } from '../../utils/combatTrigger'
 
 export const ABILITY_ID = 'taunt'
 
@@ -16,6 +17,14 @@ export function execute(ctx, caster, target, ability) {
   const live = ctx.store.placedTokens.find((t) => t.uid === target.uid)
   const liveCaster = ctx.store.placedTokens.find((t) => t.uid === caster.uid)
   if (!live) return
+
+  // Нейтральный противник, получивший провокацию, становится враждебным и вступает в бой
+  if (
+    applyHostileAct(ctx.store, liveCaster ?? caster, live) &&
+    typeof ctx.enterCombatFromAbility === 'function'
+  ) {
+    ctx.enterCombatFromAbility(caster.uid, caster.actionPoints ?? 0)
+  }
 
   // Применяем эффект провокации: remainingTurns убывает в tickTokenEffects
   ctx.addEffect(target, {

@@ -10,7 +10,10 @@ import {
   playCleaveCrack,
   playRushScream,
   playRushImpact,
+  playShadowEnter,
+  playShadowExit,
 } from './useSound'
+import { useFogVisibility } from './useFogVisibility'
 
 /**
  * Composable для исполнения способностей.
@@ -26,6 +29,7 @@ import {
  */
 export function useAbilityExecution(damageFloatRef, flashTokenFn) {
   const store = useGameStore()
+  const { isAreaVisible } = useFogVisibility()
 
   /** Текущий кастер — тот, кто выбрал способность */
   const caster = computed(() => {
@@ -142,6 +146,9 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
       playCleaveCrack,
       playRushScream,
       playRushImpact,
+      playShadowEnter,
+      playShadowExit,
+      isAreaVisible,
     }
   }
 
@@ -172,7 +179,7 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
     if (consumeAllActionPoints) {
       // Вне боевого режима не проверяем AP (например, Ярость работает везде)
       if (store.combatMode && (token.actionPoints ?? 0) <= 0) return false
-    } else if (cost > 0 && store.combatMode && (token.actionPoints ?? 0) < cost) {
+    } else if (cost > 0 && (token.actionPoints ?? 0) < cost) {
       return false
     }
 
@@ -187,7 +194,11 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
     if (!executor) return false
 
     const executionState = { combatHandoffRequested: false }
-    executor(buildCtx(executionState), token, target, ability)
+    const executorResult = executor(buildCtx(executionState), token, target, ability)
+
+    // Executor вернул false → отказ от каста (например, цель вне радиуса).
+    // AP не тратим, pendingAbility оставляем — игрок может выбрать другую клетку.
+    if (executorResult === false) return false
 
     // Тратим AP (всегда, не только в бою)
     if (consumeAllActionPoints) {
@@ -200,6 +211,7 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
 
     // Сброс pending
     store.pendingAbility = null
+    store.abilityPreviewPoints = []
 
     // Автозавершение хода при исчерпании AP
     // (skipAutoEndTurn: способность даёт MP — игрок должен успеть ими воспользоваться)

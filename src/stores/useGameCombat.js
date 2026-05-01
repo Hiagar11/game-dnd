@@ -396,6 +396,40 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     token.activeEffects = token.activeEffects.filter((e) => !expiredIds.includes(e.id))
   }
 
+  /**
+   * Добавляет токен в уже идущий бой (для токенов, атакованных вне очереди).
+   * Бросает d20 и вставляет запись в нужное место по убыванию инициативы.
+   * Если вставка происходит до текущего участника — сдвигает индекс,
+   * чтобы он остался на том же токене.
+   */
+  function joinCombat(uid) {
+    if (!combatMode.value) return
+    if (initiativeOrder.value.some((e) => e.uid === uid)) return
+
+    const token = placedTokens.value.find((t) => t.uid === uid)
+    if (!token || token.systemToken) return
+
+    const initiative = Math.floor(Math.random() * 20) + 1
+    const entry = {
+      uid,
+      initiative,
+      name: token.name,
+      src: token.src,
+      tokenType: token.tokenType ?? 'npc',
+      attitude: getNpcAttitude(token),
+    }
+
+    const insertIdx = initiativeOrder.value.findIndex((e) => e.initiative < initiative)
+    if (insertIdx === -1) {
+      initiativeOrder.value.push(entry)
+    } else {
+      initiativeOrder.value.splice(insertIdx, 0, entry)
+      if (insertIdx <= currentInitiativeIndex.value) {
+        currentInitiativeIndex.value++
+      }
+    }
+  }
+
   return {
     combatMode,
     initiativeOrder,
@@ -411,5 +445,6 @@ export function useGameCombat(placedTokens, selectedPlacedUid) {
     exitCombat,
     checkCombatEnd,
     endTurn,
+    joinCombat,
   }
 }

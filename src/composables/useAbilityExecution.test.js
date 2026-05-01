@@ -19,6 +19,12 @@ vi.mock('./useSound', () => ({
   playCleaveCrack: vi.fn(),
   playRushScream: vi.fn(),
   playRushImpact: vi.fn(),
+  playShadowEnter: vi.fn(),
+  playShadowExit: vi.fn(),
+}))
+
+vi.mock('./useFogVisibility', () => ({
+  useFogVisibility: () => ({ isAreaVisible: () => true }),
 }))
 
 import { useAbilityExecution } from './useAbilityExecution'
