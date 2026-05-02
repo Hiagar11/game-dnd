@@ -12,6 +12,9 @@ import {
   playRushImpact,
   playShadowEnter,
   playShadowExit,
+  playPoisonBlade,
+  playGravityCastStart,
+  playGravityCrushCenter,
 } from './useSound'
 import { useFogVisibility } from './useFogVisibility'
 
@@ -148,6 +151,9 @@ export function useAbilityExecution(damageFloatRef, flashTokenFn) {
       playRushImpact,
       playShadowEnter,
       playShadowExit,
+      playPoisonBlade,
+      playGravityCastStart,
+      playGravityCrushCenter,
       isAreaVisible,
     }
   }

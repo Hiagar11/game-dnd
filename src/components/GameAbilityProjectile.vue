@@ -7,7 +7,10 @@
   <div
     v-if="proj"
     class="ability-projectile"
-    :class="{ 'ability-projectile--blood': proj.kind === 'bloodBolt' }"
+    :class="{
+      'ability-projectile--blood': proj.kind === 'bloodBolt',
+      'ability-projectile--gravity': proj.kind === 'gravityCrush',
+    }"
     :style="projectileStyle"
     @transitionend="onArrived"
   >
@@ -16,6 +19,13 @@
         <div class="ability-projectile__ring ability-projectile__ring--outer" />
         <div class="ability-projectile__ring ability-projectile__ring--inner" />
         <div class="ability-projectile__core" />
+      </div>
+    </template>
+    <template v-else-if="proj.kind === 'gravityCrush'">
+      <div class="ability-projectile__grav-singularity">
+        <div class="ability-projectile__grav-ring ability-projectile__grav-ring--outer" />
+        <div class="ability-projectile__grav-ring ability-projectile__grav-ring--inner" />
+        <div class="ability-projectile__grav-core" />
       </div>
     </template>
     <img v-else :src="iconUrl" class="ability-projectile__icon" alt="" />
@@ -98,6 +108,78 @@
     filter: drop-shadow(0 0 10px rgb(220 38 38 / 95%)) drop-shadow(0 0 18px rgb(127 29 29 / 85%));
     width: 42px;
     height: 42px;
+  }
+
+  .ability-projectile--gravity {
+    filter: drop-shadow(0 0 10px rgb(139 92 246 / 95%)) drop-shadow(0 0 18px rgb(76 29 149 / 80%));
+    width: 42px;
+    height: 42px;
+  }
+
+  .ability-projectile__grav-singularity {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    opacity: 0;
+    transform: scale(0.2);
+    animation:
+      blood-singularity-birth 0.22s ease-out forwards,
+      grav-singularity-flight 0.52s linear 0.12s infinite;
+  }
+
+  .ability-projectile__grav-ring,
+  .ability-projectile__grav-core {
+    position: absolute;
+    inset: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+  }
+
+  .ability-projectile__grav-ring {
+    border-style: solid;
+    mix-blend-mode: screen;
+  }
+
+  .ability-projectile__grav-ring--outer {
+    width: 34px;
+    height: 34px;
+    border-width: 2px;
+    border-color: rgb(216 180 254 / 98%) rgb(76 29 149 / 22%) rgb(139 92 246 / 92%)
+      rgb(76 29 149 / 18%);
+    animation: grav-ring-outer 0.52s linear infinite;
+  }
+
+  .ability-projectile__grav-ring--inner {
+    width: 18px;
+    height: 18px;
+    border-width: 1px;
+    border-color: rgb(237 233 254 / 96%) rgb(76 29 149 / 16%) rgb(167 139 250 / 92%)
+      rgb(76 29 149 / 10%);
+    animation: grav-ring-inner 0.34s linear infinite reverse;
+  }
+
+  .ability-projectile__grav-core {
+    width: 15px;
+    height: 15px;
+    background:
+      radial-gradient(
+        circle,
+        rgb(255 255 255 / 100%) 0%,
+        rgb(216 180 254 / 88%) 22%,
+        transparent 54%
+      ),
+      conic-gradient(
+        from 0deg,
+        rgb(76 29 149 / 0%) 0deg,
+        rgb(139 92 246 / 92%) 130deg,
+        rgb(76 29 149 / 0%) 220deg,
+        rgb(167 139 250 / 92%) 310deg,
+        rgb(76 29 149 / 0%) 360deg
+      );
+    box-shadow:
+      0 0 12px 2px rgb(139 92 246 / 86%),
+      0 0 20px 8px rgb(76 29 149 / 34%);
+    animation: grav-core-pulse 0.36s ease-in-out infinite;
   }
 
   .ability-projectile__singularity {
@@ -261,6 +343,60 @@
     100% {
       transform: translate(-50%, -50%) scale(0.88);
       opacity: 0.9;
+    }
+  }
+
+  @keyframes grav-singularity-flight {
+    0% {
+      transform: scale(0.72);
+      opacity: 0.92;
+    }
+
+    45% {
+      transform: scale(1.08);
+      opacity: 1;
+    }
+
+    100% {
+      transform: scale(0.88);
+      opacity: 0.95;
+    }
+  }
+
+  @keyframes grav-ring-outer {
+    0% {
+      transform: translate(-50%, -50%) rotate(0deg) scale(0.9);
+    }
+
+    100% {
+      transform: translate(-50%, -50%) rotate(360deg) scale(1.1);
+    }
+  }
+
+  @keyframes grav-ring-inner {
+    0% {
+      transform: translate(-50%, -50%) rotate(0deg) scale(0.84);
+    }
+
+    100% {
+      transform: translate(-50%, -50%) rotate(360deg) scale(1.16);
+    }
+  }
+
+  @keyframes grav-core-pulse {
+    0% {
+      transform: translate(-50%, -50%) scale(0.74);
+      opacity: 0.82;
+    }
+
+    50% {
+      transform: translate(-50%, -50%) scale(1.18);
+      opacity: 1;
+    }
+
+    100% {
+      transform: translate(-50%, -50%) scale(0.86);
+      opacity: 0.88;
     }
   }
 </style>

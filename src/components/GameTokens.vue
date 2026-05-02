@@ -11,12 +11,6 @@
     <div
       v-for="placed in store.placedTokens"
       :key="placed.uid"
-      :ref="
-        (el) => {
-          if (el) tokenElMap.set(placed.uid, el)
-          else tokenElMap.delete(placed.uid)
-        }
-      "
       class="game-tokens__token"
       :class="[
         tokenClasses(placed),
@@ -58,10 +52,7 @@
         @trade-accept="onTradeAccept($event.npcUid, $event.itemName, $event.price)"
         @trade-decline="onTradeDecline($event.npcUid)"
       />
-      <GameBattleCryBubble
-        :text="battleCries[placed.uid] ?? ''"
-        :anchor-el="tokenElMap.get(placed.uid) ?? null"
-      />
+      <GameBattleCryBubble :text="battleCries[placed.uid] ?? ''" />
       <div v-if="currentTurnUid === placed.uid" class="game-tokens__turn-pillar" />
       <!-- Золотая стрелка: есть нераспределённые очки характеристик -->
       <div
@@ -83,18 +74,23 @@
       <div v-if="placed.captured" class="game-tokens__captured-icon">⛓</div>
       <!-- Звёзды — оглушённый NPC -->
       <div v-if="placed.stunned && !placed.captured" class="game-tokens__stunned-icon">💫</div>
-      <!-- Метка провокации: одна красная иконка способности -->
-      <span
-        v-if="getTauntEffect(placed)"
-        class="game-tokens__taunt-icon"
-        :title="'Провокация'"
-        :style="tauntIconStyle(getTauntEffect(placed))"
-      />
+      <!-- Ярлыки активных эффектов (провокация, яд и т.п.) -->
+      <div v-if="getEffectBadges(placed).length" class="game-tokens__effect-icons">
+        <span
+          v-for="badge in getEffectBadges(placed)"
+          :key="badge.id"
+          class="game-tokens__effect-icon"
+          :title="badge.name"
+          :style="effectIconStyle(badge)"
+        />
+      </div>
       <!-- Кольцо выделения выбранного токена -->
       <div
         v-if="store.selectedPlacedUid === placed.uid && !placed.systemToken"
         class="game-tokens__selection-ring"
       />
+      <!-- Ударная волна после рывка / impact-удара -->
+      <div v-if="flashMap.get(placed.uid) === 'shockwave'" class="game-tokens__shockwave" />
       <div v-if="isBerserkObscured(placed)" class="game-tokens__berserk-black" />
       <img
         v-else
@@ -223,7 +219,6 @@
   const { getSocket } = useSocket()
 
   const damageFloatRef = ref(null)
-  const tokenElMap = new Map()
 
   // Отслеживаем зажатый Ctrl для режима агрессии по нейтральным NPC
   const ctrlHeld = ref(false)
@@ -344,6 +339,23 @@
       const x = (token.col + 1) * (cs / 2) + store.gridNormOX
       const y = (token.row + 1) * (cs / 2) + store.gridNormOY
       damageFloatRef.value?.spawn(info.uid, `⚡ ${info.reason}`, x, y, '#f59e0b')
+    }
+  )
+
+  // ── Урон от эффектов (яд и др.) — зелёные флоаты ─────────────────────────
+  watch(
+    () => store.pendingDamageFloats,
+    (floats) => {
+      if (!floats?.length) return
+      const cs = store.cellSize
+      for (const f of floats) {
+        const token = store.placedTokens.find((t) => t.uid === f.uid)
+        if (!token) continue
+        const x = (token.col + 1) * (cs / 2) + store.gridNormOX
+        const y = (token.row + 1) * (cs / 2) + store.gridNormOY
+        damageFloatRef.value?.spawn(f.uid, `-${f.damage}`, x, y, f.color)
+      }
+      store.pendingDamageFloats = null
     }
   )
 
@@ -627,17 +639,14 @@
     closeContextMenu()
   }
 
-  function getTauntEffect(placed) {
-    const effects = placed?.activeEffects
-    if (!effects?.length) return null
-    return (
-      effects.find((effect) => effect.id === 'taunt' && (effect.remainingTurns ?? 0) > 0) ?? null
+  function getEffectBadges(placed) {
+    return (placed?.activeEffects ?? []).filter(
+      (e) => e.icon && e.color && (e.remainingTurns ?? 0) > 0
     )
   }
 
-  function tauntIconStyle(effect) {
-    const iconName = effect?.icon ?? 'shouting'
-    const url = `https://api.iconify.design/game-icons/${iconName}.svg`
+  function effectIconStyle(effect) {
+    const url = `https://api.iconify.design/game-icons/${effect.icon}.svg`
     return {
       maskImage: `url('${url}')`,
       WebkitMaskImage: `url('${url}')`,
@@ -647,7 +656,7 @@
       WebkitMaskPosition: 'center',
       maskSize: 'contain',
       WebkitMaskSize: 'contain',
-      backgroundColor: '#ef4444',
+      backgroundColor: effect.color,
     }
   }
 

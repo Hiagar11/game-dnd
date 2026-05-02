@@ -35,8 +35,24 @@ const bloodProjectileWhooshSound = new Audio('/sounds/blood-projectile-whoosh.mp
 // Рывок: ярый крик в полёте + удар «по мячу» при приземлении.
 // Файлы пользователь добавит самостоятельно — пока могут отсутствовать,
 // проигрывание тогда тихо упадёт через .catch внутри play-обёртки.
-const rushScreamSound = new Audio('/sounds/rush-scream.mp3')
-const rushImpactSound = new Audio('/sounds/rush-impact.mp3')
+const rushScreamSound = new Audio('/sounds/rush-scream.wav')
+const rushImpactSound = new Audio('/sounds/rush-impact.wav')
+
+// Теневой шаг: «вошёл в тень» / «вышел из тени» — белый шум, исчезающий и появляющийся.
+const shadowEnterSound = new Audio('/sounds/shadow-enter.mp3')
+const shadowExitSound = new Audio('/sounds/shadow-exit.wav')
+
+// Гравитационное сжатие: короткий каст + взрыв при попадании.
+const gravityCastStartSound = new Audio('/sounds/gravity-impact-start.wav')
+const gravityCrushCenterSound = new Audio('/sounds/gravity-impact-center.mp3')
+gravityCastStartSound.preload = 'auto'
+gravityCastStartSound.load()
+gravityCrushCenterSound.preload = 'auto'
+gravityCrushCenterSound.load()
+
+const poisonBladeSound = new Audio('/sounds/poison-blade.wav')
+poisonBladeSound.preload = 'auto'
+poisonBladeSound.load()
 inspireSound.preload = 'auto'
 inspireSound.load()
 tauntCrySound.preload = 'auto'
@@ -822,21 +838,108 @@ export function stopMainMenuMusic() {
 
 /**
  * Рывок: яростный крик в полёте. Короткий — звучит, пока герой летит к цели.
+ * Пропускаем 0.5с начальной тишины, чтобы крик совпал с миганием кастера.
  * .catch — на случай если файла ещё нет в public/sounds/.
  */
+const RUSH_SCREAM_SKIP_SEC = 0.25
+
 export function playRushScream() {
   const audio = rushScreamSound.cloneNode(true)
   audio.volume = 0.85
+  audio.currentTime = RUSH_SCREAM_SKIP_SEC
   audio.play().catch(() => {})
 }
 
 /**
- * Рывок: удар «по мячу» при приземлении на цель.
+ * Рывок: удар «по мячу» при приземлении.
+ * Пропускаем 0.5с начальной тишины, чтобы звук совпал с моментом удара.
+ * В исходном файле два «всплеска» — нам нужен только первый,
+ * поэтому останавливаемся на 2-й секунде.
  */
+const RUSH_IMPACT_SKIP_SEC = 0.5
+const RUSH_IMPACT_STOP_AT_SEC = 2
+
 export function playRushImpact() {
   const audio = rushImpactSound.cloneNode(true)
   audio.volume = 0.9
+  audio.currentTime = RUSH_IMPACT_SKIP_SEC
+  const onTimeUpdate = () => {
+    if (audio.currentTime >= RUSH_IMPACT_STOP_AT_SEC) {
+      audio.pause()
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+    }
+  }
+  audio.addEventListener('timeupdate', onTimeUpdate)
   audio.play().catch(() => {})
+}
+
+/**
+ * Теневой шаг: «вошёл в тень» — затухающий белый шум.
+ * Пропускаем 0.3с начальной тишины.
+ */
+const SHADOW_ENTER_SKIP_SEC = 0.3
+
+export function playShadowEnter() {
+  const audio = shadowEnterSound.cloneNode(true)
+  audio.volume = 0.7
+  audio.currentTime = SHADOW_ENTER_SKIP_SEC
+  audio.play().catch(() => {})
+}
+
+/**
+ * Теневой шаг: «вышел из тени» — нарастающий белый шум.
+ * Пропускаем 0.5с начальной тишины и останавливаем на 3-й секунде —
+ * хвост в файле длинный и не нужен.
+ */
+const SHADOW_EXIT_SKIP_SEC = 0.5
+const SHADOW_EXIT_STOP_AT_SEC = 3
+
+export function playShadowExit() {
+  const audio = shadowExitSound.cloneNode(true)
+  audio.volume = 0.7
+  audio.currentTime = SHADOW_EXIT_SKIP_SEC
+  const onTimeUpdate = () => {
+    if (audio.currentTime >= SHADOW_EXIT_STOP_AT_SEC) {
+      audio.pause()
+      audio.removeEventListener('timeupdate', onTimeUpdate)
+    }
+  }
+  audio.addEventListener('timeupdate', onTimeUpdate)
+  audio.play().catch(() => {})
+}
+
+/** Гравитационное сжатие — фаза каста: короткая руна над головой. */
+export function playGravityCastStart() {
+  const audio = gravityCastStartSound.cloneNode(true)
+  audio.volume = 0.85
+  audio.play().catch(() => {})
+}
+
+/** Гравитационное сжатие — фаза взрыва: главная мелодия попадания. */
+export function playGravityCrushCenter() {
+  const audio = gravityCrushCenterSound.cloneNode(true)
+  audio.volume = 0.9
+  audio.play().catch(() => {})
+}
+
+export function playPoisonBlade() {
+  if (swordBuffer) {
+    playBuffer(swordBuffer, 0.7)
+    return
+  }
+  if (combatBuffersPromise) {
+    combatBuffersPromise.then(() => {
+      if (swordBuffer) playBuffer(swordBuffer, 0.7)
+      else {
+        swordSound.currentTime = 0
+        swordSound.play().catch(() => {})
+      }
+    })
+    return
+  }
+  ensureCombatBuffers()
+  swordSound.currentTime = 0
+  swordSound.play().catch(() => {})
 }
 
 export function useSound() {

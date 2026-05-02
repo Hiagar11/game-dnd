@@ -110,6 +110,19 @@ export const useGameStore = defineStore('game', () => {
   // Превью зоны AoE-способности при ховере — массив { col, row }
   const abilityPreviewCells = ref([])
 
+  // Превью валидных точек приземления (для shadow_step) — массив { col, row }
+  // Рисуется как фиолетовые кружки в центре каждой клетки-кандидата.
+  const abilityPreviewPoints = ref([])
+
+  /** Сбрасывает режим выбора цели/зоны (правый клик по карте/токену). */
+  function cancelPendingAbility() {
+    if (!pendingAbility.value) return false
+    pendingAbility.value = null
+    abilityPreviewCells.value = []
+    abilityPreviewPoints.value = []
+    return true
+  }
+
   // Активная анимация удара (impact) — { cells: [{col,row}], color, icon } | null
   const abilityImpact = ref(null)
 
@@ -339,7 +352,9 @@ export const useGameStore = defineStore('game', () => {
     fogEnabled,
     // Способности
     pendingAbility,
+    cancelPendingAbility,
     abilityPreviewCells,
+    abilityPreviewPoints,
     abilityImpact,
     abilityProjectile,
     abilityVfx,

@@ -48,6 +48,8 @@
   import { DEFAULT_AP, DEFAULT_MP } from '../constants/combat'
   import { sleep } from '../utils/async'
   import { buildCleaveCells } from '../utils/cleavePattern'
+  import { expandOccupied2x2, getOccupiedCells } from '../utils/tokenPlacement'
+  import { useFogVisibility } from '../composables/useFogVisibility'
 
   // Отслеживаем Ctrl для режима агрессии по нейтральным NPC
   const ctrlHeld = ref(false)
@@ -60,6 +62,7 @@
 
   const store = useGameStore()
   const { getSocket } = useSocket()
+  const { isAreaVisible } = useFogVisibility()
 
   // Получаем смещение карты от GameView (provide/inject) — нужно для useTokenDrop
   const offsetX = inject('offsetX')
@@ -134,7 +137,15 @@
   //   валидная цель -> обычный прицел, невалидная -> запрещающий курсор
   const abilityCursorClass = computed(() => {
     if (!store.pendingAbility) return ''
-    if (store.pendingAbility.areaType === 'targeted') return 'game-range-overlay--cursor-ability'
+    if (store.pendingAbility.areaType === 'targeted') {
+      // Для shadow_step (телепорт по клетке) показываем «нельзя»-курсор,
+      // если клетка под мышью вне радиуса. setHoveredCell в onMouseMove
+      // ставится ТОЛЬКО для валидных клеток, поэтому null = вне зоны.
+      if (store.pendingAbility.id === 'shadow_step' && !store.hoveredCell) {
+        return 'game-range-overlay--cursor-ability-invalid'
+      }
+      return 'game-range-overlay--cursor-ability'
+    }
 
     const hovered = hoveredToken.value
     if (!hovered) return ''
@@ -201,6 +212,7 @@
     store.setHoveredPath([])
     store.setHoveredCell(null)
     store.abilityPreviewCells = []
+    store.abilityPreviewPoints = []
   }
 
   function onMouseMove(e) {
@@ -210,6 +222,55 @@
 
     // ── AoE-превью для targeted-способности ───────────────────────────────
     if (store.pendingAbility?.areaType === 'targeted') {
+      // Теневой шаг: визуально как обычное движение — фиолетовый пунктир
+      // от кастера до snap-клетки под курсором, без зоны вокруг.
+      // Точки приземления больше не рисуем (предыдущая итерация дизайна).
+      if (store.pendingAbility.id === 'shadow_step' && selectedToken.value) {
+        const range = store.pendingAbility.rangeCells ?? 12
+        const c = selectedToken.value
+
+        // Snap к 2-step parity кастера — телепорт ставит токен ровно по сетке 2×2.
+        const snapCol = c.col + Math.round((col - c.col) / 2) * 2
+        const snapRow = c.row + Math.round((row - c.row) / 2) * 2
+
+        const inRange =
+          Math.max(Math.abs(snapCol - c.col), Math.abs(snapRow - c.row)) <= range &&
+          (snapCol !== c.col || snapRow !== c.row)
+
+        // Валидность — те же фильтры что и в executor.
+        let valid = inRange
+        if (valid) {
+          const occupied = getOccupiedCells(store.placedTokens, [c.uid])
+          const blocked = expandOccupied2x2(occupied)
+          if (blocked.has(`${snapCol},${snapRow}`)) valid = false
+        }
+        if (valid) {
+          const wallSet = new Set((store.walls ?? []).map((w) => `${w.col},${w.row}`))
+          const itemSet = new Set((store.groundItems ?? []).map((g) => `${g.col},${g.row}`))
+          for (let dc = 0; dc < 2 && valid; dc++) {
+            for (let dr = 0; dr < 2 && valid; dr++) {
+              const k = `${snapCol + dc},${snapRow + dr}`
+              if (wallSet.has(k) || itemSet.has(k)) valid = false
+            }
+          }
+        }
+        if (valid && !isAreaVisible(snapCol, snapRow)) valid = false
+
+        store.abilityPreviewPoints = []
+        store.abilityPreviewCells = []
+        if (valid) {
+          store.setHoveredCell({ col: snapCol, row: snapRow })
+          store.setHoveredPath([{ col: snapCol, row: snapRow }])
+        } else {
+          store.setHoveredCell(null)
+          store.setHoveredPath([])
+        }
+        hoveredToken.value = null
+        hoveredPile.value = null
+        cursorInRange.value = false
+        return
+      }
+
       if (store.pendingAbility.id === 'cleave' && selectedToken.value) {
         const anchors = buildCleaveCells(selectedToken.value, { col, row })
         const fullSquares = []
@@ -222,6 +283,25 @@
           fullSquares.push({ col: anchor.col + 1, row: anchor.row + 1 })
         }
         store.abilityPreviewCells = fullSquares
+      } else if (store.pendingAbility.id === 'gravity_crush') {
+        // Курсор = центр зоны 2×2. Четыре реальных клетки симметрично вокруг курсора.
+        const STEP = 2
+        const anchors = [
+          { col: col - STEP, row: row - STEP },
+          { col: col, row: row - STEP },
+          { col: col - STEP, row: row },
+          { col: col, row: row },
+        ]
+        const cells = []
+        for (const a of anchors) {
+          cells.push(
+            a,
+            { col: a.col + 1, row: a.row },
+            { col: a.col, row: a.row + 1 },
+            { col: a.col + 1, row: a.row + 1 }
+          )
+        }
+        store.abilityPreviewCells = cells
       } else {
         const size = store.pendingAbility.areaSize ?? 1
         const cells = []
@@ -275,6 +355,8 @@
   }
 
   function onRightClick(e) {
+    // Отмену активной способности перехватывает GameView.onAbilityCancelByRightClick
+    // на capture-фазе ДО этого обработчика — здесь только контекст-меню токена.
     const { col, row } = getCellAt(e)
     const hitToken = hoveredToken.value ?? getTokenAtCell(col, row)
     if (hitToken && overlayTokenContextMenu.value) {
@@ -293,6 +375,16 @@
 
     // ── Клик при targeted AoE-способности → запустить способность ────────
     if (store.pendingAbility?.areaType === 'targeted') {
+      // shadow_step: используем уже отснэппенную к 2-step grid hoveredCell.
+      // Если её нет (курсор в туман / на стену / вне радиуса) — клик игнорируется.
+      if (store.pendingAbility.id === 'shadow_step') {
+        const snap = store.hoveredCell
+        if (!snap) return
+        if (overlayExecuteAoE.value) overlayExecuteAoE.value({ col: snap.col, row: snap.row })
+        store.abilityPreviewCells = []
+        store.abilityPreviewPoints = []
+        return
+      }
       if (overlayExecuteAoE.value) overlayExecuteAoE.value({ col, row })
       store.abilityPreviewCells = []
       return

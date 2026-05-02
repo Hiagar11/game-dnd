@@ -21,6 +21,9 @@ vi.mock('./useSound', () => ({
   playRushImpact: vi.fn(),
   playShadowEnter: vi.fn(),
   playShadowExit: vi.fn(),
+  playPoisonBlade: vi.fn(),
+  playGravityCastStart: vi.fn(),
+  playGravityCrushCenter: vi.fn(),
 }))
 
 vi.mock('./useFogVisibility', () => ({

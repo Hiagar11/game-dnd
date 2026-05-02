@@ -8,6 +8,7 @@
     }"
     @mousemove="onMouseMove"
     @mousedown="onGameMouseDown"
+    @contextmenu.capture="onAbilityCancelByRightClick"
     @contextmenu="onContextMenu"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
@@ -71,6 +72,10 @@
           <GameInspire />
           <GameBloodCastRunes />
           <GameBloodImpact />
+          <GameShadowTrail />
+          <GameGravityDistort />
+          <GameGravityCastRune />
+          <GameGravityCrushVfx />
         </div>
       </div>
 
@@ -162,6 +167,10 @@
   import GameInspire from '../components/GameInspire.vue'
   import GameBloodCastRunes from '../components/GameBloodCastRunes.vue'
   import GameBloodImpact from '../components/GameBloodImpact.vue'
+  import GameShadowTrail from '../components/GameShadowTrail.vue'
+  import GameGravityDistort from '../components/GameGravityDistort.vue'
+  import GameGravityCastRune from '../components/GameGravityCastRune.vue'
+  import GameGravityCrushVfx from '../components/GameGravityCrushVfx.vue'
   import GameTokens from '../components/GameTokens.vue'
   import GameGroundLoot from '../components/GameGroundLoot.vue'
   import GameMenu from '../components/GameMenu.vue'
@@ -201,7 +210,25 @@
 
   function onGameMouseDown(e) {
     if (e.button !== 2) return
+    // В режиме выбора цели/зоны способности ПКМ оставляет выделение героя —
+    // отменяется только сама способность (это делает onAbilityCancelByRightClick
+    // на capture-фазе contextmenu).
+    if (gameStore.pendingAbility) return
     gameStore.selectPlacedToken(null)
+  }
+
+  /**
+   * Capture-фаза contextmenu на корне .game-view — срабатывает РАНЬШЕ всех
+   * дочерних обработчиков (GameRangeOverlay.onRightClick, GameTokens.onMapRightClick,
+   * @contextmenu.stop.prevent на токенах). Если активна способность — отменяем её
+   * и гасим событие, чтобы никто ниже не открыл контекст-меню токена.
+   */
+  function onAbilityCancelByRightClick(e) {
+    if (!gameStore.pendingAbility) return
+    gameStore.cancelPendingAbility()
+    e.preventDefault()
+    e.stopPropagation()
+    e.stopImmediatePropagation()
   }
   const { playHover, playClick, playNext } = useSound()
 

@@ -201,15 +201,22 @@
   function getAbilityDisabledReason(ability) {
     if (!ability || !placed.value) return ''
 
-    if (ability.requiresMelee) {
+    const isNpc = placed.value.tokenType === 'npc'
+
+    if (!isNpc && ability.requiresMelee) {
       const weapon = getActiveWeapon(placed.value)
       if (!weapon || !MELEE_SLOTS.has(weapon.slot)) {
         return 'Требуется оружие ближнего боя'
       }
     }
 
-    if (ability.requiresShield && !hasShield(placed.value)) {
+    if (!isNpc && ability.requiresShield && !hasShield(placed.value)) {
       return 'Требуется щит в оффхэнде'
+    }
+
+    if (ability.requiresInvisibility) {
+      const isInvisible = placed.value.activeEffects?.some((e) => e?.id === 'invisibility')
+      if (!isInvisible) return 'Доступно только из невидимости'
     }
 
     const currentAp = placed.value.actionPoints ?? 0
